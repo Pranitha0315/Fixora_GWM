@@ -385,3 +385,87 @@ repair progress and invoicing.
 
 Other assigned workflows still require contract definitions.
 This draft does not confirm implementation or acceptance-test results.
+
+## Backend Comparison - 17 November 2026
+
+Reference: backend restore commit 52c0bf5.
+Status: Partial source review; owner agreement pending.
+The proposed requirements above remain requirements, not implementation proof.
+
+### Repository Paths
+
+- Customer app: Fixora.Customer
+- Mechanic app: FixoraRev.Mechanic
+- Manager web: Fixora.web
+- Shared backend: Fixora.SharedBackend
+- Cross-app documentation: Doc/architecture
+
+### Verified Request Contracts
+
+Property names below use the API's camelCase JSON format.
+
+BookingRequest:
+- vehicleId: Guid
+- serviceId: Guid
+- slotStart: DateTime
+- notes: nullable string
+- promoCode: nullable string
+- suggestionId: nullable Guid
+
+SlotDto contains start, end and freeBays; it does not contain a slot ID.
+BookingDto contains id, status, createdAt and nullable jobCardId,
+along with customer, vehicle, service, scheduling and assignment details.
+
+DecideItemsRequest:
+- decisions: list of { itemId: Guid, approve: bool, version: int }
+- note: nullable string
+
+The current decision request uses item-level versions.
+ProposalDto does not declare a proposalVersion property.
+Idempotency behaviour requires controller/service review.
+
+ChangeRequestCreate:
+- changes: list of strings
+- details: string
+
+JobActionRequest:
+- action: start | pause | resume | complete | progress
+- stage: nullable string
+- message: nullable string
+- percent: nullable int
+
+### Verified Route Declarations
+
+| Workflow | Method | Route |
+|---|---|---|
+| Customer booking | POST | /api/v1/customer/appointments |
+| Booking slots | GET | /api/v1/customer/appointments/slots |
+| Manager confirmation | POST | /api/v1/manager/bookings/{id}/confirm |
+| Manager assignment | POST | /api/v1/manager/jobs/{id}/assign |
+| Mechanic proposal | POST | /api/v1/mechanic/jobs/{jobId}/proposals |
+| Manager forwards proposal | POST | /api/v1/manager/approvals/proposals/{id}/forward |
+| Customer decision | POST | /api/v1/customer/approvals/{proposalId}/decisions |
+| Manager releases work | POST | /api/v1/manager/approvals/proposals/{id}/release |
+| Customer change request | POST | /api/v1/customer/jobs/{jobId}/change-requests |
+| Mechanic job action | POST | /api/v1/mechanic/jobs/{jobId}/actions |
+| Manager issues invoice | POST | /api/v1/manager/billing/jobs/{jobId}/invoice |
+| Manager invitation | POST | /api/v1/manager/mechanics/invitations |
+| Manager revocation | DELETE | /api/v1/manager/mechanics/invitations/{id} |
+| Mechanic accepts invitation | POST | /api/v1/mechanic/auth/invitations/accept |
+
+Route declarations confirm endpoint presence, not all acceptance checks.
+
+### Requirement Gaps and Remaining Review
+
+- Booking request fields differ from the proposed contract.
+- Customer decisions use item versions rather than a proposal version.
+- Invitation acceptance is marked AllowAnonymous in the current controller.
+  This differs from the proposed signed-in, email-bound acceptance requirement.
+  Review the request and service before deciding the required change.
+- Invitation expiry, account binding, token exposure and atomic acceptance
+  still require service review and focused tests.
+- Review assignment concurrency, duplicate writes, workflow transitions,
+  event payloads, recipients and ownership with the relevant sources.
+- The 22 passing tests cover their existing assertions only.
+  They do not prove every acceptance check in this document.
+- Task FX13-D01-NID-1 remains In Progress.
