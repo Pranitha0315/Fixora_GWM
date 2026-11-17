@@ -1,17 +1,20 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'session.dart';
 
 /// JSON client for /api/v1. Short-lived JWT + rotating refresh token, refreshed once on 401.
-/// Tokens are kept in shared_preferences for the demo; use flutter_secure_storage for release builds.
+/// Tokens are stored with [FlutterSecureStorage] (Keychain / Keystore).
 class ApiClient {
-  ApiClient(this._storageKey);
+  ApiClient(this._storageKey, {FlutterSecureStorage? secureStorage})
+      : _secure = secureStorage ?? const FlutterSecureStorage();
 
   final String _storageKey;
+  final FlutterSecureStorage _secure;
   final http.Client _http = http.Client();
 
   Session? session;
@@ -35,10 +38,18 @@ class ApiClient {
   }
 
   Future<void> restore() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_storageKey);
-    if (raw == null) return;
     try {
+      var raw = await _secure.read(key: _storageKey);
+      // One-time migrate from older SharedPreferences demo storage.
+      if (raw == null) {
+        final prefs = await SharedPreferences.getInstance();
+        raw = prefs.getString(_storageKey);
+        if (raw != null) {
+          await _secure.write(key: _storageKey, value: raw);
+          await prefs.remove(_storageKey);
+        }
+      }
+      if (raw == null) return;
       session = Session.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       session = null;
@@ -47,12 +58,15 @@ class ApiClient {
 
   Future<void> saveSession(Map<String, dynamic> tokens) async {
     session = Session.fromJson(tokens);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_storageKey, jsonEncode(session!.toJson()));
+    await _secure.write(
+      key: _storageKey,
+      value: jsonEncode(session!.toJson()),
+    );
   }
 
   Future<void> clear() async {
     session = null;
+    await _secure.delete(key: _storageKey);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_storageKey);
   }

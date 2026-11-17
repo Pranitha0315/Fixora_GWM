@@ -1,18 +1,24 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Local PIN / quick-login prefs for the mechanic demo.
+/// Local quick-login prefs for the mechanic app.
 ///
-/// Real backend note: on a production build this should unlock a refresh
-/// token kept in secure storage (flutter_secure_storage / Keychain), and the
-/// server should be able to revoke the device.
+/// Non-sensitive profile flags stay in SharedPreferences.
+/// PIN unlocks a device session; the PIN itself is kept in secure storage
+/// (flutter_secure_storage / Keychain). Production builds should also keep
+/// the refresh token there so the server can revoke the device.
 class QuickLoginStore extends ChangeNotifier {
+  QuickLoginStore({FlutterSecureStorage? secureStorage})
+      : _secure = secureStorage ?? const FlutterSecureStorage();
+
   static const _kEnabled = 'fixora.mechanic.ql.enabled';
   static const _kEmail = 'fixora.mechanic.ql.email';
   static const _kName = 'fixora.mechanic.ql.name';
   static const _kFailed = 'fixora.mechanic.ql.failed';
   static const _kPin = 'fixora.mechanic.ql.pin';
 
+  final FlutterSecureStorage _secure;
   SharedPreferences? _prefs;
 
   bool enabled = false;
@@ -31,6 +37,14 @@ class QuickLoginStore extends ChangeNotifier {
     email = p.getString(_kEmail);
     name = p.getString(_kName);
     failed = p.getInt(_kFailed) ?? 0;
+
+    // Migrate legacy PIN out of SharedPreferences if present.
+    final legacyPin = p.getString(_kPin);
+    if (legacyPin != null && legacyPin.isNotEmpty) {
+      await _secure.write(key: _kPin, value: legacyPin);
+      await p.remove(_kPin);
+    }
+
     notifyListeners();
   }
 
@@ -47,14 +61,15 @@ class QuickLoginStore extends ChangeNotifier {
     await p.setBool(_kEnabled, true);
     await p.setString(_kEmail, email);
     await p.setString(_kName, name);
-    await p.setString(_kPin, pin);
     await p.setInt(_kFailed, 0);
+    await p.remove(_kPin);
+    await _secure.write(key: _kPin, value: pin);
     notifyListeners();
   }
 
   Future<bool> unlock(String pin) async {
     final p = await _prefsInstance();
-    final saved = p.getString(_kPin);
+    final saved = await _secure.read(key: _kPin);
     if (saved == null || saved != pin) {
       failed += 1;
       await p.setInt(_kFailed, failed);
@@ -78,6 +93,7 @@ class QuickLoginStore extends ChangeNotifier {
     await p.remove(_kName);
     await p.remove(_kFailed);
     await p.remove(_kPin);
+    await _secure.delete(key: _kPin);
     notifyListeners();
   }
 
