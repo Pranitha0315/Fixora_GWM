@@ -126,11 +126,49 @@ public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitation
             : null;
     }
 
-    public async Task MarkAcceptedAsync(Guid invitationId, Guid mechanicId, CancellationToken ct = default)
+    public async Task MarkAcceptedAsync(
+        Guid invitationId,
+        Guid mechanicId,
+        CancellationToken ct = default)
     {
-        var inv = await db.Invitations.FirstAsync(i => i.Id == invitationId, ct);
+        Guard.Against(
+            mechanicId == Guid.Empty,
+            "A valid mechanic account ID is required.");
 
-        inv.AcceptedAt = clock.UtcNow;
+        var inv = await db.Invitations
+            .FirstOrDefaultAsync(i => i.Id == invitationId, ct)
+            ?? throw new NotFoundException("Invitation");
+
+        if (inv.AcceptedAt is not null)
+        {
+            if (inv.MechanicId == mechanicId)
+            {
+                return;
+            }
+
+            throw new ConflictException(
+                "invitation_already_accepted",
+                "This invitation is already linked to another mechanic account.");
+        }
+
+        var now = clock.UtcNow;
+
+        if (!inv.IsValid(now))
+        {
+            throw new AppException(
+                410,
+                "invite_expired",
+                "This invitation has expired or was revoked. Ask the manager for a new one.");
+        }
+
+        if (inv.MechanicId is not null && inv.MechanicId != mechanicId)
+        {
+            throw new ConflictException(
+                "invitation_account_mismatch",
+                "This invitation is already linked to another mechanic account.");
+        }
+
+        inv.AcceptedAt = now;
         inv.MechanicId = mechanicId;
 
         await db.SaveChangesAsync(ct);
