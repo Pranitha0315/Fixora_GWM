@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'theme/bronze_theme.dart';
+import '../features/home/presentation/screens/home_screen.dart';
+
 /// Root widget for Fixora Rev Mechanic.
 class FixoraMechanicApp extends StatelessWidget {
   const FixoraMechanicApp({super.key});
@@ -9,11 +12,8 @@ class FixoraMechanicApp extends StatelessWidget {
     return MaterialApp(
       title: 'Fixora Rev Mechanic',
       debugShowCheckedModeBanner: false,
-      home: const Scaffold(
-        body: Center(
-          child: Text('Fixora Rev Mechanic'),
-        ),
-      ),
+      theme: BronzeTheme.dark,
+      home: const HomeScreen(),
     );
   }
 }
