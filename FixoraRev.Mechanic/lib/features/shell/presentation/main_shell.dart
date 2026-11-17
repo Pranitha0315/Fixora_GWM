@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../app/theme/bronze_colors.dart';
-import '../../fixproof/presentation/screens/fixproof_screen.dart';
-import '../../home/presentation/screens/home_screen.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../dashboard/presentation/screens/home_screen.dart';
+import '../../fixproof/presentation/screens/fixproof_hub_screen.dart';
 import '../../inventory/presentation/inventory_screen.dart';
-import '../../jobs/presentation/screens/jobs_screen.dart';
-import '../../profile/presentation/screens/profile_screen.dart';
+import '../../jobs/presentation/screens/queue_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 
-final shellTabProvider = NotifierProvider<ShellTabNotifier, int>(ShellTabNotifier.new);
-
+/// Current bottom-nav tab.
 class ShellTabNotifier extends Notifier<int> {
   @override
   int build() => 0;
@@ -17,27 +16,36 @@ class ShellTabNotifier extends Notifier<int> {
   void setIndex(int index) => state = index;
 }
 
+final shellTabProvider =
+    NotifierProvider<ShellTabNotifier, int>(ShellTabNotifier.new);
+
 /// Floating pill bar — icon above label on every tab.
-/// Dark: charcoal bar · bronze selected.
+/// Light: white bar · orange selected · Dark: black bar · orange selected.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
-  static const _tabs = <_ShellTab>[
-    _ShellTab(label: 'Home', icon: Icons.home_outlined, selectedIcon: Icons.home),
-    _ShellTab(label: 'Jobs', icon: Icons.assignment_outlined, selectedIcon: Icons.assignment),
-    _ShellTab(label: 'Proof', icon: Icons.verified_outlined, selectedIcon: Icons.verified),
-    _ShellTab(label: 'Parts', icon: Icons.inventory_2_outlined, selectedIcon: Icons.inventory_2),
-    _ShellTab(label: 'Profile', icon: Icons.person_outline, selectedIcon: Icons.person),
+  static const Color _accent = Color(0xFFFF6300);
+
+  static const _tabs = <_TabSpec>[
+    _TabSpec('Home', Icons.home_outlined, Icons.home),
+    _TabSpec('Jobs', Icons.assignment_outlined, Icons.assignment),
+    _TabSpec('Proof', Icons.verified_outlined, Icons.verified),
+    _TabSpec('Parts', Icons.inventory_2_outlined, Icons.inventory_2),
+    _TabSpec('Profile', Icons.person_outline, Icons.person),
   ];
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final index = ref.watch(shellTabProvider);
+    final barBg = AppColors.navBar;
+    final idle = AppColors.body;
 
-    final pages = const <Widget>[
+    void go(int i) => ref.read(shellTabProvider.notifier).setIndex(i);
+
+    const pages = <Widget>[
       HomeScreen(),
-      JobsScreen(),
-      FixproofScreen(),
+      QueueScreen(),
+      FixproofHubScreen(),
       InventoryScreen(),
       ProfileScreen(),
     ];
@@ -49,15 +57,17 @@ class MainShell extends ConsumerWidget {
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: Container(
           height: 70,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
           decoration: BoxDecoration(
-            color: BronzeColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: BronzeColors.outline),
+            color: barBg,
+            borderRadius: BorderRadius.circular(999),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(
+                  alpha: AppColors.isDark ? 0.45 : 0.12,
+                ),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -66,9 +76,11 @@ class MainShell extends ConsumerWidget {
               for (var i = 0; i < _tabs.length; i++)
                 Expanded(
                   child: _PillNavItem(
-                    tab: _tabs[i],
+                    spec: _tabs[i],
                     selected: index == i,
-                    onTap: () => ref.read(shellTabProvider.notifier).setIndex(i),
+                    accent: _accent,
+                    idleColor: idle,
+                    onTap: () => go(i),
                   ),
                 ),
             ],
@@ -79,12 +91,8 @@ class MainShell extends ConsumerWidget {
   }
 }
 
-class _ShellTab {
-  const _ShellTab({
-    required this.label,
-    required this.icon,
-    required this.selectedIcon,
-  });
+class _TabSpec {
+  const _TabSpec(this.label, this.icon, this.selectedIcon);
 
   final String label;
   final IconData icon;
@@ -93,29 +101,39 @@ class _ShellTab {
 
 class _PillNavItem extends StatelessWidget {
   const _PillNavItem({
-    required this.tab,
+    required this.spec,
     required this.selected,
+    required this.accent,
+    required this.idleColor,
     required this.onTap,
   });
 
-  final _ShellTab tab;
+  final _TabSpec spec;
   final bool selected;
+  final Color accent;
+  final Color idleColor;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? BronzeColors.bronze : BronzeColors.creamMuted;
+    final color = selected ? accent : idleColor;
 
     return InkWell(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(28),
       onTap: onTap,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(selected ? tab.selectedIcon : tab.icon, color: color, size: 22),
+          Icon(
+            selected ? spec.selectedIcon : spec.icon,
+            color: color,
+            size: 22,
+          ),
           const SizedBox(height: 4),
           Text(
-            tab.label,
+            spec.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: color,
               fontSize: 11,
