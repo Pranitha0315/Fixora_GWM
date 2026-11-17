@@ -1,35 +1,35 @@
 <Solution>
   <Folder Name="/src/" />
   <Folder Name="/src/Customer/">
-    <Project Path="src/Customer/Fixora.Customer.Api/Fixora.Customer.Api.csproj" />
-    <Project Path="src/Customer/Fixora.Customer.Application/Fixora.Customer.Application.csproj" />
-    <Project Path="src/Customer/Fixora.Customer.Contracts/Fixora.Customer.Contracts.csproj" />
-    <Project Path="src/Customer/Fixora.Customer.Domain/Fixora.Customer.Domain.csproj" />
-    <Project Path="src/Customer/Fixora.Customer.Infrastructure/Fixora.Customer.Infrastructure.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Customer/Fixora.Customer.Api/Fixora.Customer.Api.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Customer/Fixora.Customer.Application/Fixora.Customer.Application.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Customer/Fixora.Customer.Contracts/Fixora.Customer.Contracts.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Customer/Fixora.Customer.Domain/Fixora.Customer.Domain.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Customer/Fixora.Customer.Infrastructure/Fixora.Customer.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Host/">
-    <Project Path="src/Host/Fixora.Host/Fixora.Host.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Host/Fixora.Host/Fixora.Host.csproj" />
   </Folder>
   <Folder Name="/src/Manager/">
-    <Project Path="src/Manager/Fixora.Manager.Api/Fixora.Manager.Api.csproj" />
-    <Project Path="src/Manager/Fixora.Manager.Application/Fixora.Manager.Application.csproj" />
-    <Project Path="src/Manager/Fixora.Manager.Contracts/Fixora.Manager.Contracts.csproj" />
-    <Project Path="src/Manager/Fixora.Manager.Domain/Fixora.Manager.Domain.csproj" />
-    <Project Path="src/Manager/Fixora.Manager.Infrastructure/Fixora.Manager.Infrastructure.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Manager/Fixora.Manager.Api/Fixora.Manager.Api.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Manager/Fixora.Manager.Application/Fixora.Manager.Application.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Manager/Fixora.Manager.Contracts/Fixora.Manager.Contracts.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Manager/Fixora.Manager.Domain/Fixora.Manager.Domain.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Manager/Fixora.Manager.Infrastructure/Fixora.Manager.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Mechanic/">
-    <Project Path="src/Mechanic/Fixora.Mechanic.Api/Fixora.Mechanic.Api.csproj" />
-    <Project Path="src/Mechanic/Fixora.Mechanic.Application/Fixora.Mechanic.Application.csproj" />
-    <Project Path="src/Mechanic/Fixora.Mechanic.Contracts/Fixora.Mechanic.Contracts.csproj" />
-    <Project Path="src/Mechanic/Fixora.Mechanic.Domain/Fixora.Mechanic.Domain.csproj" />
-    <Project Path="src/Mechanic/Fixora.Mechanic.Infrastructure/Fixora.Mechanic.Infrastructure.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Mechanic/Fixora.Mechanic.Api/Fixora.Mechanic.Api.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Mechanic/Fixora.Mechanic.Application/Fixora.Mechanic.Application.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Mechanic/Fixora.Mechanic.Contracts/Fixora.Mechanic.Contracts.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Mechanic/Fixora.Mechanic.Domain/Fixora.Mechanic.Domain.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Mechanic/Fixora.Mechanic.Infrastructure/Fixora.Mechanic.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
-    <Project Path="src/Shared/Fixora.Shared.Contracts/Fixora.Shared.Contracts.csproj" />
-    <Project Path="src/Shared/Fixora.Shared.Infrastructure/Fixora.Shared.Infrastructure.csproj" />
-    <Project Path="src/Shared/Fixora.SharedKernel/Fixora.SharedKernel.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Shared/Fixora.Shared.Contracts/Fixora.Shared.Contracts.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Shared/Fixora.Shared.Infrastructure/Fixora.Shared.Infrastructure.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/src/Shared/Fixora.SharedKernel/Fixora.SharedKernel.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/Fixora.tests/Fixora.tests.csproj" />
+    <Project Path="../../../../../../../../GWMS/Gwm/Fixora_GWM/Fixora.SharedBackend/tests/Fixora.tests/Fixora.tests.csproj" />
   </Folder>
 </Solution>

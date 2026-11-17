@@ -6,4 +6,8 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>
