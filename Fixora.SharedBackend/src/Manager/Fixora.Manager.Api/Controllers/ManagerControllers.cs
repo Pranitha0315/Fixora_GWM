@@ -122,7 +122,7 @@ public sealed class InventoryController(InventoryService inventory) : StaffContr
 public sealed class MechanicsController(MechanicRosterService roster, InvitationService invitations) : StaffControllerBase
 {
     [HttpGet] public Task<IReadOnlyList<MechanicRosterDto>> List(CancellationToken ct) => roster.ListAsync(ct);
-    [HttpGet("invitations")] public Task<IReadOnlyList<InvitationDto>> Invitations(CancellationToken ct) => invitations.ListAsync(ct);
+    [HttpGet("invitations")] public Task<IReadOnlyList<InvitationListDto>> Invitations(CancellationToken ct) => invitations.ListAsync(ct);
     [HttpPost("invitations")] public Task<InvitationDto> Invite(CreateInvitationRequest req, CancellationToken ct) => invitations.CreateAsync(StaffId, req, ct);
     [HttpDelete("invitations/{id:guid}")] public async Task<IActionResult> Revoke(Guid id, CancellationToken ct) { await invitations.RevokeAsync(id, ct); return NoContent(); }
 }

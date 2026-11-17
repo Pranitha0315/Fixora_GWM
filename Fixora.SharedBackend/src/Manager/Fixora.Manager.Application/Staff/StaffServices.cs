@@ -10,6 +10,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Fixora.Manager.Application.Staff;
 
+public sealed record InvitationListDto(Guid Id, string Name, string Phone, DateTime ExpiresAt, string Status);
+
 public sealed record StaffLoginRequest(string Email, string Password);
 public sealed record CreateInvitationRequest(string Name, string Phone);
 public sealed record InvitationDto(Guid Id, string Name, string Phone, string Token, string Link, DateTime ExpiresAt, string Status);
@@ -65,13 +67,29 @@ public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitation
         return ToDto(inv);
     }
 
-    public async Task<IReadOnlyList<InvitationDto>> ListAsync(CancellationToken ct = default)
-        => (await db.Invitations
+    public async Task<IReadOnlyList<InvitationListDto>> ListAsync(CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+
+        var invitations = await db.Invitations
             .AsNoTracking()
             .OrderByDescending(i => i.CreatedAt)
-            .ToListAsync(ct))
-            .Select(ToDto)
+            .ToListAsync(ct);
+
+        return invitations.Select(i => new InvitationListDto(
+            i.Id,
+            i.Name,
+            i.Phone,
+            i.ExpiresAt,
+            i.AcceptedAt is not null
+                ? "Accepted"
+                : i.RevokedAt is not null
+                    ? "Revoked"
+                    : i.ExpiresAt <= now
+                        ? "Expired"
+                        : "Pending"))
             .ToList();
+    }
 
     public async Task RevokeAsync(Guid id, CancellationToken ct = default)
     {
