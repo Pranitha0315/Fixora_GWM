@@ -1,0 +1,46 @@
+<div
+  class="fx-error-state"
+  [class.fx-error-state--compact]="compact()"
+>
+  @if (showIcon()) {
+    <div class="fx-error-icon" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v6M12 16h.01" />
+      </svg>
+    </div>
+  }
+
+  <div
+    class="fx-error-copy"
+    [attr.role]="announceError() ? 'alert' : null"
+  >
+    <h2 class="fx-error-title">
+      {{ title() }}
+    </h2>
+
+    @if (description()) {
+      <p class="fx-error-description">
+        {{ description() }}
+      </p>
+    }
+  </div>
+
+  @if (showRetry() && retryLabel().trim()) {
+    <fx-button
+      variant="primary"
+      [disabled]="retryDisabled()"
+      [loading]="retrying()"
+      [loadingText]="retryLoadingText()"
+      (pressed)="handleRetry()"
+    >
+      {{ retryLabel() }}
+    </fx-button>
+  }
+</div>
