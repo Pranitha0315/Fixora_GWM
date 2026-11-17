@@ -1,0 +1,14 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+TestResults/
+App_Data/
+appsettings.*.local.json
+
+*.bak
+
+.env
+.env.*
+!.env.example
