@@ -1,4 +1,4 @@
-package com.fixora.fixora_rev_mechanic
+package com.fixora.fixora_rev
 
 import io.flutter.embedding.android.FlutterActivity
 
