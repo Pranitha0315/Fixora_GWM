@@ -1,0 +1,25 @@
+# .NET
+**/bin/
+**/obj/
+*.user
+.vs/
+# Node / Angular
+**/node_modules/
+manager-frontend/dist/
+manager-frontend/.angular/
+manager-frontend/e2e/shots/
+# Flutter
+**/.dart_tool/
+**/build/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/android/local.properties
+**/*.iml
+# Python
+__pycache__/
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+# local uploads written by the API (LocalMediaStorage)
+**/App_Data/
