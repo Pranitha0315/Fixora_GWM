@@ -18,4 +18,15 @@ class AppState extends ChangeNotifier {
 
   //final _rnd = math.Random();
 
+  /// Digits only from a phone field (strips spaces, +94, leading 0, etc.).
+  static String digitsOf(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    if (digits.startsWith('94') && digits.length >= 11) {
+      return digits.substring(digits.length - 9);
+    }
+    if (digits.startsWith('0') && digits.length == 10) {
+      return digits.substring(1);
+    }
+    return digits.length > 9 ? digits.substring(digits.length - 9) : digits;
+  }
 }
