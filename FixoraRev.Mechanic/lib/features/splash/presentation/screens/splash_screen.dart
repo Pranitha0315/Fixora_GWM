@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/bronze_colors.dart';
@@ -16,7 +17,7 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Future<void>.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
-      Navigator.of(context).pushReplacementNamed(RouteNames.login);
+      context.go(RouteNames.login);
     });
   }
 

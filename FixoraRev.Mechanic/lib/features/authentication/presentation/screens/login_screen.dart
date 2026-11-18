@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/bronze_colors.dart';
-import '../../../../core/utils/nav.dart';
-import '../../../shell/presentation/main_shell.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -18,7 +17,11 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              const Icon(Icons.build_circle_outlined, size: 72, color: BronzeColors.bronze),
+              const Icon(
+                Icons.build_circle_outlined,
+                size: 72,
+                color: BronzeColors.bronze,
+              ),
               const SizedBox(height: 16),
               Text(
                 'Mechanic Login',
@@ -27,11 +30,11 @@ class LoginScreen extends StatelessWidget {
               ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: () => context.resetTo(const MainShell()),
+                onPressed: () => context.go(RouteNames.shell),
                 child: const Text('Continue'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).pushNamed(RouteNames.register),
+                onPressed: () => context.push(RouteNames.register),
                 child: const Text('Register'),
               ),
               const Spacer(),

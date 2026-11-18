@@ -1,41 +1,40 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'session.dart';
 
-/// JSON client for /api/v1. Short-lived JWT + rotating refresh token, refreshed once on 401.
+/// JSON client for /api/v1 using Dio.
+/// Short-lived JWT + rotating refresh token, refreshed once on 401.
 /// Tokens are stored with [FlutterSecureStorage] (Keychain / Keystore).
 class ApiClient {
-  ApiClient(this._storageKey, {FlutterSecureStorage? secureStorage})
-      : _secure = secureStorage ?? const FlutterSecureStorage();
+  ApiClient(this._storageKey, {FlutterSecureStorage? secureStorage, Dio? dio})
+      : _secure = secureStorage ?? const FlutterSecureStorage(),
+        _dio = dio ??
+            Dio(
+              BaseOptions(
+                baseUrl: _baseUrl,
+                connectTimeout: _timeout,
+                receiveTimeout: _timeout,
+                headers: {'Accept': 'application/json'},
+              ),
+            );
 
   final String _storageKey;
   final FlutterSecureStorage _secure;
-  final http.Client _http = http.Client();
+  final Dio _dio;
 
   Session? session;
   Future<String?>? _refreshing;
 
   bool get signedIn => session != null;
+  Dio get dio => _dio;
 
   static const _timeout = Duration(seconds: 20);
   static const _baseUrl = 'https://api.fixora.local/api/v1';
-
-  Uri _uri(String path, [Map<String, String?>? query]) {
-    final normalized = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$_baseUrl$normalized').replace(
-      queryParameters: query == null
-          ? null
-          : {
-              for (final e in query.entries)
-                if (e.value != null) e.key: e.value!,
-            },
-    );
-  }
 
   Future<void> restore() async {
     try {
@@ -100,47 +99,76 @@ class ApiClient {
     bool retry = true,
     bool auth = true,
   }) async {
-    final req = http.Request(method, _uri(path, query));
-    req.headers['Accept'] = 'application/json';
-    if (body != null) {
-      req.headers['Content-Type'] = 'application/json';
-      req.body = jsonEncode(body);
-    }
-    if (headers != null) req.headers.addAll(headers);
+    final normalized = path.startsWith('/') ? path : '/$path';
+    final options = Options(
+      method: method,
+      headers: {
+        ...?headers,
+        if (body != null) 'Content-Type': 'application/json',
+      },
+    );
 
     final token = session?.accessToken;
     if (auth && token != null && token.isNotEmpty) {
-      req.headers['Authorization'] = 'Bearer $token';
+      options.headers = {
+        ...?options.headers,
+        'Authorization': 'Bearer $token',
+      };
     }
 
-    late http.StreamedResponse streamed;
+    final queryParameters = query == null
+        ? null
+        : <String, dynamic>{
+            for (final e in query.entries)
+              if (e.value != null) e.key: e.value!,
+          };
+
     try {
-      streamed = await _http.send(req).timeout(_timeout);
-    } on TimeoutException {
-      throw ApiException('Request timed out', code: 'timeout');
-    } on http.ClientException catch (e) {
-      throw ApiException(e.message, code: 'connection_error', cause: e);
-    }
-
-    final response = await http.Response.fromStream(streamed);
-    if (response.statusCode == 401 && auth && retry) {
-      final refreshed = await _refreshAccessToken();
-      if (refreshed) {
-        return _send(
-          method,
-          path,
-          body: body,
-          query: query,
-          headers: headers,
-          retry: false,
-          auth: auth,
+      final response = await _dio.request<dynamic>(
+        normalized,
+        data: body,
+        queryParameters: queryParameters,
+        options: options,
+      );
+      return response.data;
+    } on DioException catch (e) {
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.sendTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw ApiException('Request timed out', code: 'timeout', cause: e);
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw ApiException(
+          e.message ?? 'Connection error',
+          code: 'connection_error',
+          cause: e,
         );
       }
-      await clear();
-      throw ApiException('Session expired. Please sign in again.', code: 'unauthorized', statusCode: 401);
-    }
 
-    return _decode(response);
+      final status = e.response?.statusCode;
+      if (status == 401 && auth && retry) {
+        final refreshed = await _refreshAccessToken();
+        if (refreshed) {
+          return _send(
+            method,
+            path,
+            body: body,
+            query: query,
+            headers: headers,
+            retry: false,
+            auth: auth,
+          );
+        }
+        await clear();
+        throw ApiException(
+          'Session expired. Please sign in again.',
+          code: 'unauthorized',
+          statusCode: 401,
+        );
+      }
+
+      throw _fromDio(e);
+    }
   }
 
   Future<bool> _refreshAccessToken() async {
@@ -178,26 +206,21 @@ class ApiClient {
     return token != null && token.isNotEmpty;
   }
 
-  dynamic _decode(http.Response response) {
-    final status = response.statusCode;
-    dynamic data;
-    if (response.body.isNotEmpty) {
-      try {
-        data = jsonDecode(response.body);
-      } catch (_) {
-        data = response.body;
-      }
-    }
-
-    if (status >= 200 && status < 300) return data;
-
+  ApiException _fromDio(DioException e) {
+    final status = e.response?.statusCode;
+    final data = e.response?.data;
     final message = data is Map && data['message'] is String
         ? data['message'] as String
-        : 'Request failed ($status)';
-    throw ApiException(message, statusCode: status, code: 'http_$status', cause: data);
+        : e.message ?? 'Request failed (${status ?? 'network'})';
+    return ApiException(
+      message,
+      statusCode: status,
+      code: status != null ? 'http_$status' : 'dio_error',
+      cause: data ?? e,
+    );
   }
 
-  void close() => _http.close();
+  void close() => _dio.close(force: true);
 }
 
 class ApiException implements Exception {
