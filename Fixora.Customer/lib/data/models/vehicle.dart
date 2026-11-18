@@ -53,6 +53,7 @@ class Vehicle {
     this.bodyType = 'Sedan',
     this.engineCc = 1500,
     this.healthScore = 0.9,
+    this.nextServiceNote = 'General Service due soon',
   });
 
   final String id;
@@ -69,6 +70,7 @@ class Vehicle {
   final String bodyType;
   final int engineCc;
   final double healthScore;
+  final String nextServiceNote;
 
   String get name => '$make $model';
 
@@ -86,6 +88,7 @@ class Vehicle {
     String? bodyType,
     int? engineCc,
     double? healthScore,
+    String? nextServiceNote,
   }) {
     return Vehicle(
       id: id,
@@ -102,6 +105,7 @@ class Vehicle {
       bodyType: bodyType ?? this.bodyType,
       engineCc: engineCc ?? this.engineCc,
       healthScore: healthScore ?? this.healthScore,
+      nextServiceNote: nextServiceNote ?? this.nextServiceNote,
     );
   }
 }
