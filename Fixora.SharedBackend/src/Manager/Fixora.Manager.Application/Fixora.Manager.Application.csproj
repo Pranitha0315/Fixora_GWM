@@ -6,4 +6,13 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -7,7 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authorization" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Core" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
+    <ProjectReference Include="..\Fixora.Customer.Application\Fixora.Customer.Application.csproj" />
   </ItemGroup>
 
 </Project>

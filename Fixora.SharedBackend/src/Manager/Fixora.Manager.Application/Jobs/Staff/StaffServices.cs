@@ -1,9 +1,4 @@
 using System.Security.Cryptography;
-using Fixora.Customer.Contracts;
-using Fixora.Manager.Application.Common;
-using Fixora.Manager.Contracts;
-using Fixora.Manager.Domain;
-using Fixora.Mechanic.Contracts;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -20,135 +15,11 @@ public sealed record ServiceUpsert(string Name, string Category, int StandardMin
 public sealed record DashboardDto(int TodayBookings, int PendingBookings, int ActiveJobs, int ProposalsToReview, int ApprovalsToRelease,
     int ChangeRequestsToReview, int OpenSos, int LowStockParts, int UnpaidInvoices, decimal RevenueThisWeek, decimal RevenueLastWeek, decimal PlatformEarningsThisMonth);
 
-public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, ITokenService tokens)
-{
-    public async Task<AuthTokens> LoginAsync(StaffLoginRequest req, CancellationToken ct = default)
-    {
-        var email = (req.Email ?? "").Trim().ToLowerInvariant();
-        var staff = await db.Staff.FirstOrDefaultAsync(s => s.Email == email, ct);
-        if (staff is null || !passwords.Verify(staff.PasswordHash, req.Password ?? "")) throw new UnauthorizedAppException();
-        return await tokens.IssueAsync(staff.Id, staff.Role, staff.Name, ct);
-    }
-}
+
 
 /// <summary>Manager-issued 7-day mechanic invitations.</summary>
-public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitationGateway
-{
-    public const int ValidDays = 7;
 
-    public async Task<InvitationDto> CreateAsync(Guid staffId, CreateInvitationRequest req, CancellationToken ct = default)
-    {
-        Guard.Against(string.IsNullOrWhiteSpace(req.Name) || string.IsNullOrWhiteSpace(req.Phone), "Name and phone are required.");
-        var token = Convert.ToHexString(RandomNumberGenerator.GetBytes(5)); // 10 hex chars, easy to read out
-        var inv = new MechanicInvitation { Name = req.Name.Trim(), Phone = req.Phone.Trim(), Token = token, CreatedBy = staffId, CreatedAt = clock.UtcNow, ExpiresAt = clock.UtcNow.AddDays(ValidDays) };
-        db.Invitations.Add(inv);
-        await db.SaveChangesAsync(ct);
-        return ToDto(inv);
-    }
 
-    public async Task<IReadOnlyList<InvitationDto>> ListAsync(CancellationToken ct = default)
-        => (await db.Invitations.AsNoTracking().OrderByDescending(i => i.CreatedAt).ToListAsync(ct)).Select(ToDto).ToList();
 
-    public async Task RevokeAsync(Guid id, CancellationToken ct = default)
-    {
-        var inv = await db.Invitations.FirstOrDefaultAsync(i => i.Id == id, ct) ?? throw new NotFoundException("Invitation");
-        inv.RevokedAt = clock.UtcNow;
-        await db.SaveChangesAsync(ct);
-    }
 
-    public async Task<InvitationInfo?> FindValidAsync(string token, CancellationToken ct = default)
-    {
-        var t = (token ?? "").Trim().ToUpperInvariant();
-        var inv = await db.Invitations.AsNoTracking().FirstOrDefaultAsync(i => i.Token == t, ct);
-        return inv is not null && inv.IsValid(clock.UtcNow) ? new InvitationInfo(inv.Id, inv.Name, inv.Phone, inv.ExpiresAt) : null;
-    }
 
-    public async Task MarkAcceptedAsync(Guid invitationId, Guid mechanicId, CancellationToken ct = default)
-    {
-        var inv = await db.Invitations.FirstAsync(i => i.Id == invitationId, ct);
-        inv.AcceptedAt = clock.UtcNow;
-        inv.MechanicId = mechanicId;
-        await db.SaveChangesAsync(ct);
-    }
-
-    private InvitationDto ToDto(MechanicInvitation i) => new(i.Id, i.Name, i.Phone, i.Token, $"fixorarev://join?token={i.Token}", i.ExpiresAt,
-        i.AcceptedAt is not null ? "Accepted" : i.RevokedAt is not null ? "Revoked" : i.ExpiresAt <= clock.UtcNow ? "Expired" : "Pending");
-}
-
-public sealed class WorkshopSettingsService(IManagerDb db)
-{
-    public async Task<WorkshopSettingsDto> GetAsync(CancellationToken ct = default) => ToDto(await db.Workshops.AsNoTracking().FirstAsync(ct));
-
-    public async Task<WorkshopSettingsDto> UpdateAsync(WorkshopSettingsDto req, CancellationToken ct = default)
-    {
-        var w = await db.Workshops.FirstAsync(ct);
-        var validHours = TimeOnly.TryParse(req.OpenTime, out var open) & TimeOnly.TryParse(req.CloseTime, out var close);
-        Guard.Against(!validHours || close <= open, "Opening hours are not valid.");
-        Guard.Against(req.LoyaltyPercent is < 0 or > 20, "Loyalty percentage must be between 0 and 20.");
-        w.Name = req.Name; w.Phone = req.Phone; w.EmergencyPhone = req.EmergencyPhone; w.Address = req.Address;
-        w.OpenTime = open; w.CloseTime = close; w.SlotMinutes = Math.Clamp(req.SlotMinutes, 15, 240);
-        w.CancelCutoffHours = Math.Clamp(req.CancelCutoffHours, 0, 72); w.EtaShiftNotifyMinutes = Math.Clamp(req.EtaShiftNotifyMinutes, 5, 120);
-        w.LoyaltyEnabled = req.LoyaltyEnabled; w.LoyaltyPercent = req.LoyaltyPercent; w.LoyaltyCapRupees = Math.Max(0, req.LoyaltyCapRupees);
-        await db.SaveChangesAsync(ct);
-        return ToDto(w);
-    }
-
-    public async Task<IReadOnlyList<BayDto>> BaysAsync(CancellationToken ct = default)
-        => await db.Bays.AsNoTracking().OrderBy(b => b.SortOrder).Select(b => new BayDto(b.Id, b.Name, b.Active)).ToListAsync(ct);
-
-    public async Task<IReadOnlyList<ServiceDto>> ServicesAsync(bool includeInactive, CancellationToken ct = default)
-        => await db.Services.AsNoTracking().Where(s => includeInactive || s.Active).OrderBy(s => s.Category).ThenBy(s => s.Name)
-            .Select(s => new ServiceDto(s.Id, s.Name, s.Category, s.StandardMinutes, s.BasePrice)).ToListAsync(ct);
-
-    public async Task<ServiceDto> UpsertServiceAsync(Guid? id, ServiceUpsert req, CancellationToken ct = default)
-    {
-        Guard.Against(string.IsNullOrWhiteSpace(req.Name) || req.StandardMinutes <= 0, "Name and duration are required.");
-        ServiceItem s;
-        if (id is null) { s = new ServiceItem(); db.Services.Add(s); }
-        else s = await db.Services.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Service");
-        s.Name = req.Name; s.Category = req.Category; s.StandardMinutes = req.StandardMinutes; s.BasePrice = req.BasePrice; s.Active = req.Active;
-        await db.SaveChangesAsync(ct);
-        return new ServiceDto(s.Id, s.Name, s.Category, s.StandardMinutes, s.BasePrice);
-    }
-
-    public static WorkshopSettingsDto ToDto(Workshop w) => new(w.Name, w.Phone, w.EmergencyPhone, w.Address, w.OpenTime.ToString("HH:mm"), w.CloseTime.ToString("HH:mm"),
-        w.SlotMinutes, w.CancelCutoffHours, w.EtaShiftNotifyMinutes, w.LoyaltyEnabled, w.LoyaltyPercent, w.LoyaltyCapRupees);
-}
-
-public sealed class DashboardService(IManagerDb db, ISosOperations sos, IClock clock)
-{
-    public async Task<DashboardDto> GetAsync(CancellationToken ct = default)
-    {
-        var now = clock.UtcNow;
-        var today = now.Date;
-        var weekStart = today.AddDays(-7);
-        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-        var openSos = (await sos.ListAsync(true, ct)).Count;
-        return new DashboardDto(
-            await db.Appointments.CountAsync(a => a.SlotStart >= today && a.SlotStart < today.AddDays(1) && a.Status != AppointmentStatus.Cancelled && a.Status != AppointmentStatus.Declined, ct),
-            await db.Appointments.CountAsync(a => a.Status == AppointmentStatus.Requested, ct),
-            await db.JobCards.CountAsync(j => j.Status != JobStatus.Completed && j.Status != JobStatus.Closed, ct),
-            await db.Proposals.CountAsync(p => p.Status == ProposalStatus.PendingManagerReview, ct),
-            await db.Proposals.CountAsync(p => p.Status == ProposalStatus.CustomerResponded, ct),
-            await db.ChangeRequests.CountAsync(c => c.Status == ChangeRequestStatus.PendingManagerReview, ct),
-            openSos,
-            await db.Parts.CountAsync(p => p.Quantity <= p.ReorderLevel, ct),
-            await db.Invoices.CountAsync(i => i.Status == InvoiceStatus.Unpaid, ct),
-            await db.Invoices.Where(i => i.Status == InvoiceStatus.Paid && i.PaidAt >= weekStart).SumAsync(i => (decimal?)i.Total, ct) ?? 0,
-            await db.Invoices.Where(i => i.Status == InvoiceStatus.Paid && i.PaidAt >= weekStart.AddDays(-7) && i.PaidAt < weekStart).SumAsync(i => (decimal?)i.Total, ct) ?? 0,
-            await db.Earnings.Where(e => e.At >= monthStart).SumAsync(e => (decimal?)e.Amount, ct) ?? 0);
-    }
-}
-
-public sealed record MechanicRosterDto(Guid Id, string Name, string Phone, string EmployeeCode, bool OnDuty, int ActiveJobs);
-
-public sealed class MechanicRosterService(IManagerDb db, IMechanicDirectory mechanics)
-{
-    public async Task<IReadOnlyList<MechanicRosterDto>> ListAsync(CancellationToken ct = default)
-    {
-        var list = await mechanics.ListAsync(ct);
-        var counts = await db.JobCards.AsNoTracking().Where(j => j.MechanicId != null && j.Status != JobStatus.Completed && j.Status != JobStatus.Closed)
-            .GroupBy(j => j.MechanicId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
-        return list.Where(m => m.Active).Select(m => new MechanicRosterDto(m.Id, m.Name, m.Phone, m.EmployeeCode, m.OnDuty, counts.GetValueOrDefault(m.Id))).ToList();
-    }
-}
