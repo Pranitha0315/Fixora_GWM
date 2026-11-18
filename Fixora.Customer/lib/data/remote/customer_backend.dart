@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../core/backend/api_client.dart';
 import '../../core/backend/fixora_config.dart';
 import '../models/vehicle.dart';
@@ -6,7 +8,7 @@ import '../repositories/app_state.dart';
 /// Customer auth + session bridge to the garage `/api/v1` backend.
 ///
 /// When [enabled] is false the UI uses in-memory [AppState] demo accounts.
-class CustomerBackend {
+class CustomerBackend extends ChangeNotifier {
   CustomerBackend._();
   static final CustomerBackend instance = CustomerBackend._();
 
@@ -83,6 +85,7 @@ class CustomerBackend {
     }
     await api.clear();
     live = false;
+    notifyListeners();
   }
 
   /// Saves a vehicle on the server (POST, or PUT when [id] is a server GUID).
@@ -141,12 +144,16 @@ class CustomerBackend {
   Future<void> _afterLogin() async {
     live = true;
     final s = api.session;
-    if (s == null) return;
+    if (s == null) {
+      notifyListeners();
+      return;
+    }
     final app = AppState.instance;
     final name = s.name.trim();
     if (name.isNotEmpty) {
       app.firstName = name.split(RegExp(r'\s+')).first;
     }
     app.notifyListeners();
+    notifyListeners();
   }
 }

@@ -25,8 +25,24 @@ class AppState extends ChangeNotifier {
   }
 
   String? lastEmail;
-  String firstName = '';
+  String _firstName = 'Kavitha';
   bool rememberMe = false;
+
+  String get firstName {
+    if (_firstName.isNotEmpty) return _firstName;
+    final n = profile.name.trim();
+    if (n.isEmpty) return 'there';
+    return n.split(RegExp(r'\s+')).first;
+  }
+
+  set firstName(String v) => _firstName = v;
+
+  String get greeting {
+    final h = DateTime.now().hour;
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
 
   /// Demo profile shown on the Profile card → Account Details.
   UserProfile profile = const UserProfile(
@@ -91,10 +107,85 @@ class AppState extends ChangeNotifier {
 
   String? selectedVehicleId;
 
+  Vehicle get selectedVehicle {
+    if (vehicles.isEmpty) {
+      return const Vehicle(
+        id: 'none',
+        make: 'Add',
+        model: 'a vehicle',
+        year: 2024,
+        plate: '—',
+      );
+    }
+    final id = selectedVehicleId;
+    if (id != null) {
+      final found = vehicles.where((v) => v.id == id);
+      if (found.isNotEmpty) return found.first;
+    }
+    final active = activeVehicles;
+    return active.isNotEmpty ? active.first : vehicles.first;
+  }
+
   void selectVehicle(String id) {
     selectedVehicleId = id;
     notifyListeners();
   }
+
+  /// Demo current job for the home "Current Service" card.
+  String currentJobId = 'FX-1042';
+  String currentStepLabel = 'In progress';
+  String currentStatusLabel = 'Bay 3 · Oil service';
+  int currentJobStep = 2; // 0..4 progress dots
+
+  final List<HomeBooking> bookings = [
+    HomeBooking(
+      id: 'b1',
+      vehicleId: 'v1',
+      service: 'Full Service',
+      date: DateTime.now().add(const Duration(days: 3)),
+      upcoming: true,
+    ),
+    HomeBooking(
+      id: 'b2',
+      vehicleId: 'v1',
+      service: 'Oil Change',
+      date: DateTime.now().subtract(const Duration(days: 18)),
+      upcoming: false,
+    ),
+  ];
+
+  HomeBooking? get nextUpcoming {
+    final upcoming = bookings.where((b) => b.upcoming).toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return upcoming.isEmpty ? null : upcoming.first;
+  }
+
+  List<HomeBooking> upcomingFor(String vehicleId) =>
+      bookings.where((b) => b.upcoming && b.vehicleId == vehicleId).toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+
+  final List<NearbyGarage> nearestGarages = const [
+    NearbyGarage(
+      name: 'Fixora Colombo',
+      distanceKm: 2.4,
+      rating: 4.8,
+      reviews: 128,
+      etaMin: 12,
+      address: '42 Galle Road, Colombo 03',
+      hours: 'Open · 8:00 AM – 6:00 PM',
+      capabilities: ['Full Service', 'Body Shop', 'EV'],
+    ),
+    NearbyGarage(
+      name: 'Fixora Nugegoda',
+      distanceKm: 5.1,
+      rating: 4.6,
+      reviews: 86,
+      etaMin: 22,
+      address: '15 High Level Road, Nugegoda',
+      hours: 'Open · 8:30 AM – 5:30 PM',
+      capabilities: ['Quick Service', 'Tyres', 'AC'],
+    ),
+  ];
 
   void removeVehicle(String id) {
     vehicles.removeWhere((v) => v.id == id);
@@ -168,4 +259,42 @@ class UserProfile {
         email: email ?? this.email,
         phone: phone ?? this.phone,
       );
+}
+
+class HomeBooking {
+  const HomeBooking({
+    required this.id,
+    required this.vehicleId,
+    required this.service,
+    required this.date,
+    required this.upcoming,
+  });
+
+  final String id;
+  final String vehicleId;
+  final String service;
+  final DateTime date;
+  final bool upcoming;
+}
+
+class NearbyGarage {
+  const NearbyGarage({
+    required this.name,
+    required this.distanceKm,
+    required this.rating,
+    this.reviews = 0,
+    this.etaMin = 15,
+    this.address = '',
+    this.hours = 'Open today',
+    this.capabilities = const [],
+  });
+
+  final String name;
+  final double distanceKm;
+  final double rating;
+  final int reviews;
+  final int etaMin;
+  final String address;
+  final String hours;
+  final List<String> capabilities;
 }
