@@ -193,6 +193,14 @@ class CustomerBackend extends ChangeNotifier {
         (x.contains('oil') && y.contains('oil'));
   }
 
+  Future<void> refreshBookings() async {
+    final list = (await api.getList('/customer/appointments'))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    AppState.instance.applyRemoteBookings(list);
+  }
+
   /// Copy session profile fields into the in-memory app store after auth.
   Future<void> _afterLogin() async {
     live = true;
@@ -205,6 +213,11 @@ class CustomerBackend extends ChangeNotifier {
     final name = s.name.trim();
     if (name.isNotEmpty) {
       app.firstName = name.split(RegExp(r'\s+')).first;
+    }
+    try {
+      await Future.wait([ensureServices(), refreshBookings()]);
+    } on ApiException {
+      // Profile sync still succeeds even if catalog/bookings are temporarily down.
     }
     app.notifyListeners();
     notifyListeners();

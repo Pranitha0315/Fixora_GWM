@@ -143,14 +143,16 @@ class AppState extends ChangeNotifier {
       vehicleId: 'v1',
       service: 'Full Service',
       date: DateTime.now().add(const Duration(days: 3)),
-      upcoming: true,
+      state: BookingState.upcoming,
+      statusLabel: 'Confirmed',
     ),
     HomeBooking(
       id: 'b2',
       vehicleId: 'v1',
       service: 'Oil Change',
       date: DateTime.now().subtract(const Duration(days: 18)),
-      upcoming: false,
+      state: BookingState.completed,
+      statusLabel: 'Completed',
     ),
   ];
 
@@ -164,6 +166,10 @@ class AppState extends ChangeNotifier {
       bookings.where((b) => b.upcoming && b.vehicleId == vehicleId).toList()
         ..sort((a, b) => a.date.compareTo(b.date));
 
+  List<HomeBooking> bookingsIn(Set<BookingState> states) =>
+      bookings.where((b) => states.contains(b.state)).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+
   HomeBooking addBooking({
     String? id,
     required String vehicleId,
@@ -171,18 +177,71 @@ class AppState extends ChangeNotifier {
     required DateTime date,
     List<String> symptoms = const [],
     String? garage,
+    BookingState state = BookingState.upcoming,
+    String? statusLabel,
   }) {
     final b = HomeBooking(
       id: id ?? 'b_${DateTime.now().millisecondsSinceEpoch}',
       vehicleId: vehicleId,
       service: service,
       date: date,
-      upcoming: true,
+      state: state,
+      statusLabel: statusLabel ?? 'Confirmed',
+      garage: garage,
     );
     bookings.insert(0, b);
     bookingCount = bookings.length;
     notifyListeners();
     return b;
+  }
+
+  /// Replaces the bookings with BookingDto rows from the backend.
+  /// status → active / upcoming / completed / cancelled
+  void applyRemoteBookings(List<Map<String, dynamic>> rows) {
+    bookings
+      ..clear()
+      ..addAll(rows.map((b) {
+        final status = (b['status'] as String?) ?? 'Requested';
+        final state = switch (status) {
+          'CheckedIn' => BookingState.active,
+          'Completed' => BookingState.completed,
+          'Declined' || 'Cancelled' || 'NoShow' => BookingState.cancelled,
+          _ => BookingState.upcoming,
+        };
+        return HomeBooking(
+          id: b['id'] as String,
+          vehicleId: (b['vehicleId'] as String?) ?? '',
+          service: (b['serviceName'] as String?) ?? 'Service',
+          date: DateTime.tryParse((b['slotStart'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
+          state: state,
+          statusLabel: switch (status) {
+            'Requested' => 'Waiting for garage',
+            'CheckedIn' => 'In the workshop',
+            'NoShow' => 'Missed',
+            _ => status,
+          },
+          garage: b['garageName'] as String?,
+        );
+      }));
+    bookingCount = bookings.length;
+    notifyListeners();
+  }
+
+  void cancelBooking(String id) {
+    final i = bookings.indexWhere((b) => b.id == id);
+    if (i < 0) return;
+    bookings[i] = bookings[i].copyWith(
+      state: BookingState.cancelled,
+      statusLabel: 'Cancelled',
+    );
+    notifyListeners();
+  }
+
+  void rescheduleBooking(String id, DateTime date) {
+    final i = bookings.indexWhere((b) => b.id == id);
+    if (i < 0) return;
+    bookings[i] = bookings[i].copyWith(date: date, statusLabel: 'Rescheduled');
+    notifyListeners();
   }
 
   final List<NearbyGarage> nearestGarages = const [
@@ -282,20 +341,46 @@ class UserProfile {
       );
 }
 
+enum BookingState { upcoming, active, completed, cancelled }
+
 class HomeBooking {
   const HomeBooking({
     required this.id,
     required this.vehicleId,
     required this.service,
     required this.date,
-    required this.upcoming,
+    required this.state,
+    this.statusLabel,
+    this.garage,
   });
 
   final String id;
   final String vehicleId;
   final String service;
   final DateTime date;
-  final bool upcoming;
+  final BookingState state;
+  final String? statusLabel;
+  final String? garage;
+
+  /// True for queue-facing bookings (requested / confirmed / in workshop).
+  bool get upcoming => state == BookingState.upcoming || state == BookingState.active;
+
+  HomeBooking copyWith({
+    BookingState? state,
+    String? statusLabel,
+    DateTime? date,
+    String? garage,
+  }) {
+    return HomeBooking(
+      id: id,
+      vehicleId: vehicleId,
+      service: service,
+      date: date ?? this.date,
+      state: state ?? this.state,
+      statusLabel: statusLabel ?? this.statusLabel,
+      garage: garage ?? this.garage,
+    );
+  }
 }
 
 class NearbyGarage {
