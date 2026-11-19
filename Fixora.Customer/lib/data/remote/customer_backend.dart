@@ -1,9 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../core/backend/api_client.dart';
 import '../../core/backend/fixora_config.dart';
+import '../../core/backend/fixora_hub.dart';
+import '../models/models.dart';
 import '../models/vehicle.dart';
 import '../repositories/app_state.dart';
+import '../repositories/job_store.dart';
 
 /// Customer auth + session bridge to the garage `/api/v1` backend.
 ///
@@ -13,12 +18,19 @@ class CustomerBackend extends ChangeNotifier {
   static final CustomerBackend instance = CustomerBackend._();
 
   final ApiClient api = ApiClient.instance;
+  late final FixoraHub hub = FixoraHub(api.freshToken);
 
   /// true once signed in against the real backend; false in demo mode.
   bool live = false;
 
   /// Garage service catalog from `/customer/garage/services` (used to resolve serviceId).
   final List<Map<String, dynamic>> services = [];
+
+  /// The proposal the customer is asked to decide on, if any.
+  Map<String, dynamic>? pendingProposal;
+
+  /// Latest SOS payload from the hub, if any.
+  final ValueNotifier<Map<String, dynamic>?> sos = ValueNotifier(null);
 
   /// `--dart-define=FIXORA_DEMO=true` forces offline demo mode.
   bool get enabled =>
@@ -81,6 +93,8 @@ class CustomerBackend extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await hub.stop();
+    hub.clearHandlers();
     try {
       await api.post('/customer/auth/logout');
     } on ApiException {
@@ -88,6 +102,8 @@ class CustomerBackend extends ChangeNotifier {
     }
     await api.clear();
     live = false;
+    pendingProposal = null;
+    sos.value = null;
     notifyListeners();
   }
 
@@ -201,6 +217,89 @@ class CustomerBackend extends ChangeNotifier {
     AppState.instance.applyRemoteBookings(list);
   }
 
+  /// Re-reads the active job and any proposal waiting for the customer.
+  Future<void> refreshJob() async {
+    final jobs = (await api.getList('/customer/jobs', query: {'activeOnly': 'true'}))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    final pending = (await api.getList('/customer/approvals/pending'))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    if (jobs.isEmpty) {
+      pendingProposal = null;
+      JobStore.instance.clearRemote();
+      return;
+    }
+    final summary = jobs.first;
+    final detail = await api.get('/customer/jobs/${summary['id']}');
+    pendingProposal = pending.where((p) => p['jobCardId'] == summary['id']).firstOrNull;
+    JobStore.instance.applyRemote(detail, pendingProposal);
+    notifyListeners();
+  }
+
+  Future<void> refreshNotifications() async {
+    final list = (await api.getList('/notifications', query: {'take': '60'}))
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+    JobStore.instance.replaceNotifications(list.map(notificationFrom).toList());
+  }
+
+  static AppNotification notificationFrom(Map<String, dynamic> n) {
+    final type = (n['type'] as String?) ?? '';
+    final kind = switch (type.split('.').first) {
+      'approval' || 'proposal' || 'change' =>
+        type == 'approval.confirmed' ? NotificationKind.progress : NotificationKind.estimate,
+      'booking' => NotificationKind.booking,
+      'job' => type == 'job.completed' ? NotificationKind.completed : NotificationKind.progress,
+      'queue' => NotificationKind.queue,
+      'sos' => NotificationKind.sos,
+      'invoice' => NotificationKind.payment,
+      'drivesense' => NotificationKind.serviceDue,
+      _ => NotificationKind.reminder,
+    };
+    return AppNotification(
+      id: n['id'] as String,
+      title: (n['title'] as String?) ?? '',
+      body: (n['body'] as String?) ?? '',
+      time: DateTime.tryParse((n['createdAt'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
+      kind: kind,
+      unread: n['read'] != true,
+    );
+  }
+
+  // ------------------------------------------------------------------ realtime
+
+  void _wireRealtime() {
+    hub.clearHandlers();
+    hub.on('notification', (payload) {
+      if (payload is! Map) return;
+      final n = Map<String, dynamic>.from(payload);
+      JobStore.instance.push(notificationFrom(n));
+      final type = (n['type'] as String?) ?? '';
+      // queue / booking / job events...
+      if (type.startsWith('approval') ||
+          type.startsWith('change') ||
+          type.startsWith('job') ||
+          type.startsWith('queue') ||
+          type.startsWith('invoice')) {
+        unawaited(refreshJob().catchError((Object _) {}));
+      }
+      if (type.startsWith('booking')) unawaited(refreshBookings().catchError((Object _) {}));
+    });
+    // A realtime event never proves completion: re-read the authoritative state.
+    hub.on('approval.updated', (_) => unawaited(refreshJob().catchError((Object _) {})));
+    hub.on('sos.updated', (payload) {
+      if (payload is Map) sos.value = Map<String, dynamic>.from(payload);
+    });
+    hub.onConnected(() {
+      unawaited(refreshJob().catchError((Object _) {}));
+      unawaited(refreshNotifications().catchError((Object _) {}));
+    });
+  }
+
   /// Copy session profile fields into the in-memory app store after auth.
   Future<void> _afterLogin() async {
     live = true;
@@ -215,10 +314,17 @@ class CustomerBackend extends ChangeNotifier {
       app.firstName = name.split(RegExp(r'\s+')).first;
     }
     try {
-      await Future.wait([ensureServices(), refreshBookings()]);
+      await Future.wait([
+        ensureServices(),
+        refreshBookings(),
+        refreshJob(),
+        refreshNotifications(),
+      ]);
     } on ApiException {
       // Profile sync still succeeds even if catalog/bookings are temporarily down.
     }
+    _wireRealtime();
+    unawaited(hub.start());
     app.notifyListeners();
     notifyListeners();
   }

@@ -1,3 +1,47 @@
+enum NotificationKind {
+  estimate,
+  progress,
+  media,
+  payment,
+  reminder,
+  queue,
+  sos,
+  booking,
+  received,
+  completed,
+  serviceDue,
+  offer,
+  subscription,
+}
+
+class AppNotification {
+  final String id;
+  final String title;
+  final String body;
+  final DateTime time;
+  final NotificationKind kind;
+  final bool unread;
+  const AppNotification({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.time,
+    required this.kind,
+    this.unread = false,
+  });
+
+  bool get isOffer => kind == NotificationKind.offer || kind == NotificationKind.subscription;
+
+  AppNotification copyWith({bool? unread}) => AppNotification(
+        id: id,
+        title: title,
+        body: body,
+        time: time,
+        kind: kind,
+        unread: unread ?? this.unread,
+      );
+}
+
 enum BookingState { active, upcoming, completed, cancelled }
 
 class Booking {

@@ -7,6 +7,9 @@ import '../../data/models/vehicle.dart';
 import '../../data/remote/customer_backend.dart';
 import '../../data/repositories/app_state.dart';
 import '../bookings/book_service_screen.dart';
+import '../bookings/bookings_screen.dart';
+import '../bookings/live_queue_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
 import '../vehicles/my_vehicles_screen.dart';
@@ -190,7 +193,7 @@ class _Header extends StatelessWidget {
           children: [
             IconButton(
               tooltip: 'Notifications',
-              onPressed: () => HomeScreen._soon(context, 'Notifications'),
+              onPressed: () => context.push(const NotificationsScreen()),
               icon: Icon(Icons.notifications_none_rounded, color: AppColors.navy),
             ),
             if (unread)
@@ -794,7 +797,9 @@ class _RecentBooking extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => HomeScreen._soon(context, upcoming ? 'Live Queue' : 'Bookings'),
+        onTap: () => upcoming
+            ? context.push(LiveQueueScreen(bookingId: b.id))
+            : context.push(const BookingsScreen()),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(

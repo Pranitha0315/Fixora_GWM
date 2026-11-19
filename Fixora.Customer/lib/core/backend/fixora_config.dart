@@ -11,4 +11,6 @@ class FixoraConfig {
   );
 
   static String get apiV1 => '$apiBase/api/v1';
+
+  static String get hubUrl => '$apiBase/hubs/fixora';
 }
