@@ -114,6 +114,53 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
             => Task.CompletedTask;
     }
 
+    /// <summary>Directory stub that can expose active, inactive, or unknown mechanics.</summary>
+    private sealed class AssignableMechanicDirectory : IMechanicDirectory
+    {
+        private readonly HashSet<Guid> _active = new();
+        private readonly HashSet<Guid> _inactive = new();
+
+        public AssignableMechanicDirectory WithActive(params Guid[] ids)
+        {
+            foreach (var id in ids)
+            {
+                _active.Add(id);
+            }
+
+            return this;
+        }
+
+        public AssignableMechanicDirectory WithInactive(params Guid[] ids)
+        {
+            foreach (var id in ids)
+            {
+                _inactive.Add(id);
+            }
+
+            return this;
+        }
+
+        public Task<MechanicSummary?> GetAsync(Guid mechanicId, CancellationToken ct = default)
+        {
+            if (_active.Contains(mechanicId))
+            {
+                return Task.FromResult<MechanicSummary?>(
+                    new MechanicSummary(mechanicId, "Active", "0770000001", "EMP-100", true, true));
+            }
+
+            if (_inactive.Contains(mechanicId))
+            {
+                return Task.FromResult<MechanicSummary?>(
+                    new MechanicSummary(mechanicId, "Inactive", "0770000002", "EMP-101", false, false));
+            }
+
+            return Task.FromResult<MechanicSummary?>(null);
+        }
+
+        public Task<IReadOnlyList<MechanicSummary>> ListAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<MechanicSummary>>(Array.Empty<MechanicSummary>());
+    }
+
     private sealed class Harness
     {
         public required ManagerDbContext Db { get; init; }
@@ -132,17 +179,19 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
     }
 
     private static Harness CreateHarness(ManagerDbContext db, params Guid[] mechanicIds)
+        => CreateHarness(db, new AssignableMechanicDirectory().WithActive(mechanicIds));
+
+    private static Harness CreateHarness(ManagerDbContext db, IMechanicDirectory mechanics)
     {
         var clock = new TestClock();
         var notifier = new CapturingNotifier();
         var customers = new StubCustomers();
         var media = new StubMedia();
-        var mechanics = new TestMechanicDirectory(mechanicIds);
         var read = new WorkshopReadModel(db, mechanics, media, clock);
         var queue = new QueueService(db, notifier, read, clock);
         var billing = new BillingService(db, customers, notifier, clock);
         var inventory = new InventoryService(db, notifier, clock);
-        var jobs = new JobService(db, read, notifier, queue, billing, clock);
+        var jobs = new JobService(db, read, notifier, queue, billing, mechanics, clock);
         var bookings = new BookingService(db, read, notifier, queue, customers, clock);
         var approvals = new ApprovalWorkflowService(db, read, notifier, queue, inventory, clock);
         var changes = new ChangeRequestService(db, notifier, clock);
@@ -464,5 +513,90 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
 
         Assert.DoesNotContain(otherHistory, h => h.JobId == job.Id);
         Assert.Empty(otherHistory);
+    }
+
+    // ---- Mechanic account validation on assign ----
+
+    [Fact]
+    public async Task Unknown_mechanic_is_rejected_without_mutating_job_or_notifying()
+    {
+        await using var db = CreateDb();
+        var customerId = Guid.NewGuid();
+        var existingMechanic = Guid.NewGuid();
+        var existingBay = Guid.NewGuid();
+        var unknownMechanic = Guid.NewGuid();
+        var job = SeedOpenJob(db, customerId, existingMechanic, existingBay);
+        var harness = CreateHarness(db, existingMechanic);
+
+        var ex = await Assert.ThrowsAsync<NotFoundException>(
+            () => harness.Jobs.AssignAsync(
+                Guid.NewGuid(),
+                job.Id,
+                new AssignJobRequest(unknownMechanic, Guid.NewGuid())));
+
+        Assert.Equal("not_found", ex.Code);
+
+        var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+        Assert.Equal(existingMechanic, reloaded.MechanicId);
+        Assert.Equal(existingBay, reloaded.BayId);
+        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+    }
+
+    [Fact]
+    public async Task Inactive_mechanic_is_rejected_without_mutating_job_or_notifying()
+    {
+        await using var db = CreateDb();
+        var customerId = Guid.NewGuid();
+        var existingMechanic = Guid.NewGuid();
+        var existingBay = Guid.NewGuid();
+        var inactiveMechanic = Guid.NewGuid();
+        var job = SeedOpenJob(db, customerId, existingMechanic, existingBay);
+        var directory = new AssignableMechanicDirectory()
+            .WithActive(existingMechanic)
+            .WithInactive(inactiveMechanic);
+        var harness = CreateHarness(db, directory);
+
+        var ex = await Assert.ThrowsAsync<ConflictException>(
+            () => harness.Jobs.AssignAsync(
+                Guid.NewGuid(),
+                job.Id,
+                new AssignJobRequest(inactiveMechanic, Guid.NewGuid())));
+
+        Assert.Equal("mechanic_inactive", ex.Code);
+
+        var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+        Assert.Equal(existingMechanic, reloaded.MechanicId);
+        Assert.Equal(existingBay, reloaded.BayId);
+        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+    }
+
+    [Fact]
+    public async Task Active_mechanic_can_be_assigned()
+    {
+        await using var db = CreateDb();
+        var customerId = Guid.NewGuid();
+        var mechanicId = Guid.NewGuid();
+        var bayId = Guid.NewGuid();
+        var job = SeedOpenJob(db, customerId);
+        var harness = CreateHarness(db, mechanicId);
+
+        var summary = await harness.Jobs.AssignAsync(
+            Guid.NewGuid(),
+            job.Id,
+            new AssignJobRequest(mechanicId, bayId));
+
+        Assert.Equal(mechanicId, summary.MechanicId);
+        Assert.Equal(bayId, summary.BayId);
+
+        var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+        Assert.Equal(mechanicId, reloaded.MechanicId);
+        Assert.Equal(bayId, reloaded.BayId);
+
+        var assigned = Assert.Single(
+            JobAssignedNotifications(harness.Notifier),
+            n => n.Message.Title == "Job assigned to you");
+        Assert.Contains(
+            assigned.Recipients,
+            r => r.Role == Roles.Mechanic && r.UserId == mechanicId);
     }
 }

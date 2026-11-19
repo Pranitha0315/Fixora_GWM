@@ -2,6 +2,7 @@ using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
+using Fixora.Mechanic.Contracts;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public sealed class JobService(
     INotificationService notifier,
     QueueService queue,
     BillingService billing,
+    IMechanicDirectory mechanics,
     IClock clock)
 {
     public async Task<JobSummaryDto> ApplyMechanicActionAsync(
@@ -264,6 +266,16 @@ public sealed class JobService(
             throw new ConflictException(
                 "job_finished",
                 "Cannot reassign a completed or closed job.");
+        }
+
+        var account = await mechanics.GetAsync(req.MechanicId, ct)
+            ?? throw new NotFoundException("Mechanic");
+
+        if (!account.Active)
+        {
+            throw new ConflictException(
+                "mechanic_inactive",
+                "Only an active mechanic account can be assigned.");
         }
 
         var previousMechanicId = job.MechanicId;

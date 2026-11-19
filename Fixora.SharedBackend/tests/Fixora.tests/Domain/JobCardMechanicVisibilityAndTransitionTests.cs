@@ -107,11 +107,12 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
 
     private static JobService CreateJobService(ManagerDbContext db, IClock clock)
     {
-        var read = new WorkshopReadModel(db, new TestMechanicDirectory(), new StubMedia(), clock);
+        var mechanics = new TestMechanicDirectory();
+        var read = new WorkshopReadModel(db, mechanics, new StubMedia(), clock);
         var notifier = new StubNotifier();
         var queue = new QueueService(db, notifier, read, clock);
         var billing = new BillingService(db, new StubCustomers(), notifier, clock);
-        return new JobService(db, read, notifier, queue, billing, clock);
+        return new JobService(db, read, notifier, queue, billing, mechanics, clock);
     }
 
     private static JobCard SeedAssignedJob(
