@@ -15,7 +15,9 @@ public enum JobStatus
     Closed,
 }
 
-/// <summary>Canonical job card. Mechanic and customer apps only read/act through gateways.</summary>
+/// <summary>
+/// Canonical job card. Mechanic and customer apps only read/act through gateways.
+/// </summary>
 public sealed class JobCard : Entity
 {
     public string Number { get; set; } = "";
@@ -28,8 +30,12 @@ public sealed class JobCard : Entity
     public Guid? BayId { get; set; }
     public JobStatus Status { get; set; } = JobStatus.Open;
     public string? Complaint { get; set; }
-    /// <summary>Higher runs first: SOS conversion 2, loyalty priority tier 1, normal 0.</summary>
+
+    /// <summary>
+    /// Higher runs first: SOS conversion 2, loyalty priority tier 1, normal 0.
+    /// </summary>
     public int Priority { get; set; }
+
     public int EstimatedMinutes { get; set; } = 60;
     public int QueueOrder { get; set; }
     public int QueuePosition { get; set; }
@@ -40,21 +46,32 @@ public sealed class JobCard : Entity
     public double WorkedMinutes { get; set; }
     public DateTime? CompletedAt { get; set; }
 
-    public bool IsActive => Status is not (JobStatus.Completed or JobStatus.Closed);
+    public bool IsActive =>
+        Status is not (JobStatus.Completed or JobStatus.Closed);
 
     public double ElapsedMinutes(DateTime now)
-        => WorkedMinutes + (RunningSince is { } since ? (now - since).TotalMinutes : 0);
+        => WorkedMinutes +
+           (RunningSince is { } since
+               ? (now - since).TotalMinutes
+               : 0);
 
     public void Start(DateTime now)
     {
         if (Status != JobStatus.Open)
-            throw new ConflictException("job_already_started", "This job has already been started.");
+        {
+            throw new ConflictException(
+                "job_already_started",
+                "This job has already been started.");
+        }
+
         StartedAt = now;
         RunningSince = now;
         Status = JobStatus.Inspecting;
     }
 
-    /// <summary>Approved work released by the manager: the job runs again.</summary>
+    /// <summary>
+    /// Approved work released by the manager: the job runs again.
+    /// </summary>
     public void BeginApprovedWork(DateTime now)
     {
         RunningSince ??= now;
@@ -65,7 +82,12 @@ public sealed class JobCard : Entity
     public void Pause(DateTime now)
     {
         if (Status != JobStatus.InProgress)
-            throw new ConflictException("job_not_running", "Only a running job can be paused.");
+        {
+            throw new ConflictException(
+                "job_not_running",
+                "Only a running job can be paused.");
+        }
+
         StopClock(now);
         Status = JobStatus.Paused;
     }
@@ -73,18 +95,57 @@ public sealed class JobCard : Entity
     public void Resume(DateTime now)
     {
         if (Status != JobStatus.Paused)
-            throw new ConflictException("job_not_paused", "Only a paused job can be resumed.");
+        {
+            throw new ConflictException(
+                "job_not_paused",
+                "Only a paused job can be resumed.");
+        }
+
         RunningSince = now;
         Status = JobStatus.InProgress;
     }
 
     public void Complete(DateTime now)
     {
-        if (Status is not (JobStatus.InProgress or JobStatus.Paused or JobStatus.Inspecting))
-            throw new ConflictException("job_cannot_complete", "Finish the approved work before completing the job.");
+        if (Status is not (
+            JobStatus.InProgress or
+            JobStatus.Paused or
+            JobStatus.Inspecting))
+        {
+            throw new ConflictException(
+                "job_cannot_complete",
+                "Finish the approved work before completing the job.");
+        }
+
         StopClock(now);
         Status = JobStatus.Completed;
         CompletedAt = now;
+    }
+
+    /// <summary>
+    /// Validates progress reporting without changing job state or timing.
+    /// </summary>
+    public void EnsureCanReportProgress()
+    {
+        if (Status is
+            JobStatus.AwaitingManagerReview or
+            JobStatus.AwaitingCustomerApproval or
+            JobStatus.AwaitingRelease)
+        {
+            throw new ConflictException(
+                "approval_pending",
+                "Wait until the manager releases the approved work.");
+        }
+
+        if (Status is not (
+            JobStatus.Inspecting or
+            JobStatus.InProgress or
+            JobStatus.Paused))
+        {
+            throw new ConflictException(
+                "job_cannot_report_progress",
+                "Progress can only be reported for an inspecting, running or paused job.");
+        }
     }
 
     private void StopClock(DateTime now)
@@ -108,10 +169,17 @@ public sealed class ProgressUpdate : Entity
     public DateTime At { get; set; } = DateTime.UtcNow;
 }
 
-public enum IssueSeverity { Safe, Attention, Urgent }
+public enum IssueSeverity
+{
+    Safe,
+    Attention,
+    Urgent
+}
 
-/// <summary>A FixProof finding confirmed by the mechanic. Only verified issues are stored here;
-/// unverified AI drafts stay in the mechanic schema and never reach the customer (AC-02).</summary>
+/// <summary>
+/// A FixProof finding confirmed by the mechanic.
+/// Unverified AI drafts stay in the mechanic schema.
+/// </summary>
 public sealed class InspectionIssue : Entity
 {
     public Guid JobCardId { get; set; }
@@ -125,8 +193,14 @@ public sealed class InspectionIssue : Entity
     public Guid CreatedByMechanicId { get; set; }
     public int ReportVersion { get; set; } = 1;
     public DateTime ConfirmedAt { get; set; } = DateTime.UtcNow;
-    /// <summary>Visible to the customer once the manager forwards the proposal it belongs to.</summary>
+
+    /// <summary>
+    /// Visible to the customer once the manager forwards its proposal.
+    /// </summary>
     public bool PublishedToCustomer { get; set; }
 
-    public IReadOnlyList<string> MediaRefs => MediaRefsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries);
+    public IReadOnlyList<string> MediaRefs =>
+        MediaRefsCsv.Split(
+            ',',
+            StringSplitOptions.RemoveEmptyEntries);
 }
