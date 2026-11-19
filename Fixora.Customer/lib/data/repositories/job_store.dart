@@ -73,8 +73,51 @@ class JobStore extends ChangeNotifier {
 
   /// Active remote job id from the garage API, if any.
   String? remoteJobId;
+  String jobId = 'FX-1042';
   String statusLabel = 'In progress';
+  String currentStepLabel = 'Diagnosis';
   double journey = 0.2;
+  JobStatus status = JobStatus.diagnosis;
+
+  final List<MediaItem> media = [
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.photo,
+      stage: MediaStage.before,
+      caption: 'Front bumper scratch at check-in',
+    ),
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.photo,
+      stage: MediaStage.during,
+      caption: 'Brake disc inspection',
+    ),
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.photo,
+      stage: MediaStage.during,
+      caption: 'Old vs new brake pads',
+    ),
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.photo,
+      stage: MediaStage.during,
+      caption: 'Wheel alignment in progress',
+    ),
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.photo,
+      stage: MediaStage.after,
+      caption: 'Bumper after polishing',
+    ),
+    const MediaItem(
+      asset: '',
+      kind: MediaKind.video,
+      stage: MediaStage.during,
+      caption: 'Brake pad replacement',
+      duration: '02:36',
+    ),
+  ];
 
   void clearRemote() {
     remoteJobId = null;

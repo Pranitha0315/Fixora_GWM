@@ -42,6 +42,64 @@ class AppNotification {
       );
 }
 
+enum MediaKind { photo, video }
+
+enum MediaStage { before, during, after }
+
+class MediaItem {
+  final String asset;
+
+  /// Photo picked from the gallery / camera (empty [asset] then).
+  final List<int>? bytes;
+  final MediaKind kind;
+  final MediaStage stage;
+  final String caption;
+  final String? duration;
+  final bool uploadedByMe;
+
+  const MediaItem({
+    required this.asset,
+    this.bytes,
+    required this.kind,
+    required this.stage,
+    required this.caption,
+    this.duration,
+    this.uploadedByMe = false,
+  });
+}
+
+class DiagnosisFinding {
+  final String code;
+  final String title;
+  final String description;
+  final String severity; // High / Medium / Low
+  final double confidence; // 0..1
+  const DiagnosisFinding({
+    required this.code,
+    required this.title,
+    required this.description,
+    required this.severity,
+    required this.confidence,
+  });
+}
+
+class LiveReading {
+  final String label;
+  final String value;
+  final String unit;
+  final bool warning;
+  const LiveReading(this.label, this.value, this.unit, {this.warning = false});
+}
+
+enum JobStatus {
+  diagnosis,
+  awaitingApproval,
+  changesRequested,
+  inProgress,
+  completed,
+  paid,
+}
+
 enum BookingState { active, upcoming, completed, cancelled }
 
 class Booking {
