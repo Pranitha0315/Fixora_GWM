@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,6 +75,12 @@ class ApiClient {
 
   /// Dedupes concurrent refresh calls so only one POST /auth/refresh is in flight.
   Future<String?>? _refreshInFlight;
+
+  static String newIdempotencyKey() {
+    final r = Random.secure();
+    final bytes = List<int>.generate(16, (_) => r.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+  }
 
   Uri _uri(String path) {
     final base = FixoraConfig.apiV1;
@@ -157,25 +164,57 @@ class ApiClient {
     }
   }
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) =>
-      _send('GET', path, query: query);
+  Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) async {
+    final r = await _send('GET', path, query: query);
+    if (r is Map<String, dynamic>) return r;
+    return <String, dynamic>{};
+  }
 
-  Future<Map<String, dynamic>> post(String path, {Object? body}) =>
-      _send('POST', path, body: body);
+  Future<List<dynamic>> getList(String path, {Map<String, String>? query}) async {
+    final r = await _send('GET', path, query: query);
+    if (r is List) return r;
+    if (r is Map<String, dynamic>) {
+      return (r['items'] as List<dynamic>?) ??
+          (r['services'] as List<dynamic>?) ??
+          const [];
+    }
+    return const [];
+  }
 
-  Future<Map<String, dynamic>> put(String path, {Object? body}) =>
-      _send('PUT', path, body: body);
+  Future<Map<String, dynamic>> post(
+    String path, {
+    Object? body,
+    Map<String, String>? headers,
+  }) async {
+    final r = await _send('POST', path, body: body, extraHeaders: headers);
+    if (r is Map<String, dynamic>) return r;
+    return <String, dynamic>{};
+  }
 
-  Future<Map<String, dynamic>> patch(String path, {Object? body}) =>
-      _send('PATCH', path, body: body);
+  Future<Map<String, dynamic>> put(String path, {Object? body}) async {
+    final r = await _send('PUT', path, body: body);
+    if (r is Map<String, dynamic>) return r;
+    return <String, dynamic>{};
+  }
 
-  Future<Map<String, dynamic>> delete(String path) => _send('DELETE', path);
+  Future<Map<String, dynamic>> patch(String path, {Object? body}) async {
+    final r = await _send('PATCH', path, body: body);
+    if (r is Map<String, dynamic>) return r;
+    return <String, dynamic>{};
+  }
 
-  Future<Map<String, dynamic>> _send(
+  Future<Map<String, dynamic>> delete(String path) async {
+    final r = await _send('DELETE', path);
+    if (r is Map<String, dynamic>) return r;
+    return <String, dynamic>{};
+  }
+
+  Future<Object> _send(
     String method,
     String path, {
     Object? body,
     Map<String, String>? query,
+    Map<String, String>? extraHeaders,
     bool retried = false,
   }) async {
     final token = await freshToken();
@@ -188,6 +227,7 @@ class ApiClient {
       'Accept': 'application/json',
       if (body != null) 'Content-Type': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+      if (extraHeaders != null) ...extraHeaders,
     };
 
     late http.Response res;
@@ -226,30 +266,38 @@ class ApiClient {
     if (res.statusCode == 401 && !retried) {
       final refreshed = await refresh();
       if (refreshed != null) {
-        return _send(method, path, body: body, query: query, retried: true);
+        return _send(
+          method,
+          path,
+          body: body,
+          query: query,
+          extraHeaders: extraHeaders,
+          retried: true,
+        );
       }
     }
 
     return _decode(res);
   }
 
-  Map<String, dynamic> _decode(http.Response res) {
-    Map<String, dynamic>? json;
+  Object _decode(http.Response res) {
+    Object? decoded;
+    Map<String, dynamic>? asMap;
     if (res.body.isNotEmpty) {
       try {
-        final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic>) json = decoded;
+        decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) asMap = decoded;
       } catch (_) {
-        json = null;
+        decoded = null;
       }
     }
 
     if (res.statusCode >= 200 && res.statusCode < 300) {
-      return json ?? <String, dynamic>{};
+      return decoded ?? <String, dynamic>{};
     }
 
-    final code = (json?['code'] as String?) ?? 'HTTP_${res.statusCode}';
-    final message = (json?['message'] as String?) ??
+    final code = (asMap?['code'] as String?) ?? 'HTTP_${res.statusCode}';
+    final message = (asMap?['message'] as String?) ??
         (res.body.isNotEmpty ? res.body : 'Request failed (${res.statusCode})');
     throw ApiException(res.statusCode, code, message);
   }

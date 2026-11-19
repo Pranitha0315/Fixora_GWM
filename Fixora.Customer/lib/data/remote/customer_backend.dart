@@ -17,6 +17,9 @@ class CustomerBackend extends ChangeNotifier {
   /// true once signed in against the real backend; false in demo mode.
   bool live = false;
 
+  /// Garage service catalog from `/customer/garage/services` (used to resolve serviceId).
+  final List<Map<String, dynamic>> services = [];
+
   /// `--dart-define=FIXORA_DEMO=true` forces offline demo mode.
   bool get enabled =>
       const String.fromEnvironment('FIXORA_DEMO', defaultValue: '') != 'true' &&
@@ -138,6 +141,56 @@ class CustomerBackend extends ChangeNotifier {
       color: (v['color'] as String?) ?? 'White',
       active: true,
     );
+  }
+
+  /// Loads garage services so [book] can resolve a real [serviceId].
+  Future<void> ensureServices() async {
+    if (services.isNotEmpty) return;
+    final list = await api.getList('/customer/garage/services');
+    services
+      ..clear()
+      ..addAll(list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
+  }
+
+  /// Requests a booking against real bay capacity. 409 means the slot was just taken.
+  ///
+  /// POST /customer/appointments
+  /// vehicleId, serviceId, slotStart, notes + Idempotency-Key
+  Future<Map<String, dynamic>> book({
+    required String vehicleId,
+    required String serviceName,
+    required DateTime slotStart,
+    String? notes,
+  }) async {
+    await ensureServices();
+    final svc = services.where((s) => _sameService('${s['name'] ?? ''}', serviceName)).firstOrNull ??
+        services.firstOrNull;
+    if (svc == null) {
+      throw ApiException(404, 'no_services', 'The garage has no services to book yet.');
+    }
+    final r = await api.post(
+      '/customer/appointments',
+      body: {
+        'vehicleId': vehicleId,
+        'serviceId': svc['id'],
+        'slotStart': slotStart.toUtc().toIso8601String(),
+        'notes': notes,
+        'promoCode': null,
+        'suggestionId': null,
+      },
+      headers: {'Idempotency-Key': ApiClient.newIdempotencyKey()},
+    );
+    return r;
+  }
+
+  static bool _sameService(String a, String b) {
+    String n(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    final x = n(a), y = n(b);
+    return x == y ||
+        x.contains(y) ||
+        y.contains(x) ||
+        (x.contains('brake') && y.contains('brake')) ||
+        (x.contains('oil') && y.contains('oil'));
   }
 
   /// Copy session profile fields into the in-memory app store after auth.

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/vehicle.dart';
 import '../../data/remote/customer_backend.dart';
 import '../../data/repositories/app_state.dart';
+import '../bookings/book_service_screen.dart';
 import '../profile/profile_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
 import '../vehicles/my_vehicles_screen.dart';
@@ -47,7 +48,7 @@ class HomeScreen extends StatelessWidget {
                         title: 'Book\nService',
                         icon: Icons.event_available_rounded,
                         color: AppColors.primarySoft,
-                        onTap: () => _soon(context, 'Book Service'),
+                        onTap: () => context.push(BookServiceScreen(vehicleId: v.id)),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -675,7 +676,9 @@ class _NextServiceCard extends StatelessWidget {
           SizedBox(
             height: 46,
             child: FilledButton(
-              onPressed: () => HomeScreen._soon(context, 'Book Now · $title'),
+              onPressed: () => context.push(
+                BookServiceScreen(vehicleId: vehicle.id, service: title),
+              ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),

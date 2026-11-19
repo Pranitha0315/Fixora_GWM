@@ -164,6 +164,27 @@ class AppState extends ChangeNotifier {
       bookings.where((b) => b.upcoming && b.vehicleId == vehicleId).toList()
         ..sort((a, b) => a.date.compareTo(b.date));
 
+  HomeBooking addBooking({
+    String? id,
+    required String vehicleId,
+    required String service,
+    required DateTime date,
+    List<String> symptoms = const [],
+    String? garage,
+  }) {
+    final b = HomeBooking(
+      id: id ?? 'b_${DateTime.now().millisecondsSinceEpoch}',
+      vehicleId: vehicleId,
+      service: service,
+      date: date,
+      upcoming: true,
+    );
+    bookings.insert(0, b);
+    bookingCount = bookings.length;
+    notifyListeners();
+    return b;
+  }
+
   final List<NearbyGarage> nearestGarages = const [
     NearbyGarage(
       name: 'Fixora Colombo',
