@@ -1,6 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+import '../models/models.dart';
 import '../models/vehicle.dart';
+
+export '../models/models.dart' show Booking, BookingState;
 
 /// App-wide state: profile, vehicles, bookings, subscription and settings.
 ///
@@ -137,16 +140,17 @@ class AppState extends ChangeNotifier {
   String currentStatusLabel = 'Bay 3 · Oil service';
   int currentJobStep = 2; // 0..4 progress dots
 
-  final List<HomeBooking> bookings = [
-    HomeBooking(
+  final List<Booking> bookings = [
+    Booking(
       id: 'b1',
       vehicleId: 'v1',
       service: 'Full Service',
       date: DateTime.now().add(const Duration(days: 3)),
       state: BookingState.upcoming,
       statusLabel: 'Confirmed',
+      queuePosition: 2,
     ),
-    HomeBooking(
+    Booking(
       id: 'b2',
       vehicleId: 'v1',
       service: 'Oil Change',
@@ -156,21 +160,21 @@ class AppState extends ChangeNotifier {
     ),
   ];
 
-  HomeBooking? get nextUpcoming {
+  Booking? get nextUpcoming {
     final upcoming = bookings.where((b) => b.upcoming).toList()
       ..sort((a, b) => a.date.compareTo(b.date));
     return upcoming.isEmpty ? null : upcoming.first;
   }
 
-  List<HomeBooking> upcomingFor(String vehicleId) =>
+  List<Booking> upcomingFor(String vehicleId) =>
       bookings.where((b) => b.upcoming && b.vehicleId == vehicleId).toList()
         ..sort((a, b) => a.date.compareTo(b.date));
 
-  List<HomeBooking> bookingsIn(Set<BookingState> states) =>
+  List<Booking> bookingsIn(Set<BookingState> states) =>
       bookings.where((b) => states.contains(b.state)).toList()
         ..sort((a, b) => b.date.compareTo(a.date));
 
-  HomeBooking addBooking({
+  Booking addBooking({
     String? id,
     required String vehicleId,
     required String service,
@@ -179,15 +183,18 @@ class AppState extends ChangeNotifier {
     String? garage,
     BookingState state = BookingState.upcoming,
     String? statusLabel,
+    int? queuePosition,
   }) {
-    final b = HomeBooking(
+    final b = Booking(
       id: id ?? 'b_${DateTime.now().millisecondsSinceEpoch}',
       vehicleId: vehicleId,
       service: service,
       date: date,
       state: state,
       statusLabel: statusLabel ?? 'Confirmed',
-      garage: garage,
+      garage: garage ?? 'Fixora Garage',
+      symptoms: symptoms,
+      queuePosition: queuePosition,
     );
     bookings.insert(0, b);
     bookingCount = bookings.length;
@@ -208,7 +215,7 @@ class AppState extends ChangeNotifier {
           'Declined' || 'Cancelled' || 'NoShow' => BookingState.cancelled,
           _ => BookingState.upcoming,
         };
-        return HomeBooking(
+        return Booking(
           id: b['id'] as String,
           vehicleId: (b['vehicleId'] as String?) ?? '',
           service: (b['serviceName'] as String?) ?? 'Service',
@@ -220,7 +227,8 @@ class AppState extends ChangeNotifier {
             'NoShow' => 'Missed',
             _ => status,
           },
-          garage: b['garageName'] as String?,
+          garage: (b['garageName'] as String?) ?? 'Fixora Garage',
+          queuePosition: (b['queuePosition'] as num?)?.toInt(),
         );
       }));
     bookingCount = bookings.length;
@@ -339,48 +347,6 @@ class UserProfile {
         email: email ?? this.email,
         phone: phone ?? this.phone,
       );
-}
-
-enum BookingState { upcoming, active, completed, cancelled }
-
-class HomeBooking {
-  const HomeBooking({
-    required this.id,
-    required this.vehicleId,
-    required this.service,
-    required this.date,
-    required this.state,
-    this.statusLabel,
-    this.garage,
-  });
-
-  final String id;
-  final String vehicleId;
-  final String service;
-  final DateTime date;
-  final BookingState state;
-  final String? statusLabel;
-  final String? garage;
-
-  /// True for queue-facing bookings (requested / confirmed / in workshop).
-  bool get upcoming => state == BookingState.upcoming || state == BookingState.active;
-
-  HomeBooking copyWith({
-    BookingState? state,
-    String? statusLabel,
-    DateTime? date,
-    String? garage,
-  }) {
-    return HomeBooking(
-      id: id,
-      vehicleId: vehicleId,
-      service: service,
-      date: date ?? this.date,
-      state: state ?? this.state,
-      statusLabel: statusLabel ?? this.statusLabel,
-      garage: garage ?? this.garage,
-    );
-  }
 }
 
 class NearbyGarage {
