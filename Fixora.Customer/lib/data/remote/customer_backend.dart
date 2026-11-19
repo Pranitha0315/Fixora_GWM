@@ -217,6 +217,51 @@ class CustomerBackend extends ChangeNotifier {
     AppState.instance.applyRemoteBookings(list);
   }
 
+  /// Per-item decision (BR-FP-07). Goes to the service manager, who releases approved work to the mechanic.
+  ///
+  /// POST /customer/approvals/{id}/decisions + Idempotency-Key.
+  /// Stale item version → 409; the same key is reused on network retry.
+  Future<void> decide(Map<String, bool> approveByItemId, {String? note}) async {
+    final p = pendingProposal;
+    if (p == null) {
+      throw ApiException(409, 'nothing_pending', 'There is nothing waiting for your approval.');
+    }
+    final items = (p['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? const [];
+    final decisions = [
+      for (final it in items)
+        if (it['status'] == 'AwaitingCustomer')
+          {
+            'itemId': it['id'],
+            'approve': approveByItemId[it['id']] ?? true,
+            'version': it['version'],
+          },
+    ];
+    final key = ApiClient.newIdempotencyKey();
+    try {
+      await api.post(
+        '/customer/approvals/${p['id']}/decisions',
+        body: {
+          'decisions': decisions,
+          'note': (note == null || note.isEmpty) ? null : note,
+        },
+        headers: {'Idempotency-Key': key},
+      );
+    } on ApiException catch (e) {
+      // Stale version / business conflict → refresh then rethrow (409).
+      if (!e.isNetwork) {
+        await refreshJob();
+        rethrow;
+      }
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await api.post(
+        '/customer/approvals/${p['id']}/decisions',
+        body: {'decisions': decisions, 'note': note},
+        headers: {'Idempotency-Key': key},
+      );
+    }
+    await refreshJob();
+  }
+
   /// Re-reads the active job, its FixProof report and any proposal waiting for the customer.
   Future<void> refreshJob() async {
     final jobs = (await api.getList('/customer/jobs', query: {'activeOnly': 'true'}))
