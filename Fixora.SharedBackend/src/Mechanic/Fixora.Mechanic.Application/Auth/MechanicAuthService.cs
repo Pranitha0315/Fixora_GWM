@@ -14,7 +14,13 @@ public sealed record ChangePinRequest(string CurrentPin, string NewPin);
 public sealed record MechanicProfileDto(Guid Id, string Name, string Phone, string EmployeeCode, bool OnDuty, string PreferredLanguage);
 public sealed record DutyRequest(bool OnDuty);
 
-public sealed class MechanicAuthService(IMechanicDb db, IPasswordService passwords, ITokenService tokens, IInvitationGateway invitations, IClock clock)
+public sealed class MechanicAuthService(
+    IMechanicDb db,
+    IPasswordService passwords,
+    ITokenService tokens,
+    IInvitationGateway invitations,
+    IClock clock,
+    IFixoraTransaction transaction)
 {
     /// <summary>Login with employee code (EMP-001) or phone + 4-digit PIN; 5 wrong PINs lock for 15 minutes.</summary>
     public async Task<AuthTokens> LoginAsync(PinLoginRequest req, CancellationToken ct = default)
@@ -43,20 +49,27 @@ public sealed class MechanicAuthService(IMechanicDb db, IPasswordService passwor
     {
         Guard.Against(req.Pin is null || req.Pin.Length != 4 || !req.Pin.All(char.IsDigit), "PIN must be 4 digits.");
         var inv = await CheckInvitationAsync(req.Token, ct);
-        var count = await db.Mechanics.CountAsync(ct);
-        var m = new MechanicAccount
+
+        // Account row (mechanic schema) + invitation bind (workshop schema) commit together.
+        var created = await transaction.ExecuteAsync(async innerCt =>
         {
-            Name = string.IsNullOrWhiteSpace(req.Name) ? inv.Name : req.Name.Trim(),
-            Phone = inv.Phone,
-            EmployeeCode = $"EMP-{count + 1:000}",
-            PinHash = passwords.Hash(req.Pin!),
-            InvitationId = inv.Id,
-            CreatedAt = clock.UtcNow,
-        };
-        db.Mechanics.Add(m);
-        await db.SaveChangesAsync(ct);
-        await invitations.MarkAcceptedAsync(inv.Id, m.Id, ct);
-        return await tokens.IssueAsync(m.Id, Roles.Mechanic, m.Name, ct);
+            var count = await db.Mechanics.CountAsync(innerCt);
+            var m = new MechanicAccount
+            {
+                Name = string.IsNullOrWhiteSpace(req.Name) ? inv.Name : req.Name.Trim(),
+                Phone = inv.Phone,
+                EmployeeCode = $"EMP-{count + 1:000}",
+                PinHash = passwords.Hash(req.Pin!),
+                InvitationId = inv.Id,
+                CreatedAt = clock.UtcNow,
+            };
+            db.Mechanics.Add(m);
+            await db.SaveChangesAsync(innerCt);
+            await invitations.MarkAcceptedAsync(inv.Id, m.Id, innerCt);
+            return m;
+        }, ct);
+
+        return await tokens.IssueAsync(created.Id, Roles.Mechanic, created.Name, ct);
     }
 
     public async Task<MechanicProfileDto> ProfileAsync(Guid id, CancellationToken ct = default)

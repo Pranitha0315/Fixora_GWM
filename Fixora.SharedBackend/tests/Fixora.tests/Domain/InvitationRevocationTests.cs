@@ -2,6 +2,7 @@
 using Fixora.Manager.Domain;
 using Fixora.Manager.Infrastructure.Persistence;
 using Fixora.SharedKernel;
+using Fixora.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -17,6 +18,9 @@ public sealed class InvitationRevocationTests
 
         return new ManagerDbContext(options);
     }
+
+    private static InvitationService CreateService(ManagerDbContext db)
+        => new(db, new SystemClock(), new TestMechanicDirectory());
 
     private static MechanicInvitation CreateInvitation() => new()
     {
@@ -36,7 +40,7 @@ public sealed class InvitationRevocationTests
         db.Invitations.Add(invitation);
         await db.SaveChangesAsync();
 
-        var service = new InvitationService(db, new SystemClock());
+        var service = CreateService(db);
         await service.RevokeAsync(invitation.Id);
 
         db.ChangeTracker.Clear();
@@ -58,7 +62,7 @@ public sealed class InvitationRevocationTests
         db.Invitations.Add(invitation);
         await db.SaveChangesAsync();
 
-        var service = new InvitationService(db, new SystemClock());
+        var service = CreateService(db);
 
         var error = await Assert.ThrowsAsync<ConflictException>(
             () => service.RevokeAsync(invitation.Id));
@@ -84,7 +88,7 @@ public sealed class InvitationRevocationTests
         db.Invitations.Add(invitation);
         await db.SaveChangesAsync();
 
-        var service = new InvitationService(db, new SystemClock());
+        var service = CreateService(db);
 
         await service.RevokeAsync(invitation.Id);
         await service.RevokeAsync(invitation.Id);

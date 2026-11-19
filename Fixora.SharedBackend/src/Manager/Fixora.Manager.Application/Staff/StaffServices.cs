@@ -39,7 +39,7 @@ public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, 
 }
 
 /// <summary>Manager-issued 7-day mechanic invitations.</summary>
-public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitationGateway
+public sealed class InvitationService(IManagerDb db, IClock clock, IMechanicDirectory mechanics) : IInvitationGateway
 {
     public const int ValidDays = 7;
 
@@ -135,6 +135,16 @@ public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitation
             mechanicId == Guid.Empty,
             "A valid mechanic account ID is required.");
 
+        var account = await mechanics.GetAsync(mechanicId, ct)
+            ?? throw new NotFoundException("Mechanic");
+
+        if (!account.Active)
+        {
+            throw new ConflictException(
+                "mechanic_inactive",
+                "Only an active mechanic account can accept an invitation.");
+        }
+
         var inv = await db.Invitations
             .FirstOrDefaultAsync(i => i.Id == invitationId, ct)
             ?? throw new NotFoundException("Invitation");
@@ -170,8 +180,25 @@ public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitation
 
         inv.AcceptedAt = now;
         inv.MechanicId = mechanicId;
+        inv.Version++;
 
-        await db.SaveChangesAsync(ct);
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException) when (db is DbContext ctx)
+        {
+            await ctx.Entry(inv).ReloadAsync(ct);
+
+            if (inv.AcceptedAt is not null && inv.MechanicId == mechanicId)
+            {
+                return;
+            }
+
+            throw new ConflictException(
+                "invitation_already_accepted",
+                "This invitation is already linked to another mechanic account.");
+        }
     }
 
     private InvitationDto ToDto(MechanicInvitation i) => new(

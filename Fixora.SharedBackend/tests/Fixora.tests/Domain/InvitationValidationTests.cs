@@ -2,6 +2,7 @@
 using Fixora.Manager.Domain;
 using Fixora.Manager.Infrastructure.Persistence;
 using Fixora.SharedKernel;
+using Fixora.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
@@ -26,12 +27,15 @@ public sealed class InvitationValidationTests
         return new ManagerDbContext(options);
     }
 
+    private static InvitationService CreateService(ManagerDbContext db, IClock clock, params Guid[] mechanicIds)
+        => new(db, clock, new TestMechanicDirectory(mechanicIds));
+
     [Fact]
     public async Task Created_invitation_expires_after_exactly_seven_days()
     {
         await using var db = CreateDb();
         var clock = new TestClock();
-        var service = new InvitationService(db, clock);
+        var service = CreateService(db, clock);
         var staffId = Guid.NewGuid();
 
         var result = await service.CreateAsync(
@@ -56,7 +60,7 @@ public sealed class InvitationValidationTests
     {
         await using var db = CreateDb();
         var clock = new TestClock();
-        var service = new InvitationService(db, clock);
+        var service = CreateService(db, clock);
 
         var result = await service.CreateAsync(
             Guid.NewGuid(),
@@ -72,7 +76,7 @@ public sealed class InvitationValidationTests
     {
         await using var db = CreateDb();
         var clock = new TestClock();
-        var service = new InvitationService(db, clock);
+        var service = CreateService(db, clock);
 
         var result = await service.CreateAsync(
             Guid.NewGuid(),
@@ -90,7 +94,7 @@ public sealed class InvitationValidationTests
     {
         await using var db = CreateDb();
         var clock = new TestClock();
-        var service = new InvitationService(db, clock);
+        var service = CreateService(db, clock);
 
         var result = await service.CreateAsync(
             Guid.NewGuid(),
@@ -106,13 +110,14 @@ public sealed class InvitationValidationTests
     {
         await using var db = CreateDb();
         var clock = new TestClock();
-        var service = new InvitationService(db, clock);
+        var mechanicId = Guid.NewGuid();
+        var service = CreateService(db, clock, mechanicId);
 
         var result = await service.CreateAsync(
             Guid.NewGuid(),
             new CreateInvitationRequest("Test Mechanic", "0770000000"));
 
-        await service.MarkAcceptedAsync(result.Id, Guid.NewGuid());
+        await service.MarkAcceptedAsync(result.Id, mechanicId);
 
         Assert.Null(await service.FindValidAsync(result.Token));
     }

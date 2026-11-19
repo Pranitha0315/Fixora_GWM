@@ -71,6 +71,8 @@ public sealed class MechanicInvitation : Entity
     public DateTime? AcceptedAt { get; set; }
     public Guid? MechanicId { get; set; }
     public DateTime? RevokedAt { get; set; }
+    /// <summary>Optimistic concurrency token so two accept calls cannot bind different accounts.</summary>
+    public int Version { get; set; }
 
     public bool IsValid(DateTime now) => AcceptedAt is null && RevokedAt is null && ExpiresAt > now;
 }

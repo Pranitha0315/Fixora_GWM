@@ -43,6 +43,11 @@ builder.Services.AddFixoraShared(config);
 builder.Services.AddCustomerModule(config);
 builder.Services.AddMechanicModule(config);
 builder.Services.AddManagerModule(config);
+// Manager + Mechanic schemas share one SQL database; acceptance must commit both or neither.
+builder.Services.AddScoped<IFixoraTransaction>(sp =>
+    new CrossContextTransaction<ManagerDbContext, MechanicDbContext>(
+        sp.GetRequiredService<ManagerDbContext>(),
+        sp.GetRequiredService<MechanicDbContext>()));
 
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(CustomerControllerBase).Assembly)

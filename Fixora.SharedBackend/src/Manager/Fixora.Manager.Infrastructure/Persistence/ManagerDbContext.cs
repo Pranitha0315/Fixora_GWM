@@ -46,7 +46,12 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
 
         b.Entity<Workshop>().Property(x => x.Name).HasMaxLength(200);
         b.Entity<StaffUser>(e => { e.HasIndex(x => x.Email).IsUnique(); e.Property(x => x.Email).HasMaxLength(256); e.Property(x => x.Role).HasMaxLength(32); });
-        b.Entity<MechanicInvitation>(e => { e.HasIndex(x => x.Token).IsUnique(); e.Property(x => x.Token).HasMaxLength(32); });
+        b.Entity<MechanicInvitation>(e =>
+        {
+            e.HasIndex(x => x.Token).IsUnique();
+            e.Property(x => x.Token).HasMaxLength(32);
+            e.Property(x => x.Version).IsConcurrencyToken();
+        });
 
         b.Entity<Appointment>(e =>
         {
