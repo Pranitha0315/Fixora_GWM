@@ -226,6 +226,26 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         db.SaveChanges();
     }
 
+    private static Bay SeedBay(
+        ManagerDbContext db,
+        Guid? id = null,
+        bool active = true,
+        string name = "Bay 1")
+    {
+        EnsureWorkshop(db);
+
+        var bay = new Bay
+        {
+            Id = id ?? Guid.NewGuid(),
+            Name = name,
+            Active = active,
+            SortOrder = active ? 1 : 99
+        };
+        db.Bays.Add(bay);
+        db.SaveChanges();
+        return bay;
+    }
+
     private static JobCard SeedOpenJob(
         ManagerDbContext db,
         Guid customerId,
@@ -327,21 +347,21 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var mechanicId = Guid.NewGuid();
-        var bayId = Guid.NewGuid();
+        var bay = SeedBay(db);
         var job = SeedOpenJob(db, customerId);
         var harness = CreateHarness(db, mechanicId);
 
         var summary = await harness.Jobs.AssignAsync(
             Guid.NewGuid(),
             job.Id,
-            new AssignJobRequest(mechanicId, bayId));
+            new AssignJobRequest(mechanicId, bay.Id));
 
         Assert.Equal(mechanicId, summary.MechanicId);
-        Assert.Equal(bayId, summary.BayId);
+        Assert.Equal(bay.Id, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
         Assert.Equal(mechanicId, reloaded.MechanicId);
-        Assert.Equal(bayId, reloaded.BayId);
+        Assert.Equal(bay.Id, reloaded.BayId);
     }
 
     [Fact]
@@ -350,7 +370,7 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var mechanicId = Guid.NewGuid();
-        var bayId = Guid.NewGuid();
+        var bay = SeedBay(db);
         var job = SeedOpenJob(db, customerId);
         var harness = CreateHarness(db, mechanicId);
 
@@ -360,13 +380,13 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
             var current = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
             persistedBeforeNotify =
                 current.MechanicId == mechanicId &&
-                current.BayId == bayId;
+                current.BayId == bay.Id;
         };
 
         await harness.Jobs.AssignAsync(
             Guid.NewGuid(),
             job.Id,
-            new AssignJobRequest(mechanicId, bayId));
+            new AssignJobRequest(mechanicId, bay.Id));
 
         Assert.True(
             persistedBeforeNotify,
@@ -389,8 +409,8 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         var customerId = Guid.NewGuid();
         var previous = Guid.NewGuid();
         var next = Guid.NewGuid();
-        var bayId = Guid.NewGuid();
-        var job = SeedOpenJob(db, customerId, previous, Guid.NewGuid());
+        var bay = SeedBay(db);
+        var job = SeedOpenJob(db, customerId, previous, SeedBay(db, name: "Prior Bay").Id);
         job.Status = JobStatus.InProgress;
         job.StartedAt = Now.AddMinutes(-20);
         job.RunningSince = Now.AddMinutes(-10);
@@ -401,7 +421,7 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         await harness.Jobs.AssignAsync(
             Guid.NewGuid(),
             job.Id,
-            new AssignJobRequest(next, bayId));
+            new AssignJobRequest(next, bay.Id));
 
         var viewEx = await Assert.ThrowsAsync<NotFoundException>(
             () => harness.Jobs.GetAsync(
@@ -436,21 +456,21 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var mechanicId = Guid.NewGuid();
-        var firstBay = Guid.NewGuid();
-        var secondBay = Guid.NewGuid();
-        var job = SeedOpenJob(db, customerId, mechanicId, firstBay);
+        var firstBay = SeedBay(db, name: "Bay A");
+        var secondBay = SeedBay(db, name: "Bay B");
+        var job = SeedOpenJob(db, customerId, mechanicId, firstBay.Id);
         var harness = CreateHarness(db, mechanicId);
 
         await harness.Jobs.AssignAsync(
             Guid.NewGuid(),
             job.Id,
-            new AssignJobRequest(mechanicId, secondBay));
+            new AssignJobRequest(mechanicId, secondBay.Id));
 
         Assert.Empty(JobAssignedNotifications(harness.Notifier));
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
         Assert.Equal(mechanicId, reloaded.MechanicId);
-        Assert.Equal(secondBay, reloaded.BayId);
+        Assert.Equal(secondBay.Id, reloaded.BayId);
     }
 
     [Fact]
@@ -576,21 +596,21 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var mechanicId = Guid.NewGuid();
-        var bayId = Guid.NewGuid();
+        var bay = SeedBay(db);
         var job = SeedOpenJob(db, customerId);
         var harness = CreateHarness(db, mechanicId);
 
         var summary = await harness.Jobs.AssignAsync(
             Guid.NewGuid(),
             job.Id,
-            new AssignJobRequest(mechanicId, bayId));
+            new AssignJobRequest(mechanicId, bay.Id));
 
         Assert.Equal(mechanicId, summary.MechanicId);
-        Assert.Equal(bayId, summary.BayId);
+        Assert.Equal(bay.Id, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
         Assert.Equal(mechanicId, reloaded.MechanicId);
-        Assert.Equal(bayId, reloaded.BayId);
+        Assert.Equal(bay.Id, reloaded.BayId);
 
         var assigned = Assert.Single(
             JobAssignedNotifications(harness.Notifier),
@@ -598,5 +618,58 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         Assert.Contains(
             assigned.Recipients,
             r => r.Role == Roles.Mechanic && r.UserId == mechanicId);
+    }
+
+    // ---- Bay validation on assign ----
+
+    [Fact]
+    public async Task Unknown_bay_is_rejected_without_mutating_job_or_notifying()
+    {
+        await using var db = CreateDb();
+        var customerId = Guid.NewGuid();
+        var mechanicId = Guid.NewGuid();
+        var existingBay = SeedBay(db, name: "Existing Bay");
+        var job = SeedOpenJob(db, customerId, mechanicId, existingBay.Id);
+        var harness = CreateHarness(db, mechanicId);
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(
+            () => harness.Jobs.AssignAsync(
+                Guid.NewGuid(),
+                job.Id,
+                new AssignJobRequest(mechanicId, Guid.NewGuid())));
+
+        Assert.Equal("validation_failed", ex.Code);
+        Assert.Equal("Pick an active bay.", ex.Message);
+
+        var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+        Assert.Equal(mechanicId, reloaded.MechanicId);
+        Assert.Equal(existingBay.Id, reloaded.BayId);
+        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+    }
+
+    [Fact]
+    public async Task Inactive_bay_is_rejected_without_mutating_job_or_notifying()
+    {
+        await using var db = CreateDb();
+        var customerId = Guid.NewGuid();
+        var mechanicId = Guid.NewGuid();
+        var existingBay = SeedBay(db, name: "Existing Bay");
+        var inactiveBay = SeedBay(db, active: false, name: "Inactive Bay");
+        var job = SeedOpenJob(db, customerId, mechanicId, existingBay.Id);
+        var harness = CreateHarness(db, mechanicId);
+
+        var ex = await Assert.ThrowsAsync<ValidationException>(
+            () => harness.Jobs.AssignAsync(
+                Guid.NewGuid(),
+                job.Id,
+                new AssignJobRequest(mechanicId, inactiveBay.Id)));
+
+        Assert.Equal("validation_failed", ex.Code);
+        Assert.Equal("Pick an active bay.", ex.Message);
+
+        var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
+        Assert.Equal(mechanicId, reloaded.MechanicId);
+        Assert.Equal(existingBay.Id, reloaded.BayId);
+        Assert.Empty(JobAssignedNotifications(harness.Notifier));
     }
 }

@@ -278,6 +278,10 @@ public sealed class JobService(
                 "Only an active mechanic account can be assigned.");
         }
 
+        Guard.Against(
+            !await db.Bays.AnyAsync(b => b.Id == req.BayId && b.Active, ct),
+            "Pick an active bay.");
+
         var previousMechanicId = job.MechanicId;
 
         job.MechanicId = req.MechanicId;
