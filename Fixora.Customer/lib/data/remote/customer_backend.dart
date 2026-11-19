@@ -217,7 +217,7 @@ class CustomerBackend extends ChangeNotifier {
     AppState.instance.applyRemoteBookings(list);
   }
 
-  /// Re-reads the active job and any proposal waiting for the customer.
+  /// Re-reads the active job, its FixProof report and any proposal waiting for the customer.
   Future<void> refreshJob() async {
     final jobs = (await api.getList('/customer/jobs', query: {'activeOnly': 'true'}))
         .whereType<Map>()

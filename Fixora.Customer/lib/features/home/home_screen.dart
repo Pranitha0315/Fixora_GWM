@@ -9,6 +9,7 @@ import '../../data/repositories/app_state.dart';
 import '../bookings/book_service_screen.dart';
 import '../bookings/bookings_screen.dart';
 import '../bookings/live_queue_screen.dart';
+import '../job/screens/job_tracker_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
@@ -476,7 +477,7 @@ class _CurrentServiceCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        onTap: () => HomeScreen._soon(context, 'Job Tracker'),
+        onTap: () => context.push(const JobTrackerScreen()),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(

@@ -7,6 +7,7 @@ import '../../data/models/models.dart';
 import '../../data/models/vehicle.dart';
 import '../../data/repositories/app_state.dart';
 import '../../data/repositories/job_store.dart';
+import '../job/screens/job_tracker_screen.dart';
 import 'book_service_screen.dart';
 import 'live_queue_screen.dart';
 
@@ -166,9 +167,7 @@ class _BookingCard extends StatelessWidget {
         onTap: () {
           switch (booking.state) {
             case BookingState.active:
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Job tracker coming soon'), behavior: SnackBarBehavior.floating),
-              );
+              context.push(const JobTrackerScreen());
             case BookingState.upcoming:
               context.push(LiveQueueScreen(bookingId: booking.id));
             case BookingState.completed:
