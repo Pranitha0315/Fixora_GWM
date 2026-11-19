@@ -6,6 +6,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/media.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/job_store.dart';
+import 'approval_request_screen.dart';
 import 'diagnosis_report_screen.dart';
 import 'view_photos_screen.dart';
 
@@ -152,6 +153,19 @@ class _ServiceTab extends StatelessWidget {
             icon: const Icon(Icons.assignment_outlined),
             label: const Text('Open Diagnosis Report'),
             style: OutlinedButton.styleFrom(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 48,
+          child: FilledButton.icon(
+            onPressed: () => context.push(const ApprovalRequestScreen()),
+            icon: const Icon(Icons.assignment_turned_in_outlined),
+            label: const Text('Review & Approve Estimate'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),

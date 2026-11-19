@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 enum NotificationKind {
   estimate,
   progress,
@@ -40,6 +42,40 @@ class AppNotification {
         kind: kind,
         unread: unread ?? this.unread,
       );
+}
+
+enum ItemType { part, labour }
+
+class EstimateItem {
+  final String name;
+  final String subtitle;
+  final int qty;
+  final double unitPrice;
+  final ItemType type;
+  final IconData icon;
+  final Color color;
+  final bool inStock;
+
+  /// Backend RepairItem id, version and status (empty in demo mode).
+  final String id;
+  final int version;
+  final String status;
+
+  const EstimateItem({
+    this.id = '',
+    this.version = 1,
+    this.status = '',
+    required this.name,
+    required this.subtitle,
+    required this.qty,
+    required this.unitPrice,
+    required this.type,
+    required this.icon,
+    required this.color,
+    this.inStock = true,
+  });
+
+  double get amount => qty * unitPrice;
 }
 
 enum MediaKind { photo, video }
