@@ -12,7 +12,6 @@ public static class DependencyInjection
     {
         services.AddScoped<StaffAuthService>();
         services.AddScoped<InvitationService>();
-
         services.AddScoped<IInvitationGateway>(sp => sp.GetRequiredService<InvitationService>());
         return services;
     }

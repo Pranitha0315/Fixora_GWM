@@ -23,7 +23,6 @@ public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, 
     }
 }
 
-/// <summary>Manager-issued 7-day mechanic invitations.</summary>
 public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitationGateway
 {
     public const int ValidDays = 7;

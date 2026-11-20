@@ -8,6 +8,5 @@ public interface IManagerDb
 {
     DbSet<StaffUser> Staff { get; }
     DbSet<MechanicInvitation> Invitations { get; }
-
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }
