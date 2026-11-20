@@ -14,6 +14,8 @@ public sealed record VerifyOtpRequest(string Email, string Code);
 public sealed record LoginRequest(string Email, string Password);
 public sealed record ForgotPasswordRequest(string Email);
 public sealed record ResetPasswordRequest(string Email, string Code, string NewPassword);
+public sealed record ProfileDto(Guid Id, string Name, string Email, string Phone, string PreferredLanguage, int LoyaltyPoints);
+public sealed record UpdateProfileRequest(string Name, string Phone, string PreferredLanguage);
 
 /// <summary>Email OTP registration, password login, JWT + rotating refresh tokens (BR-SF-01).</summary>
 public sealed class AuthService(ICustomerDb db, IPasswordService passwords, ITokenService tokens, IEmailSender email, IOptions<CustomerOptions> options, IClock clock)
@@ -85,6 +87,24 @@ public sealed class AuthService(ICustomerDb db, IPasswordService passwords, ITok
         customer.PasswordHash = passwords.Hash(req.NewPassword!);
         customer.EmailVerified = true;
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<ProfileDto> GetProfileAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var c = await db.Customers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == customerId, ct) ?? throw new NotFoundException("Account");
+        var points = 0; // loyalty points arrive on Day 9
+        return new ProfileDto(c.Id, c.Name, c.Email, c.Phone, c.PreferredLanguage, points);
+    }
+
+    public async Task<ProfileDto> UpdateProfileAsync(Guid customerId, UpdateProfileRequest req, CancellationToken ct = default)
+    {
+        var c = await db.Customers.FirstOrDefaultAsync(x => x.Id == customerId, ct) ?? throw new NotFoundException("Account");
+        Guard.Against(string.IsNullOrWhiteSpace(req.Name), "Name is required.");
+        c.Name = req.Name.Trim();
+        c.Phone = req.Phone?.Trim() ?? c.Phone;
+        c.PreferredLanguage = req.PreferredLanguage is "ta" or "en" ? req.PreferredLanguage : c.PreferredLanguage;
+        await db.SaveChangesAsync(ct);
+        return await GetProfileAsync(customerId, ct);
     }
 
     private async Task<OtpSentResponse> SendOtpAsync(string mail, string purpose, CancellationToken ct)

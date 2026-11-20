@@ -27,3 +27,25 @@ public sealed class EmailOtpChallenge : Entity
 
     public bool IsUsable(DateTime now) => ConsumedAt is null && ExpiresAt > now && Attempts < MaxAttempts;
 }
+
+public enum VehicleType { Car, VanSuv, ThreeWheeler, Bike }
+
+public sealed class Vehicle : Entity
+{
+    public Guid CustomerId { get; set; }
+    public string RegistrationNo { get; set; } = "";
+    public string Make { get; set; } = "";
+    public string Model { get; set; } = "";
+    public int Year { get; set; }
+    public VehicleType Type { get; set; } = VehicleType.Car;
+    public int MileageKm { get; set; }
+    public string? Color { get; set; }
+    public string? Fuel { get; set; }
+    /// <summary>DriveSense is opt-in per vehicle and off by default (BR-DS-01).</summary>
+    public bool DriveSenseOptIn { get; set; }
+    public DateTime? DriveSenseConsentAt { get; set; }
+    public bool Active { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public string Label => $"{Make} {Model} ({RegistrationNo})";
+}

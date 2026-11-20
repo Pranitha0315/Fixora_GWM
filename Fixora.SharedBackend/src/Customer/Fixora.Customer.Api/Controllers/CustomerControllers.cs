@@ -1,5 +1,9 @@
 using Fixora.Customer.Application.Auth;
 using Fixora.Customer.Application.Common;
+using Fixora.Customer.Application.Vehicles;
+using Fixora.Customer.Application.Workshop;
+using Fixora.Customer.Contracts;
+using Fixora.Manager.Contracts;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
@@ -34,4 +38,30 @@ public sealed class AuthController(AuthService auth) : ControllerBase
     [HttpPost("login")][AllowAnonymous] public Task<AuthTokens> Login(LoginRequest req, CancellationToken ct) => auth.LoginAsync(req, ct);
     [HttpPost("forgot-password")][AllowAnonymous] public Task<OtpSentResponse> Forgot(ForgotPasswordRequest req, CancellationToken ct) => auth.ForgotPasswordAsync(req, ct);
     [HttpPost("reset-password")][AllowAnonymous] public async Task<IActionResult> Reset(ResetPasswordRequest req, CancellationToken ct) { await auth.ResetPasswordAsync(req, ct); return NoContent(); }
+}
+
+// 2
+[Route("api/v1/customer/profile")]
+public sealed class ProfileController(AuthService auth) : CustomerControllerBase
+{
+    [HttpGet] public Task<ProfileDto> Get(CancellationToken ct) => auth.GetProfileAsync(CustomerId, ct);
+    [HttpPut] public Task<ProfileDto> Update(UpdateProfileRequest req, CancellationToken ct) => auth.UpdateProfileAsync(CustomerId, req, ct);
+}
+
+// 3
+[Route("api/v1/customer/vehicles")]
+public sealed class VehiclesController(VehicleService vehicles) : CustomerControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<VehicleDto>> List(CancellationToken ct) => vehicles.ListAsync(CustomerId, ct);
+    [HttpPost] public Task<VehicleDto> Add(VehicleUpsert req, CancellationToken ct) => vehicles.AddAsync(CustomerId, req, ct);
+    [HttpPut("{id:guid}")] public Task<VehicleDto> Update(Guid id, VehicleUpsert req, CancellationToken ct) => vehicles.UpdateAsync(CustomerId, id, req, ct);
+    [HttpDelete("{id:guid}")] public async Task<IActionResult> Remove(Guid id, CancellationToken ct) { await vehicles.RemoveAsync(CustomerId, id, ct); return NoContent(); }
+}
+
+// 4
+[Route("api/v1/customer/garage")]
+public sealed class GarageController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet] public Task<GarageDto> Get(CancellationToken ct) => workshop.GarageAsync(ct);
+    [HttpGet("services")] public Task<IReadOnlyList<ServiceDto>> Services(CancellationToken ct) => workshop.ServicesAsync(ct);
 }

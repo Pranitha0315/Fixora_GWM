@@ -1,7 +1,9 @@
 using System.Security.Cryptography;
+using Fixora.Customer.Contracts;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
+using Fixora.Mechanic.Contracts;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -11,6 +13,10 @@ namespace Fixora.Manager.Application.Staff;
 public sealed record StaffLoginRequest(string Email, string Password);
 public sealed record CreateInvitationRequest(string Name, string Phone);
 public sealed record InvitationDto(Guid Id, string Name, string Phone, string Token, string Link, DateTime ExpiresAt, string Status);
+public sealed record WorkshopSettingsDto(string Name, string Phone, string EmergencyPhone, string Address, string OpenTime, string CloseTime,
+    int SlotMinutes, int CancelCutoffHours, int EtaShiftNotifyMinutes, bool LoyaltyEnabled, decimal LoyaltyPercent, decimal LoyaltyCapRupees);
+public sealed record BayDto(Guid Id, string Name, bool Active);
+public sealed record ServiceUpsert(string Name, string Category, int StandardMinutes, decimal BasePrice, bool Active);
 
 public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, ITokenService tokens)
 {
@@ -23,6 +29,7 @@ public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, 
     }
 }
 
+/// <summary>Manager-issued 7-day mechanic invitations.</summary>
 public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitationGateway
 {
     public const int ValidDays = 7;
@@ -64,4 +71,57 @@ public sealed class InvitationService(IManagerDb db, IClock clock) : IInvitation
 
     private InvitationDto ToDto(MechanicInvitation i) => new(i.Id, i.Name, i.Phone, i.Token, $"fixorarev://join?token={i.Token}", i.ExpiresAt,
         i.AcceptedAt is not null ? "Accepted" : i.RevokedAt is not null ? "Revoked" : i.ExpiresAt <= clock.UtcNow ? "Expired" : "Pending");
+}
+
+public sealed class WorkshopSettingsService(IManagerDb db)
+{
+    public async Task<WorkshopSettingsDto> GetAsync(CancellationToken ct = default) => ToDto(await db.Workshops.AsNoTracking().FirstAsync(ct));
+
+    public async Task<WorkshopSettingsDto> UpdateAsync(WorkshopSettingsDto req, CancellationToken ct = default)
+    {
+        var w = await db.Workshops.FirstAsync(ct);
+        var validHours = TimeOnly.TryParse(req.OpenTime, out var open) & TimeOnly.TryParse(req.CloseTime, out var close);
+        Guard.Against(!validHours || close <= open, "Opening hours are not valid.");
+        Guard.Against(req.LoyaltyPercent is < 0 or > 20, "Loyalty percentage must be between 0 and 20.");
+        w.Name = req.Name; w.Phone = req.Phone; w.EmergencyPhone = req.EmergencyPhone; w.Address = req.Address;
+        w.OpenTime = open; w.CloseTime = close; w.SlotMinutes = Math.Clamp(req.SlotMinutes, 15, 240);
+        w.CancelCutoffHours = Math.Clamp(req.CancelCutoffHours, 0, 72); w.EtaShiftNotifyMinutes = Math.Clamp(req.EtaShiftNotifyMinutes, 5, 120);
+        w.LoyaltyEnabled = req.LoyaltyEnabled; w.LoyaltyPercent = req.LoyaltyPercent; w.LoyaltyCapRupees = Math.Max(0, req.LoyaltyCapRupees);
+        await db.SaveChangesAsync(ct);
+        return ToDto(w);
+    }
+
+    public async Task<IReadOnlyList<BayDto>> BaysAsync(CancellationToken ct = default)
+        => await db.Bays.AsNoTracking().OrderBy(b => b.SortOrder).Select(b => new BayDto(b.Id, b.Name, b.Active)).ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ServiceDto>> ServicesAsync(bool includeInactive, CancellationToken ct = default)
+        => await db.Services.AsNoTracking().Where(s => includeInactive || s.Active).OrderBy(s => s.Category).ThenBy(s => s.Name)
+            .Select(s => new ServiceDto(s.Id, s.Name, s.Category, s.StandardMinutes, s.BasePrice)).ToListAsync(ct);
+
+    public async Task<ServiceDto> UpsertServiceAsync(Guid? id, ServiceUpsert req, CancellationToken ct = default)
+    {
+        Guard.Against(string.IsNullOrWhiteSpace(req.Name) || req.StandardMinutes <= 0, "Name and duration are required.");
+        ServiceItem s;
+        if (id is null) { s = new ServiceItem(); db.Services.Add(s); }
+        else s = await db.Services.FirstOrDefaultAsync(x => x.Id == id, ct) ?? throw new NotFoundException("Service");
+        s.Name = req.Name; s.Category = req.Category; s.StandardMinutes = req.StandardMinutes; s.BasePrice = req.BasePrice; s.Active = req.Active;
+        await db.SaveChangesAsync(ct);
+        return new ServiceDto(s.Id, s.Name, s.Category, s.StandardMinutes, s.BasePrice);
+    }
+
+    public static WorkshopSettingsDto ToDto(Workshop w) => new(w.Name, w.Phone, w.EmergencyPhone, w.Address, w.OpenTime.ToString("HH:mm"), w.CloseTime.ToString("HH:mm"),
+        w.SlotMinutes, w.CancelCutoffHours, w.EtaShiftNotifyMinutes, w.LoyaltyEnabled, w.LoyaltyPercent, w.LoyaltyCapRupees);
+}
+
+public sealed record MechanicRosterDto(Guid Id, string Name, string Phone, string EmployeeCode, bool OnDuty, int ActiveJobs);
+
+public sealed class MechanicRosterService(IManagerDb db, IMechanicDirectory mechanics)
+{
+    public async Task<IReadOnlyList<MechanicRosterDto>> ListAsync(CancellationToken ct = default)
+    {
+        var list = await mechanics.ListAsync(ct);
+        var counts = await db.JobCards.AsNoTracking().Where(j => j.MechanicId != null && j.Status != JobStatus.Completed && j.Status != JobStatus.Closed)
+            .GroupBy(j => j.MechanicId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        return list.Where(m => m.Active).Select(m => new MechanicRosterDto(m.Id, m.Name, m.Phone, m.EmployeeCode, m.OnDuty, counts.GetValueOrDefault(m.Id))).ToList();
+    }
 }

@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Fixora.Mechanic.Contracts\Fixora.Mechanic.Contracts.csproj" />
     <ProjectReference Include="..\Fixora.Mechanic.Domain\Fixora.Mechanic.Domain.csproj" />
     <ProjectReference Include="..\..\Manager\Fixora.Manager.Contracts\Fixora.Manager.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />

@@ -1,5 +1,6 @@
 using Fixora.Manager.Contracts;
 using Fixora.Mechanic.Application.Common;
+using Fixora.Mechanic.Contracts;
 using Fixora.Mechanic.Domain;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
@@ -80,4 +81,15 @@ public sealed class MechanicAuthService(IMechanicDb db, IPasswordService passwor
         await db.SaveChangesAsync(ct);
         return await ProfileAsync(id, ct);
     }
+}
+
+public sealed class MechanicDirectory(IMechanicDb db) : IMechanicDirectory
+{
+    public async Task<MechanicSummary?> GetAsync(Guid mechanicId, CancellationToken ct = default)
+        => await db.Mechanics.AsNoTracking().Where(m => m.Id == mechanicId)
+            .Select(m => new MechanicSummary(m.Id, m.Name, m.Phone, m.EmployeeCode, m.Active, m.OnDuty)).FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<MechanicSummary>> ListAsync(CancellationToken ct = default)
+        => await db.Mechanics.AsNoTracking().OrderBy(m => m.EmployeeCode)
+            .Select(m => new MechanicSummary(m.Id, m.Name, m.Phone, m.EmployeeCode, m.Active, m.OnDuty)).ToListAsync(ct);
 }

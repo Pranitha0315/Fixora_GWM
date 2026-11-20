@@ -1,3 +1,4 @@
+using Fixora.Customer.Contracts;
 using Fixora.Manager.Contracts;
 using Fixora.Mechanic.Application.Auth;
 using Fixora.Shared.Contracts;
@@ -8,11 +9,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 
+// Every controller in this assembly binds JSON bodies and returns ProblemDetails-style 400s.
 [assembly: Microsoft.AspNetCore.Mvc.ApiController]
 
 namespace Fixora.Mechanic.Api.Controllers;
 
-/// <summary>Fixora.Mechanic.Api — Fixora Rev endpoints (/api/v1/mechanc/*). Assigned-job guard onevery job route.<summary>
+/// <summary>Fixora.Mechanic.Api — Fixora Rev endpoints (/api/v1/mechanic/*). Assigned-job guard on every job route.</summary>
 [ApiController]
 [Authorize(Policy = Policies.Mechanic)]
 public abstract class MechanicControllerBase : ControllerBase

@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Customer\Fixora.Customer.Contracts\Fixora.Customer.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />
     <ProjectReference Include="..\..\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
     <ProjectReference Include="..\Fixora.Manager.Application\Fixora.Manager.Application.csproj" />
