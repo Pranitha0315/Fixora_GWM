@@ -1,12 +1,17 @@
 using System.Text.Json.Serialization;
 using Fixora.Customer.Api.Controllers;
 using Fixora.Customer.Infrastructure;
+using Fixora.Customer.Infrastructure.Persistence;
 using Fixora.Manager.Api.Controllers;
+using Fixora.Manager.Application.Common;
 using Fixora.Manager.Infrastructure;
+using Fixora.Manager.Infrastructure.Persistence;
 using Fixora.Mechanic.Api.Controllers;
 using Fixora.Mechanic.Infrastructure;
+using Fixora.Mechanic.Infrastructure.Persistence;
 using Fixora.Shared.Contracts;
 using Fixora.Shared.Infrastructure;
+using Fixora.Shared.Infrastructure.Api;
 using Fixora.Shared.Infrastructure.Persistence;
 using Fixora.Shared.Infrastructure.Web;
 using Fixora.SharedKernel;
@@ -40,6 +45,7 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(CustomerControllerBase).Assembly)
     .AddApplicationPart(typeof(MechanicControllerBase).Assembly)
     .AddApplicationPart(typeof(StaffControllerBase).Assembly)
+    .AddApplicationPart(typeof(SessionController).Assembly)
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
@@ -59,6 +65,9 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseSerilogRequestLogging();
 app.UseCors("apps");
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.MapControllers();
 app.MapOpenApi();
@@ -74,6 +83,31 @@ app.MapGet("/", () => Results.Ok(new
     swagger = "/swagger",
 }));
 
+await InitialiseDatabaseAsync(app);
 app.Run();
+
+static async Task InitialiseDatabaseAsync(WebApplication app)
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    var sp = scope.ServiceProvider;
+    var cfg = sp.GetRequiredService<IConfiguration>();
+    var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
+
+    // One SQL Server, one schema per owner (shared / customer / mechanic / workshop).
+    await sp.GetRequiredService<SharedDbContext>().EnsureSchemaAsync(SharedDbContext.Schema);
+    await sp.GetRequiredService<CustomerDbContext>().EnsureSchemaAsync(CustomerDbContext.Schema);
+    await sp.GetRequiredService<MechanicDbContext>().EnsureSchemaAsync(MechanicDbContext.Schema);
+    await sp.GetRequiredService<ManagerDbContext>().EnsureSchemaAsync(ManagerDbContext.Schema);
+
+    if (cfg.GetValue("Database:Seed", true))
+    {
+        var passwords = sp.GetRequiredService<IPasswordService>();
+        var clock = sp.GetRequiredService<IClock>();
+        await CustomerSeeder.SeedAsync(sp.GetRequiredService<CustomerDbContext>(), passwords, clock);
+        await MechanicSeeder.SeedAsync(sp.GetRequiredService<MechanicDbContext>(), passwords);
+        await ManagerSeeder.SeedAsync(sp.GetRequiredService<ManagerDbContext>(), passwords, clock);
+        logger.LogInformation("Demo garage seeded (see DemoIds for logins)");
+    }
+}
 
 public partial class Program { }

@@ -10,4 +10,11 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Fixora.Mechanic.Domain\Fixora.Mechanic.Domain.csproj" />
+    <ProjectReference Include="..\..\Manager\Fixora.Manager.Contracts\Fixora.Manager.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />
+    <ProjectReference Include="..\..\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
+  </ItemGroup>
+
 </Project>
