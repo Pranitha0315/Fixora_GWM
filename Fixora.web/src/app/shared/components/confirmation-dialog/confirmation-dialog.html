@@ -1,0 +1,77 @@
+<fx-modal
+  [dialogId]="dialogId()"
+  [title]="title()"
+  [open]="open()"
+  size="sm"
+  [busy]="busy()"
+  [dismissible]="!busy()"
+  [closeOnEscape]="true"
+  [closeOnBackdrop]="false"
+  (closeRequested)="handleClose($event)"
+>
+  <div class="fx-confirm-content">
+    <div
+      class="fx-confirm-icon"
+      [class]="'fx-confirm-icon fx-confirm-icon--' + tone()"
+      aria-hidden="true"
+    >
+      @switch (tone()) {
+        @case ('danger') {
+          <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <path d="M12 3 2 21h20L12 3Z" />
+            <path d="M12 9v5M12 17h.01" />
+          </svg>
+        }
+
+        @case ('warning') {
+          <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v6M12 16h.01" />
+          </svg>
+        }
+
+        @case ('success') {
+          <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="m8 12 3 3 5-6" />
+          </svg>
+        }
+
+        @default {
+          <svg viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v6M12 7h.01" />
+          </svg>
+        }
+      }
+    </div>
+
+    <p class="fx-confirm-message">
+      {{ message() }}
+    </p>
+  </div>
+
+  <div modal-footer class="fx-confirm-actions">
+    <fx-button
+      variant="outline"
+      [disabled]="busy()"
+      (pressed)="cancel()"
+    >
+      {{ cancelText() }}
+    </fx-button>
+
+    <fx-button
+      [variant]="buttonVariant()"
+      [disabled]="confirmDisabled()"
+      [loading]="busy()"
+      [loadingText]="processingText()"
+      (pressed)="confirm()"
+    >
+      {{ confirmText() }}
+    </fx-button>
+  </div>
+</fx-modal>

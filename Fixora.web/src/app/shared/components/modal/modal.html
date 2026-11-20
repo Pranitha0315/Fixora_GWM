@@ -1,0 +1,40 @@
+<dialog
+  #dialog
+  class="fx-modal"
+  [class]="'fx-modal fx-modal--' + size()"
+  [id]="dialogId()"
+  [attr.aria-labelledby]="dialogId() + '-title'"
+  [attr.aria-modal]="open() ? 'true' : null"
+  [attr.aria-busy]="busy() ? 'true' : null"
+  (cancel)="handleCancel($event)"
+  (click)="handleBackdrop($event)"
+>
+  <div class="fx-modal-header">
+    <h2
+      class="fx-modal-title"
+      [id]="dialogId() + '-title'"
+    >
+      {{ title() }}
+    </h2>
+
+    @if (dismissible()) {
+      <button
+        class="fx-modal-close"
+        type="button"
+        aria-label="Close dialog"
+        [disabled]="busy()"
+        (click)="requestClose('button')"
+      >
+        <span aria-hidden="true">&#215;</span>
+      </button>
+    }
+  </div>
+
+  <div class="fx-modal-body">
+    <ng-content />
+  </div>
+
+  <div class="fx-modal-footer">
+    <ng-content select="[modal-footer]" />
+  </div>
+</dialog>

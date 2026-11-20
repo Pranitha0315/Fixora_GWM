@@ -1,0 +1,43 @@
+<div
+  class="fx-loading-state"
+  [class.fx-loading-state--compact]="compact()"
+  role="status"
+  aria-live="polite"
+  aria-atomic="true"
+>
+  @if (variant() === 'spinner') {
+    <span
+      class="fx-loading-spinner"
+      [class]="'fx-loading-spinner fx-loading-spinner--' + size()"
+      aria-hidden="true"
+    ></span>
+  } @else {
+    <div
+      class="fx-loading-skeleton"
+      aria-hidden="true"
+    >
+      @for (row of rows(); track row) {
+        <div class="fx-skeleton-row">
+          <span class="fx-skeleton-avatar"></span>
+
+          <div class="fx-skeleton-lines">
+            <span class="fx-skeleton-line"></span>
+            <span class="fx-skeleton-line fx-skeleton-line--short"></span>
+          </div>
+
+          <span class="fx-skeleton-end"></span>
+        </div>
+      }
+    </div>
+  }
+
+  <p class="fx-loading-message">
+    {{ message() }}
+  </p>
+
+  @if (description()) {
+    <p class="fx-loading-description">
+      {{ description() }}
+    </p>
+  }
+</div>
