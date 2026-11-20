@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\Fixora.Mechanic.Application\Fixora.Mechanic.Application.csproj" />
+    <ProjectReference Include="..\..\Shared\Fixora.Shared.Infrastructure\Fixora.Shared.Infrastructure.csproj" />
+  </ItemGroup>
+
 </Project>
