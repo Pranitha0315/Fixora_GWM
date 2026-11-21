@@ -16,6 +16,9 @@ public interface IWorkshopGateway
     Task<IReadOnlyList<JobSummaryDto>> ListJobsAsync(Guid customerId, bool activeOnly, CancellationToken ct = default);
     Task<JobDetailDto> GetJobAsync(Guid customerId, Guid jobId, CancellationToken ct = default);
     Task<QueueEstimateDto> GetQueueEstimateAsync(Guid customerId, Guid jobId, CancellationToken ct = default);
+    Task<IReadOnlyList<ProposalDto>> ListPendingApprovalsAsync(Guid customerId, CancellationToken ct = default);
+    Task<ProposalDto> DecideItemsAsync(Guid customerId, Guid proposalId, DecideItemsRequest request, string idempotencyKey, CancellationToken ct = default);
+    Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default);
 }
 
 /// <summary>The "job / inspection gateway" used by the Mechanic application.</summary>
@@ -26,6 +29,9 @@ public interface IWorkshopJobGateway
     Task<JobDetailDto> GetJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default);
     Task<JobSummaryDto> ApplyJobActionAsync(Guid mechanicId, Guid jobId, JobActionRequest request, CancellationToken ct = default);
     Task<IssueDto> PublishVerifiedIssueAsync(Guid mechanicId, Guid jobId, VerifiedIssueInput issue, CancellationToken ct = default);
+    Task<ProposalDto> SubmitProposalAsync(Guid mechanicId, Guid jobId, SubmitProposalRequest request, CancellationToken ct = default);
+    Task<IReadOnlyList<ProposalDto>> ListProposalsAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default);
+    Task<ChangeRequestDto> AcknowledgeChangeRequestAsync(Guid mechanicId, Guid changeRequestId, string? note, CancellationToken ct = default);
     Task<Guid?> GetVehicleIdForJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default);
 }
 

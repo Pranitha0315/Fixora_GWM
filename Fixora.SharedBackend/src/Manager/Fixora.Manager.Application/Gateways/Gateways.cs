@@ -1,3 +1,4 @@
+using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Jobs;
@@ -15,6 +16,8 @@ public sealed class WorkshopGateway(
     IManagerDb db,
     BookingService bookings,
     JobService jobs,
+    ApprovalWorkflowService approvals,
+    ChangeRequestService changes,
     WorkshopSettingsService settings,
     WorkshopReadModel read,
     IClock clock) : IWorkshopGateway
@@ -53,10 +56,26 @@ public sealed class WorkshopGateway(
         var job = await db.JobCards.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId && j.CustomerId == customerId, ct) ?? throw new NotFoundException("Job");
         return WorkshopReadModel.Queue(job);
     }
+
+    public async Task<IReadOnlyList<ProposalDto>> ListPendingApprovalsAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var jobIds = await db.JobCards.AsNoTracking().Where(j => j.CustomerId == customerId).Select(j => j.Id).ToListAsync(ct);
+        var ids = await db.Proposals.AsNoTracking().Where(p => jobIds.Contains(p.JobCardId) && p.Status == ProposalStatus.AwaitingCustomer)
+            .OrderByDescending(p => p.PublishedAt).Select(p => p.Id).ToListAsync(ct);
+        var list = new List<ProposalDto>();
+        foreach (var id in ids) list.Add(await read.ProposalAsync(id, false, ct));
+        return list;
+    }
+
+    public Task<ProposalDto> DecideItemsAsync(Guid customerId, Guid proposalId, DecideItemsRequest request, string idempotencyKey, CancellationToken ct = default)
+        => approvals.DecideAsync(customerId, proposalId, request, idempotencyKey, ct);
+
+    public Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default)
+        => changes.CreateAsync(customerId, jobId, request, ct);
 }
 
 /// <summary>Mechanic-facing gateway: only jobs assigned to the calling mechanic.</summary>
-public sealed class WorkshopJobGateway(IManagerDb db, JobService jobs, WorkshopReadModel read) : IWorkshopJobGateway
+public sealed class WorkshopJobGateway(IManagerDb db, JobService jobs, ApprovalWorkflowService approvals, ChangeRequestService changes, WorkshopReadModel read) : IWorkshopJobGateway
 {
     public Task<IReadOnlyList<JobSummaryDto>> ListAssignedJobsAsync(Guid mechanicId, CancellationToken ct = default) => jobs.ListAsync(false, mechanicId, null, ct);
 
@@ -70,6 +89,21 @@ public sealed class WorkshopJobGateway(IManagerDb db, JobService jobs, WorkshopR
 
     public Task<IssueDto> PublishVerifiedIssueAsync(Guid mechanicId, Guid jobId, VerifiedIssueInput issue, CancellationToken ct = default)
         => jobs.AddVerifiedIssueAsync(mechanicId, jobId, issue, ct);
+
+    public Task<ProposalDto> SubmitProposalAsync(Guid mechanicId, Guid jobId, SubmitProposalRequest request, CancellationToken ct = default)
+        => approvals.SubmitAsync(mechanicId, jobId, request, ct);
+
+    public async Task<IReadOnlyList<ProposalDto>> ListProposalsAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default)
+    {
+        var job = await db.JobCards.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId && j.MechanicId == mechanicId, ct) ?? throw new NotFoundException("Job");
+        var ids = await db.Proposals.AsNoTracking().Where(p => p.JobCardId == job.Id).OrderByDescending(p => p.SubmittedAt).Select(p => p.Id).ToListAsync(ct);
+        var list = new List<ProposalDto>();
+        foreach (var id in ids) list.Add(await read.ProposalAsync(id, true, ct));
+        return list;
+    }
+
+    public Task<ChangeRequestDto> AcknowledgeChangeRequestAsync(Guid mechanicId, Guid changeRequestId, string? note, CancellationToken ct = default)
+        => changes.AcknowledgeAsync(mechanicId, changeRequestId, note, ct);
 
     public async Task<Guid?> GetVehicleIdForJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default)
         => await db.JobCards.AsNoTracking().Where(j => j.Id == jobId && j.MechanicId == mechanicId).Select(j => (Guid?)j.VehicleId).FirstOrDefaultAsync(ct);

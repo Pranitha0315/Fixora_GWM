@@ -1,3 +1,4 @@
+using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Gateways;
@@ -17,6 +18,8 @@ public static class DependencyInjection
         services.AddScoped<QueueService>();
         services.AddScoped<JobService>();
         services.AddScoped<BookingService>();
+        services.AddScoped<ApprovalWorkflowService>();
+        services.AddScoped<ChangeRequestService>();
         services.AddScoped<StaffAuthService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<WorkshopSettingsService>();

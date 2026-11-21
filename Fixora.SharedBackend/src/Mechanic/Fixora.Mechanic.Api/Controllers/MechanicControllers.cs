@@ -24,6 +24,8 @@ public abstract class MechanicControllerBase : ControllerBase
     protected Guid MechanicId => HttpContext.RequestServices.GetRequiredService<ICurrentUser>().UserId;
 }
 
+public sealed record NoteBody(string? Note);
+
 [Route("api/v1/mechanic/auth")]
 [EnableRateLimiting("auth")]
 public sealed class MechanicAuthController(MechanicAuthService auth) : ControllerBase
@@ -50,6 +52,11 @@ public sealed class AssignedJobsController(MechanicJobService jobs) : MechanicCo
 
     /// <summary>start | pause | resume | progress | complete — progress reaches customer and manager in real time.</summary>
     [HttpPost("{jobId:guid}/actions")] public Task<JobSummaryDto> Action(Guid jobId, JobActionRequest req, CancellationToken ct) => jobs.ActionAsync(MechanicId, jobId, req, ct);
+
+    /// <summary>Repair proposal → manager review → customer → manager release → back to you.</summary>
+    [HttpPost("{jobId:guid}/proposals")] public Task<ProposalDto> Propose(Guid jobId, SubmitProposalRequest req, CancellationToken ct) => jobs.SubmitProposalAsync(MechanicId, jobId, req, ct);
+    [HttpGet("{jobId:guid}/proposals")] public Task<IReadOnlyList<ProposalDto>> Proposals(Guid jobId, CancellationToken ct) => jobs.ProposalsAsync(MechanicId, jobId, ct);
+    [HttpPost("change-requests/{id:guid}/acknowledge")] public Task<ChangeRequestDto> Acknowledge(Guid id, NoteBody req, CancellationToken ct) => jobs.AcknowledgeChangeAsync(MechanicId, id, req.Note, ct);
 }
 
 [Route("api/v1/mechanic/jobs/{jobId:guid}/fixproof")]

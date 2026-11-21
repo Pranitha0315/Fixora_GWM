@@ -1,4 +1,5 @@
 using Fixora.Customer.Contracts;
+using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Jobs;
@@ -22,6 +23,9 @@ public abstract class StaffControllerBase : ControllerBase
 {
     protected Guid StaffId => HttpContext.RequestServices.GetRequiredService<ICurrentUser>().UserId;
 }
+
+public sealed record NoteRequest(string? Note);
+public sealed record PriceRequest(decimal UnitPrice, int Qty);
 
 [Route("api/v1/manager/auth")]
 public sealed class ManagerAuthController(StaffAuthService auth) : ControllerBase
@@ -54,6 +58,22 @@ public sealed class JobsController(JobService jobs) : StaffControllerBase
     [HttpPost("{id:guid}/assign")] public Task<JobSummaryDto> Assign(Guid id, AssignJobRequest req, CancellationToken ct) => jobs.AssignAsync(StaffId, id, req, ct);
     [HttpPost("{id:guid}/reorder")] public Task<JobSummaryDto> Reorder(Guid id, ReorderJobRequest req, CancellationToken ct) => jobs.ReorderAsync(id, req, ct);
     [HttpPost("{id:guid}/extend")] public Task<JobSummaryDto> Extend(Guid id, ExtendJobRequest req, CancellationToken ct) => jobs.ExtendAsync(id, req, ct);
+}
+
+/// <summary>The manager's approval inbox: both directions of the hand-off live here.</summary>
+[Route("api/v1/manager/approvals")]
+public sealed class ApprovalsController(ApprovalWorkflowService approvals, ChangeRequestService changes) : StaffControllerBase
+{
+    [HttpGet("proposals")] public Task<IReadOnlyList<ProposalDto>> Proposals([FromQuery] string? status, CancellationToken ct) => approvals.ListForStaffAsync(status, ct);
+    [HttpPut("proposals/{id:guid}/items/{itemId:guid}/price")] public Task<ProposalDto> SetPrice(Guid id, Guid itemId, PriceRequest req, CancellationToken ct) => approvals.SetItemPriceAsync(StaffId, id, itemId, req.UnitPrice, req.Qty, ct);
+    [HttpPost("proposals/{id:guid}/forward")] public Task<ProposalDto> Forward(Guid id, NoteRequest req, CancellationToken ct) => approvals.ForwardToCustomerAsync(StaffId, id, req.Note, ct);
+    [HttpPost("proposals/{id:guid}/return")] public Task<ProposalDto> Return(Guid id, NoteRequest req, CancellationToken ct) => approvals.ReturnToMechanicAsync(StaffId, id, req.Note ?? "", ct);
+    [HttpPost("proposals/{id:guid}/release")] public Task<ProposalDto> Release(Guid id, NoteRequest req, CancellationToken ct) => approvals.ReleaseAsync(StaffId, id, req.Note, ct);
+    [HttpPut("proposals/{id:guid}/items/{itemId:guid}/revise")] public Task<ProposalDto> Revise(Guid id, Guid itemId, PriceRequest req, CancellationToken ct) => approvals.ReviseItemAsync(StaffId, id, itemId, req.UnitPrice, req.Qty, ct);
+
+    [HttpGet("change-requests")] public Task<IReadOnlyList<ChangeRequestDto>> ChangeRequests([FromQuery] bool pendingOnly = false, CancellationToken ct = default) => changes.ListForStaffAsync(pendingOnly, ct);
+    [HttpPost("change-requests/{id:guid}/forward")] public Task<ChangeRequestDto> ForwardChange(Guid id, NoteRequest req, CancellationToken ct) => changes.ForwardAsync(StaffId, id, req.Note, ct);
+    [HttpPost("change-requests/{id:guid}/decline")] public Task<ChangeRequestDto> DeclineChange(Guid id, NoteRequest req, CancellationToken ct) => changes.DeclineAsync(StaffId, id, req.Note ?? "", ct);
 }
 
 [Route("api/v1/manager/mechanics")]

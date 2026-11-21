@@ -49,6 +49,34 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         i.Id, i.Component, i.FindingEn, i.FindingTa, i.RecommendationEn, i.RecommendationTa, i.Severity.ToString(),
         i.MediaRefs.Select(r => media.GetSignedUrl(r, TimeSpan.FromMinutes(15))).ToList(), i.ReportVersion, i.ConfirmedAt);
 
+    /// <param name="maskForMechanic">Before the manager releases work the mechanic sees customer decisions as still pending.</param>
+    public async Task<ProposalDto> ProposalAsync(RepairProposal p, JobCard job, bool maskForMechanic = false, CancellationToken ct = default)
+    {
+        var audit = await db.ApprovalAudit.AsNoTracking().Where(a => a.ProposalId == p.Id).OrderBy(a => a.At).ToListAsync(ct);
+        var hideDecisions = maskForMechanic && p.Status is ProposalStatus.AwaitingCustomer or ProposalStatus.CustomerResponded;
+        var items = p.Items.OrderBy(i => i.Kind).ThenBy(i => i.Title).Select(i => new RepairItemDto(
+            i.Id, i.Title, i.Kind.ToString(), i.Qty, i.UnitPrice, i.Amount, i.Version,
+            hideDecisions && i.Status is RepairItemStatus.Approved or RepairItemStatus.Rejected ? RepairItemStatus.AwaitingCustomer.ToString() : i.Status.ToString(),
+            i.LinkedIssueId)).ToList();
+        var status = hideDecisions && p.Status == ProposalStatus.CustomerResponded ? ProposalStatus.AwaitingCustomer.ToString() : p.Status.ToString();
+        return new ProposalDto(
+            p.Id, p.JobCardId, job.Number, job.VehicleLabel, job.CustomerName, status, p.MechanicId, await MechanicNameAsync(p.MechanicId, ct),
+            p.MechanicNote, p.ManagerNote, maskForMechanic ? null : p.CustomerNote, p.SubmittedAt, p.PublishedAt, p.RespondedAt, p.ReleasedAt,
+            p.Total, hideDecisions ? 0 : p.ApprovedTotal, items,
+            audit.Where(a => !hideDecisions || a.ActorRole != Roles.Customer).Select(a => new AuditDto(a.ActorRole, a.Action, a.Detail, a.At)).ToList());
+    }
+
+    public async Task<ProposalDto> ProposalAsync(Guid proposalId, bool maskForMechanic = false, CancellationToken ct = default)
+    {
+        var p = await db.Proposals.Include(x => x.Items).AsNoTracking().FirstOrDefaultAsync(x => x.Id == proposalId, ct)
+                ?? throw new NotFoundException("Proposal");
+        var job = await db.JobCards.AsNoTracking().FirstAsync(j => j.Id == p.JobCardId, ct);
+        return await ProposalAsync(p, job, maskForMechanic, ct);
+    }
+
+    public static ChangeRequestDto ChangeRequest(CustomerChangeRequest c, string jobNumber) => new(
+        c.Id, c.JobCardId, jobNumber, c.Number, c.Changes, c.Details, c.Status.ToString(), c.ManagerNote, c.MechanicNote, c.CreatedAt);
+
     public static QueueEstimateDto Queue(JobCard j) => new(j.Id, j.QueuePosition, j.IsActive ? j.EtaAt : null, j.Status.ToString());
 
     public enum Viewer { Staff, Mechanic, Customer }
@@ -66,8 +94,17 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         if (viewer == Viewer.Customer) issuesQ = issuesQ.Where(i => i.PublishedToCustomer);
         var issues = (await issuesQ.OrderBy(i => i.ConfirmedAt).ToListAsync(ct)).Select(Issue).ToList();
 
-        var proposals = new List<ProposalDto>();      // repair proposals arrive on Day 7
-        var changes = new List<ChangeRequestDto>();   // change requests arrive on Day 7
+        var proposalsQ = db.Proposals.Include(p => p.Items).AsNoTracking().Where(p => p.JobCardId == job.Id);
+        if (viewer == Viewer.Customer)
+            proposalsQ = proposalsQ.Where(p => p.Status == ProposalStatus.AwaitingCustomer || p.Status == ProposalStatus.CustomerResponded || p.Status == ProposalStatus.ReleasedToMechanic);
+        var proposals = new List<ProposalDto>();
+        foreach (var p in await proposalsQ.OrderByDescending(p => p.SubmittedAt).ToListAsync(ct))
+            proposals.Add(await ProposalAsync(p, job, viewer == Viewer.Mechanic, ct));
+
+        var changesQ = db.ChangeRequests.AsNoTracking().Where(c => c.JobCardId == job.Id);
+        if (viewer == Viewer.Mechanic)
+            changesQ = changesQ.Where(c => c.Status == ChangeRequestStatus.ForwardedToMechanic || c.Status == ChangeRequestStatus.Acknowledged);
+        var changes = (await changesQ.OrderByDescending(c => c.CreatedAt).ToListAsync(ct)).Select(c => ChangeRequest(c, job.Number)).ToList();
 
         return new JobDetailDto(await JobAsync(job, ct), timeline, issues, proposals, changes,
             null, Queue(job)); // invoices arrive on Day 11

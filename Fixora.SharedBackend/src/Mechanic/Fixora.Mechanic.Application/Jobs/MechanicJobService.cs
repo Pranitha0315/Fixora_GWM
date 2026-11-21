@@ -20,4 +20,9 @@ public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirect
     }
 
     public Task<JobSummaryDto> ActionAsync(Guid mechanicId, Guid jobId, JobActionRequest req, CancellationToken ct) => jobs.ApplyJobActionAsync(mechanicId, jobId, req, ct);
+
+    /// <summary>Mechanic → Manager: the proposal goes to the manager first, never straight to the customer.</summary>
+    public Task<ProposalDto> SubmitProposalAsync(Guid mechanicId, Guid jobId, SubmitProposalRequest req, CancellationToken ct) => jobs.SubmitProposalAsync(mechanicId, jobId, req, ct);
+    public Task<IReadOnlyList<ProposalDto>> ProposalsAsync(Guid mechanicId, Guid jobId, CancellationToken ct) => jobs.ListProposalsAsync(mechanicId, jobId, ct);
+    public Task<ChangeRequestDto> AcknowledgeChangeAsync(Guid mechanicId, Guid changeId, string? note, CancellationToken ct) => jobs.AcknowledgeChangeRequestAsync(mechanicId, changeId, note, ct);
 }

@@ -29,4 +29,7 @@ public sealed class CustomerWorkshopService(IWorkshopGateway workshop, VehicleSe
     public Task<IReadOnlyList<JobSummaryDto>> JobsAsync(Guid customerId, bool activeOnly, CancellationToken ct) => workshop.ListJobsAsync(customerId, activeOnly, ct);
     public Task<JobDetailDto> JobAsync(Guid customerId, Guid jobId, CancellationToken ct) => workshop.GetJobAsync(customerId, jobId, ct);
     public Task<QueueEstimateDto> QueueAsync(Guid customerId, Guid jobId, CancellationToken ct) => workshop.GetQueueEstimateAsync(customerId, jobId, ct);
+    public Task<IReadOnlyList<ProposalDto>> PendingApprovalsAsync(Guid customerId, CancellationToken ct) => workshop.ListPendingApprovalsAsync(customerId, ct);
+    public Task<ProposalDto> DecideAsync(Guid customerId, Guid proposalId, DecideItemsRequest req, string key, CancellationToken ct) => workshop.DecideItemsAsync(customerId, proposalId, req, key, ct);
+    public Task<ChangeRequestDto> ChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate req, CancellationToken ct) => workshop.CreateChangeRequestAsync(customerId, jobId, req, ct);
 }

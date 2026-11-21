@@ -19,6 +19,11 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
     public DbSet<JobCard> JobCards => Set<JobCard>();
     public DbSet<ProgressUpdate> ProgressUpdates => Set<ProgressUpdate>();
     public DbSet<InspectionIssue> Issues => Set<InspectionIssue>();
+    public DbSet<RepairProposal> Proposals => Set<RepairProposal>();
+    public DbSet<RepairItem> RepairItems => Set<RepairItem>();
+    public DbSet<ApprovalDecisionRecord> ApprovalDecisions => Set<ApprovalDecisionRecord>();
+    public DbSet<ApprovalAuditEntry> ApprovalAudit => Set<ApprovalAuditEntry>();
+    public DbSet<CustomerChangeRequest> ChangeRequests => Set<CustomerChangeRequest>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder c)
     {
@@ -58,6 +63,37 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
             e.Property(x => x.Severity).HasConversion<string>().HasMaxLength(16);
             e.HasIndex(x => x.JobCardId);
             e.Ignore(x => x.MediaRefs);
+        });
+
+        b.Entity<RepairProposal>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            e.HasMany(x => x.Items).WithOne().HasForeignKey(i => i.ProposalId);
+            e.HasIndex(x => x.JobCardId);
+            e.Ignore(x => x.Total);
+            e.Ignore(x => x.ApprovedTotal);
+        });
+
+        b.Entity<RepairItem>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);
+            e.Property(x => x.Kind).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.Version).IsConcurrencyToken(); // stale customer decision → 409
+            e.Ignore(x => x.Amount);
+        });
+
+        b.Entity<ApprovalDecisionRecord>(e =>
+        {
+            e.Property(x => x.IdempotencyKey).HasMaxLength(100);
+            e.HasIndex(x => new { x.RepairItemId, x.IdempotencyKey }).IsUnique();
+        });
+
+        b.Entity<ApprovalAuditEntry>().HasIndex(x => x.ProposalId);
+
+        b.Entity<CustomerChangeRequest>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
+            e.Ignore(x => x.Changes);
         });
 
         b.UseClientGeneratedGuids();

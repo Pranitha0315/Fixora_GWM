@@ -107,6 +107,25 @@ public sealed class FixProofController(CustomerWorkshopService workshop) : Custo
     }
 }
 
+// 9
+[Route("api/v1/customer/approvals")]
+public sealed class RepairApprovalsController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet("pending")] public Task<IReadOnlyList<ProposalDto>> Pending(CancellationToken ct) => workshop.PendingApprovalsAsync(CustomerId, ct);
+
+    /// <summary>Per-item approve / reject. Requires Idempotency-Key; stale item version → 409.</summary>
+    [HttpPost("{proposalId:guid}/decisions")]
+    public Task<ProposalDto> Decide(Guid proposalId, DecideItemsRequest req, [FromHeader(Name = "Idempotency-Key")] string? key, CancellationToken ct)
+        => workshop.DecideAsync(CustomerId, proposalId, req, key ?? "", ct);
+}
+
+// 10
+[Route("api/v1/customer/jobs/{jobId:guid}/change-requests")]
+public sealed class ChangeRequestsController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpPost] public Task<ChangeRequestDto> Create(Guid jobId, ChangeRequestCreate req, CancellationToken ct) => workshop.ChangeRequestAsync(CustomerId, jobId, req, ct);
+}
+
 // 11
 [Route("api/v1/customer/evidence")]
 public sealed class EvidenceController(CustomerWorkshopService workshop) : CustomerControllerBase
