@@ -2,7 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Fixora.Mechanic.Application.Common;
+using Fixora.Shared.Contracts;
 using Fixora.Shared.Infrastructure.Seeding;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Fixora.Tests.Integration;
 
@@ -14,8 +20,9 @@ namespace Fixora.Tests.Integration;
 public sealed class FixProofTranscribeHttpCollection;
 
 /// <summary>
-/// FX13-D06-NID-1 (first slice): characterize the current FixProof transcribe HTTP contract
-/// under NullSpeechToText. Does not claim real STT, language validation, or job-assignment gating.
+/// FX13-D06-NID-1: FixProof transcribe HTTP contract under NullSpeechToText, auth gates,
+/// and vendor-agnostic STT provider failure fallback (BR-FP-13). Does not claim real STT,
+/// language validation, or job-assignment gating.
 /// </summary>
 [Collection("fixproof-transcribe-http")]
 public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
@@ -112,5 +119,77 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             form);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Assigned_mechanic_transcribe_when_stt_throws_returns_unavailable_fallback()
+    {
+        await using var factory = new ThrowingSttFixoraFactory(() =>
+            throw new InvalidOperationException("STT provider unavailable"));
+        var ravi = await factory.Mechanic();
+        using var form = BuildAudioForm("ta");
+
+        var response = await ravi.PostAsync(
+            $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
+            form);
+
+        await AssertNullSttContractAsync(response);
+    }
+
+    [Fact]
+    public async Task Assigned_mechanic_transcribe_when_stt_times_out_returns_unavailable_fallback()
+    {
+        // Provider timeout surfaces as TaskCanceledException without the request token being cancelled.
+        await using var factory = new ThrowingSttFixoraFactory(() =>
+            throw new TaskCanceledException("STT timed out"));
+        var ravi = await factory.Mechanic();
+        using var form = BuildAudioForm("en");
+
+        var response = await ravi.PostAsync(
+            $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
+            form);
+
+        await AssertNullSttContractAsync(response);
+    }
+
+    /// <summary>Isolated host that replaces <see cref="ISpeechToText"/> with a throwing double.</summary>
+    private sealed class ThrowingSttFixoraFactory : WebApplicationFactory<Program>
+    {
+        private readonly Func<Exception> _fault;
+
+        public ThrowingSttFixoraFactory(Func<Exception> fault)
+        {
+            _fault = fault;
+            Environment.SetEnvironmentVariable("Database__Provider", "InMemory");
+            Environment.SetEnvironmentVariable("Database__InMemoryName", $"fixora-tests-stt-{Guid.NewGuid():N}");
+            Environment.SetEnvironmentVariable("Workers__Enabled", "false");
+        }
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            builder.ConfigureTestServices(services =>
+            {
+                foreach (var d in services.Where(d => d.ServiceType == typeof(ISpeechToText)).ToList())
+                    services.Remove(d);
+                services.AddSingleton<ISpeechToText>(new ThrowingSpeechToText(_fault));
+            });
+        }
+
+        public async Task<HttpClient> Mechanic()
+        {
+            var client = CreateClient();
+            var res = await client.PostAsJsonAsync("/api/v1/mechanic/auth/pin-login", new { login = "EMP-001", pin = "1234" });
+            res.EnsureSuccessStatusCode();
+            var tokens = await res.Content.ReadFromJsonAsync<AuthTokens>();
+            client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", tokens!.AccessToken);
+            return client;
+        }
+    }
+
+    private sealed class ThrowingSpeechToText(Func<Exception> fault) : ISpeechToText
+    {
+        public Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
+            => Task.FromException<string?>(fault());
     }
 }
