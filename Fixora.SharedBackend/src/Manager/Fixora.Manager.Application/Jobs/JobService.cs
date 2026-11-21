@@ -69,6 +69,31 @@ public sealed class JobService(
         return await read.JobAsync(job, ct);
     }
 
+    /// <summary>Mechanic confirmed a FixProof finding. Stays hidden from the customer until a proposal is forwarded.</summary>
+    public async Task<IssueDto> AddVerifiedIssueAsync(Guid mechanicId, Guid jobId, VerifiedIssueInput input, CancellationToken ct = default)
+    {
+        var job = await db.JobCards.FirstOrDefaultAsync(j => j.Id == jobId && j.MechanicId == mechanicId, ct) ?? throw new NotFoundException("Job");
+        Guard.Against(string.IsNullOrWhiteSpace(input.Component) || string.IsNullOrWhiteSpace(input.FindingEn), "Component and finding are required.");
+        var issue = new InspectionIssue
+        {
+            JobCardId = job.Id,
+            Component = input.Component.Trim(),
+            FindingEn = input.FindingEn.Trim(),
+            FindingTa = input.FindingTa?.Trim() ?? "",
+            RecommendationEn = input.RecommendationEn?.Trim() ?? "",
+            RecommendationTa = input.RecommendationTa?.Trim() ?? "",
+            Severity = Enum.TryParse<IssueSeverity>(input.Severity, true, out var s) ? s : IssueSeverity.Attention,
+            MediaRefsCsv = string.Join(',', input.MediaRefs ?? Array.Empty<string>()),
+            CreatedByMechanicId = mechanicId,
+            ConfirmedAt = clock.UtcNow,
+        };
+        db.Issues.Add(issue);
+        if (job.Status == JobStatus.Open) job.Start(clock.UtcNow);
+        await db.SaveChangesAsync(ct);
+        await PublishJobAsync(job, ct);
+        return read.Issue(issue);
+    }
+
     public async Task<JobSummaryDto> AssignAsync(Guid staffId, Guid jobId, AssignJobRequest req, CancellationToken ct = default)
     {
         var job = await db.JobCards.FirstOrDefaultAsync(j => j.Id == jobId, ct) ?? throw new NotFoundException("Job");

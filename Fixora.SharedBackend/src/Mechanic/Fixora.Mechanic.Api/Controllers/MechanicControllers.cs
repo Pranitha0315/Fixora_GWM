@@ -1,6 +1,7 @@
 using Fixora.Customer.Contracts;
 using Fixora.Manager.Contracts;
 using Fixora.Mechanic.Application.Auth;
+using Fixora.Mechanic.Application.FixProof;
 using Fixora.Mechanic.Application.Jobs;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
@@ -49,4 +50,32 @@ public sealed class AssignedJobsController(MechanicJobService jobs) : MechanicCo
 
     /// <summary>start | pause | resume | progress | complete — progress reaches customer and manager in real time.</summary>
     [HttpPost("{jobId:guid}/actions")] public Task<JobSummaryDto> Action(Guid jobId, JobActionRequest req, CancellationToken ct) => jobs.ActionAsync(MechanicId, jobId, req, ct);
+}
+
+[Route("api/v1/mechanic/jobs/{jobId:guid}/fixproof")]
+public sealed class FixProofCaptureController(FixProofCaptureService fixproof) : MechanicControllerBase
+{
+    [HttpPost("media")]
+    [RequestSizeLimit(60_000_000)]
+    public async Task<MediaUploadResult> Upload(Guid jobId, IFormFile file, [FromForm] string phase = "Before", [FromForm] string? caption = null, CancellationToken ct = default)
+    {
+        await using var stream = file.OpenReadStream();
+        return await fixproof.UploadMediaAsync(MechanicId, jobId, stream, file.ContentType, file.FileName, phase, caption, ct);
+    }
+
+    [HttpGet("media")] public Task<IReadOnlyList<MediaUploadResult>> Media(Guid jobId, CancellationToken ct) => fixproof.ListMediaAsync(MechanicId, jobId, ct);
+
+    [HttpPost("transcribe")]
+    public async Task<object> Transcribe(Guid jobId, IFormFile audio, [FromForm] string language = "ta", CancellationToken ct = default)
+    {
+        await using var stream = audio.OpenReadStream();
+        var text = await fixproof.TranscribeAsync(stream, audio.ContentType, language, ct);
+        return new { transcript = text, available = text is not null };
+    }
+
+    [HttpGet("drafts")] public Task<IReadOnlyList<DraftDto>> Drafts(Guid jobId, CancellationToken ct) => fixproof.ListDraftsAsync(MechanicId, jobId, ct);
+    [HttpPost("drafts")] public Task<DraftDto> Draft(Guid jobId, CreateDraftRequest req, CancellationToken ct) => fixproof.CreateDraftAsync(MechanicId, jobId, req, ct);
+    [HttpPut("drafts/{draftId:guid}")] public Task<DraftDto> Update(Guid jobId, Guid draftId, UpdateDraftRequest req, CancellationToken ct) => fixproof.UpdateDraftAsync(MechanicId, draftId, req, ct);
+    [HttpPost("drafts/{draftId:guid}/confirm")] public Task<DraftDto> Confirm(Guid jobId, Guid draftId, CancellationToken ct) => fixproof.ConfirmAsync(MechanicId, draftId, ct);
+    [HttpDelete("drafts/{draftId:guid}")] public async Task<IActionResult> Discard(Guid jobId, Guid draftId, CancellationToken ct) { await fixproof.DiscardAsync(MechanicId, draftId, ct); return NoContent(); }
 }

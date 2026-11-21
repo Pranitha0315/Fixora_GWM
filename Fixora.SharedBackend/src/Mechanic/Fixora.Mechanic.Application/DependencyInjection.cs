@@ -1,4 +1,5 @@
 using Fixora.Mechanic.Application.Auth;
+using Fixora.Mechanic.Application.FixProof;
 using Fixora.Mechanic.Application.Jobs;
 using Fixora.Mechanic.Contracts;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,7 @@ public static class DependencyInjection
     {
         services.AddScoped<MechanicAuthService>();
         services.AddScoped<MechanicJobService>();
+        services.AddScoped<FixProofCaptureService>();
         services.AddScoped<IMechanicDirectory, MechanicDirectory>();
         return services;
     }

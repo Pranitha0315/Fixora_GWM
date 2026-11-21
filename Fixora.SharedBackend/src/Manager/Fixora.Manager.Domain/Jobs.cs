@@ -107,3 +107,26 @@ public sealed class ProgressUpdate : Entity
     public Guid ActorId { get; set; }
     public DateTime At { get; set; } = DateTime.UtcNow;
 }
+
+public enum IssueSeverity { Safe, Attention, Urgent }
+
+/// <summary>A FixProof finding confirmed by the mechanic. Only verified issues are stored here;
+/// unverified AI drafts stay in the mechanic schema and never reach the customer (AC-02).</summary>
+public sealed class InspectionIssue : Entity
+{
+    public Guid JobCardId { get; set; }
+    public string Component { get; set; } = "";
+    public string FindingEn { get; set; } = "";
+    public string FindingTa { get; set; } = "";
+    public string RecommendationEn { get; set; } = "";
+    public string RecommendationTa { get; set; } = "";
+    public IssueSeverity Severity { get; set; }
+    public string MediaRefsCsv { get; set; } = "";
+    public Guid CreatedByMechanicId { get; set; }
+    public int ReportVersion { get; set; } = 1;
+    public DateTime ConfirmedAt { get; set; } = DateTime.UtcNow;
+    /// <summary>Visible to the customer once the manager forwards the proposal it belongs to.</summary>
+    public bool PublishedToCustomer { get; set; }
+
+    public IReadOnlyList<string> MediaRefs => MediaRefsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries);
+}

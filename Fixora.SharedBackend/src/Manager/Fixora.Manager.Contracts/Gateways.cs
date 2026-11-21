@@ -25,6 +25,7 @@ public interface IWorkshopJobGateway
     Task<IReadOnlyList<JobSummaryDto>> GetQueueBoardAsync(CancellationToken ct = default);
     Task<JobDetailDto> GetJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default);
     Task<JobSummaryDto> ApplyJobActionAsync(Guid mechanicId, Guid jobId, JobActionRequest request, CancellationToken ct = default);
+    Task<IssueDto> PublishVerifiedIssueAsync(Guid mechanicId, Guid jobId, VerifiedIssueInput issue, CancellationToken ct = default);
     Task<Guid?> GetVehicleIdForJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default);
 }
 

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using Fixora.Shared.Contracts;
+using Fixora.Shared.Infrastructure.Media;
 using Fixora.Shared.Infrastructure.Persistence;
 using Fixora.Shared.Infrastructure.Realtime;
 using Fixora.Shared.Infrastructure.Security;
@@ -34,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, TokenService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<IPushSender, LoggingPushSender>();
+        services.AddSingleton<IMediaStorage, LocalMediaStorage>();
         services.AddFixoraDbContext<SharedDbContext>(config);
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

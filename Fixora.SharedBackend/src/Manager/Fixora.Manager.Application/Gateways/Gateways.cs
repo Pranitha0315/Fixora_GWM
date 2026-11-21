@@ -68,6 +68,9 @@ public sealed class WorkshopJobGateway(IManagerDb db, JobService jobs, WorkshopR
     public Task<JobSummaryDto> ApplyJobActionAsync(Guid mechanicId, Guid jobId, JobActionRequest request, CancellationToken ct = default)
         => jobs.ApplyMechanicActionAsync(mechanicId, jobId, request, ct);
 
+    public Task<IssueDto> PublishVerifiedIssueAsync(Guid mechanicId, Guid jobId, VerifiedIssueInput issue, CancellationToken ct = default)
+        => jobs.AddVerifiedIssueAsync(mechanicId, jobId, issue, ct);
+
     public async Task<Guid?> GetVehicleIdForJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default)
         => await db.JobCards.AsNoTracking().Where(j => j.Id == jobId && j.MechanicId == mechanicId).Select(j => (Guid?)j.VehicleId).FirstOrDefaultAsync(ct);
 }

@@ -8,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Fixora.Manager.Application.Common;
 
 /// <summary>Builds DTOs from manager-owned rows, resolving bay and mechanic names once per request.</summary>
-public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanics, IClock clock)
+public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanics, IMediaStorage media, IClock clock)
 {
     private Dictionary<Guid, string>? _mechanicNames;
     private Dictionary<Guid, string>? _bayNames;
@@ -45,6 +45,10 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         a.Status.ToString(), a.Source.ToString(), a.JobCardId, a.BayId, await BayNameAsync(a.BayId, ct),
         a.MechanicId, await MechanicNameAsync(a.MechanicId, ct), a.Notes, a.PromoCode, a.DeclineReason, a.CreatedAt);
 
+    public IssueDto Issue(InspectionIssue i) => new(
+        i.Id, i.Component, i.FindingEn, i.FindingTa, i.RecommendationEn, i.RecommendationTa, i.Severity.ToString(),
+        i.MediaRefs.Select(r => media.GetSignedUrl(r, TimeSpan.FromMinutes(15))).ToList(), i.ReportVersion, i.ConfirmedAt);
+
     public static QueueEstimateDto Queue(JobCard j) => new(j.Id, j.QueuePosition, j.IsActive ? j.EtaAt : null, j.Status.ToString());
 
     public enum Viewer { Staff, Mechanic, Customer }
@@ -58,7 +62,9 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         var timeline = await db.ProgressUpdates.AsNoTracking().Where(p => p.JobCardId == job.Id).OrderBy(p => p.At)
             .Select(p => new ProgressDto(p.Stage, p.Message, p.Percent, p.ActorRole, p.At)).ToListAsync(ct);
 
-        var issues = new List<IssueDto>(); // FixProof findings arrive on Day 6
+        var issuesQ = db.Issues.AsNoTracking().Where(i => i.JobCardId == job.Id);
+        if (viewer == Viewer.Customer) issuesQ = issuesQ.Where(i => i.PublishedToCustomer);
+        var issues = (await issuesQ.OrderBy(i => i.ConfirmedAt).ToListAsync(ct)).Select(Issue).ToList();
 
         var proposals = new List<ProposalDto>();      // repair proposals arrive on Day 7
         var changes = new List<ChangeRequestDto>();   // change requests arrive on Day 7

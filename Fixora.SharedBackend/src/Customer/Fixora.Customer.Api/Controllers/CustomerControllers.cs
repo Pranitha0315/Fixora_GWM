@@ -93,3 +93,35 @@ public sealed class JobsController(CustomerWorkshopService workshop) : CustomerC
     [HttpGet] public Task<IReadOnlyList<JobSummaryDto>> List([FromQuery] bool activeOnly = false, CancellationToken ct = default) => workshop.JobsAsync(CustomerId, activeOnly, ct);
     [HttpGet("{id:guid}")] public Task<JobDetailDto> Get(Guid id, CancellationToken ct) => workshop.JobAsync(CustomerId, id, ct);
 }
+
+// 8
+[Route("api/v1/customer/fixproof")]
+public sealed class FixProofController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    /// <summary>Verified report only: confirmed findings that the manager has published with a proposal.</summary>
+    [HttpGet("jobs/{jobId:guid}/report")]
+    public async Task<object> Report(Guid jobId, CancellationToken ct)
+    {
+        var job = await workshop.JobAsync(CustomerId, jobId, ct);
+        return new { job.Job.Id, job.Job.Number, job.Job.VehicleLabel, issues = job.Issues, proposals = job.Proposals, verified = true };
+    }
+}
+
+// 11
+[Route("api/v1/customer/evidence")]
+public sealed class EvidenceController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    /// <summary>Evidence Passport: published findings with short-lived signed media URLs, newest first.</summary>
+    [HttpGet]
+    public async Task<IReadOnlyList<object>> Passport([FromQuery] Guid? vehicleId, CancellationToken ct)
+    {
+        var jobs = await workshop.JobsAsync(CustomerId, false, ct);
+        var list = new List<object>();
+        foreach (var j in jobs.Where(j => vehicleId is null || j.VehicleId == vehicleId))
+        {
+            var d = await workshop.JobAsync(CustomerId, j.Id, ct);
+            list.AddRange(d.Issues.Select(i => (object)new { jobId = j.Id, j.Number, j.VehicleId, j.VehicleLabel, issue = i }));
+        }
+        return list;
+    }
+}

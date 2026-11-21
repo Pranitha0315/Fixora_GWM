@@ -14,6 +14,7 @@ public interface IManagerDb
     DbSet<Appointment> Appointments { get; }
     DbSet<JobCard> JobCards { get; }
     DbSet<ProgressUpdate> ProgressUpdates { get; }
+    DbSet<InspectionIssue> Issues { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

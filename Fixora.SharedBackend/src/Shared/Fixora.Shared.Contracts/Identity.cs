@@ -27,3 +27,12 @@ public interface IPasswordService
     string Hash(string secret);
     bool Verify(string hash, string secret);
 }
+
+public sealed record StoredMedia(string MediaRef, string ContentType, long Size);
+
+/// <summary>Private media storage. Callers only ever receive short-lived signed URLs.</summary>
+public interface IMediaStorage
+{
+    Task<StoredMedia> SaveAsync(Stream content, string contentType, string fileName, CancellationToken ct = default);
+    string GetSignedUrl(string mediaRef, TimeSpan ttl);
+}

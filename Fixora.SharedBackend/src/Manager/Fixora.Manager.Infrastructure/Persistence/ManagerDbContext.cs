@@ -18,6 +18,7 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
     public DbSet<Appointment> Appointments => Set<Appointment>();
     public DbSet<JobCard> JobCards => Set<JobCard>();
     public DbSet<ProgressUpdate> ProgressUpdates => Set<ProgressUpdate>();
+    public DbSet<InspectionIssue> Issues => Set<InspectionIssue>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder c)
     {
@@ -50,6 +51,13 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
             e.HasIndex(x => x.CustomerId);
             e.HasIndex(x => x.MechanicId);
             e.Ignore(x => x.IsActive);
+        });
+
+        b.Entity<InspectionIssue>(e =>
+        {
+            e.Property(x => x.Severity).HasConversion<string>().HasMaxLength(16);
+            e.HasIndex(x => x.JobCardId);
+            e.Ignore(x => x.MediaRefs);
         });
 
         b.UseClientGeneratedGuids();

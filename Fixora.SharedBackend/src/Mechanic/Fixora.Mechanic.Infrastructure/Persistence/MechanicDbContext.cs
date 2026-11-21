@@ -13,6 +13,8 @@ public sealed class MechanicDbContext(DbContextOptions<MechanicDbContext> option
     public const string Schema = "mechanic";
 
     public DbSet<MechanicAccount> Mechanics => Set<MechanicAccount>();
+    public DbSet<InspectionDraft> Drafts => Set<InspectionDraft>();
+    public DbSet<CaptureMedia> Media => Set<CaptureMedia>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -23,6 +25,16 @@ public sealed class MechanicDbContext(DbContextOptions<MechanicDbContext> option
             e.HasIndex(x => x.Phone);
             e.Property(x => x.EmployeeCode).HasMaxLength(16);
             e.Property(x => x.Phone).HasMaxLength(32);
+        });
+        b.Entity<InspectionDraft>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(12);
+            e.HasIndex(x => new { x.JobCardId, x.MechanicId });
+        });
+        b.Entity<CaptureMedia>(e =>
+        {
+            e.Property(x => x.Phase).HasConversion<string>().HasMaxLength(8);
+            e.HasIndex(x => x.JobCardId);
         });
         b.UseClientGeneratedGuids();
     }

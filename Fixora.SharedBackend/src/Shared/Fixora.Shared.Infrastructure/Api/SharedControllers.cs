@@ -1,4 +1,5 @@
 using Fixora.Shared.Contracts;
+using Fixora.Shared.Infrastructure.Media;
 using Fixora.Shared.Infrastructure.Persistence;
 using Fixora.Shared.Infrastructure.Realtime;
 using Fixora.SharedKernel;
@@ -82,6 +83,21 @@ public sealed class DevicesController(SharedDbContext db, ICurrentUser user, ICl
         }
         await db.SaveChangesAsync(ct);
         return NoContent();
+    }
+}
+
+[ApiController]
+[Route("api/v1/media")]
+public sealed class MediaController(IMediaStorage storage) : ControllerBase
+{
+    /// <summary>Streams private media only with a valid, unexpired signature.</summary>
+    [HttpGet("{mediaRef}")]
+    [AllowAnonymous]
+    public IActionResult Get(string mediaRef, [FromQuery] long exp, [FromQuery] string sig)
+    {
+        if (storage is not LocalMediaStorage local || !local.TryOpen(mediaRef, exp, sig ?? "", out var path, out var type))
+            return NotFound();
+        return PhysicalFile(path, type);
     }
 }
 
