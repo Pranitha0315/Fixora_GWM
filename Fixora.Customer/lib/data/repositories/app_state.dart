@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../models/models.dart';
 import '../models/vehicle.dart';
 
-export '../models/models.dart' show Booking, BookingState;
+export '../models/models.dart'
+    show Booking, BookingState, PassportEntry, PassportStatus, ServiceRecord, UpcomingService;
 
 /// App-wide state: profile, vehicles, bookings, subscription and settings.
 ///
@@ -81,6 +83,55 @@ class AppState extends ChangeNotifier {
   List<Vehicle> get activeVehicles => vehicles.where((v) => v.active).toList();
 
   int get vehicleCount => vehicles.length;
+
+  static const Map<String, List<PassportEntry>> _passport = {
+    'v1': [
+      PassportEntry(
+        title: 'Radiator cap seal weak',
+        detail: 'Pressure test borderline (0.9 bar). Could cause slow coolant loss.',
+        foundOn: '27 Aug 2026',
+        jobId: 'FX-1042',
+        status: PassportStatus.unresolved,
+        linkedSymptom: 'Coolant level dropping',
+      ),
+      PassportEntry(
+        title: 'Rear left wheel bearing noise',
+        detail: 'Faint hum above 80 km/h. Not confirmed on lift.',
+        foundOn: '14 Jun 2026',
+        jobId: 'JC-2026-00087',
+        status: PassportStatus.stillUnresolved,
+        linkedSymptom: 'Humming noise at speed',
+      ),
+      PassportEntry(
+        title: 'Alternator undercharging',
+        detail: 'Output measured 14.1 V after battery check - within range.',
+        foundOn: '05 Sep 2025',
+        jobId: 'JC-2025-00731',
+        status: PassportStatus.ruledOut,
+        linkedSymptom: 'Battery drains overnight',
+      ),
+      PassportEntry(
+        title: 'Thermostat stuck open',
+        detail: 'Suspected in June, confirmed by OBD P0128 + thermal image in August.',
+        foundOn: '14 Jun 2026',
+        jobId: 'FX-1042',
+        status: PassportStatus.confirmed,
+        linkedSymptom: 'Heater blows cold air',
+      ),
+    ],
+    'v2': [
+      PassportEntry(
+        title: 'Hybrid battery cell imbalance',
+        detail: 'Block 7 voltage 0.3 V lower than average. Monitor next visit.',
+        foundOn: '02 Mar 2026',
+        jobId: 'JC-2026-00031',
+        status: PassportStatus.unresolved,
+        linkedSymptom: 'Reduced EV mode range',
+      ),
+    ],
+  };
+
+  List<PassportEntry> passportFor(String id) => _passport[id] ?? const [];
 
   Vehicle vehicleById(String id) => vehicles.firstWhere(
         (v) => v.id == id,
@@ -166,9 +217,100 @@ class AppState extends ChangeNotifier {
     return upcoming.isEmpty ? null : upcoming.first;
   }
 
-  List<Booking> upcomingFor(String vehicleId) =>
+  List<Booking> upcomingBookingsFor(String vehicleId) =>
       bookings.where((b) => b.upcoming && b.vehicleId == vehicleId).toList()
         ..sort((a, b) => a.date.compareTo(b.date));
+
+  static final Map<String, List<ServiceRecord>> _history = {
+    'v1': [
+      ServiceRecord(
+        title: 'General Service',
+        subtitle: 'Oil change, filters, full inspection',
+        jobId: 'JC-2026-00087',
+        date: DateTime(2026, 6, 14),
+        mileageKm: 32500,
+        amount: 18630,
+        work: const ['Engine oil & filter', 'Air filter', '21-point inspection'],
+        icon: Icons.handyman_outlined,
+      ),
+      ServiceRecord(
+        title: 'Brake Inspection',
+        subtitle: 'Front brake pad check and cleaning',
+        jobId: 'JC-2026-00044',
+        date: DateTime(2026, 3, 10),
+        mileageKm: 29900,
+        amount: 6500,
+        work: const ['Front pads cleaned', 'Brake fluid checked'],
+        icon: Icons.album_outlined,
+      ),
+      ServiceRecord(
+        title: 'Wheel Alignment',
+        subtitle: 'Alignment and balancing',
+        jobId: 'JC-2025-00980',
+        date: DateTime(2025, 12, 22),
+        mileageKm: 25200,
+        amount: 7800,
+        work: const ['4-wheel alignment', 'Wheel balancing'],
+        garage: 'AutoCare Workshop',
+        icon: Icons.tire_repair_rounded,
+      ),
+      ServiceRecord(
+        title: 'Battery Check',
+        subtitle: 'Battery health test and terminal cleaning',
+        jobId: 'JC-2025-00731',
+        date: DateTime(2025, 9, 5),
+        mileageKm: 21800,
+        amount: 2500,
+        work: const ['Battery load test', 'Terminal cleaning'],
+        icon: Icons.battery_charging_full_rounded,
+      ),
+    ],
+    'v2': [
+      ServiceRecord(
+        title: 'AC Repair',
+        subtitle: 'AC gas refill and leak test',
+        jobId: 'JC-2026-00031',
+        date: DateTime(2026, 3, 2),
+        mileageKm: 18020,
+        amount: 24150,
+        work: const ['AC gas refill', 'Cabin filter', 'Leak test'],
+        garage: 'AutoCare Workshop',
+        icon: Icons.ac_unit_rounded,
+      ),
+    ],
+  };
+
+  static final Map<String, List<UpcomingService>> _upcomingServices = {
+    'v1': [
+      UpcomingService(
+        title: 'Engine Oil Change',
+        subtitle: 'Oil and filter replacement',
+        date: DateTime(2026, 11, 27),
+        icon: Icons.oil_barrel_outlined,
+        service: 'General Service',
+      ),
+      UpcomingService(
+        title: 'General Service',
+        subtitle: 'Full vehicle inspection and maintenance',
+        date: DateTime(2027, 1, 27),
+        icon: Icons.handyman_outlined,
+        service: 'General Service',
+      ),
+      UpcomingService(
+        title: 'Brake Service',
+        subtitle: 'Brake pad check and replacement (if needed)',
+        date: DateTime(2027, 3, 27),
+        icon: Icons.album_outlined,
+        service: 'Brakes',
+      ),
+    ],
+  };
+
+  List<ServiceRecord> historyFor(String id) => _history[id] ?? const [];
+
+  List<UpcomingService> upcomingFor(String id) => _upcomingServices[id] ?? const [];
+
+  String distance(int km) => '${km.toString().replaceAllMapped(RegExp(r'(\d)(?=(\d{3})+(?!\d))'), (m) => '${m[1]},')} km';
 
   List<Booking> bookingsIn(Set<BookingState> states) =>
       bookings.where((b) => states.contains(b.state)).toList()

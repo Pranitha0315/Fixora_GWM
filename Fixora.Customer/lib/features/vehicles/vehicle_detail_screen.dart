@@ -5,7 +5,10 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/vehicle.dart';
 import '../../data/repositories/app_state.dart';
+import '../bookings/book_service_screen.dart';
 import 'add_vehicle_screen.dart';
+import 'evidence_passport_screen.dart';
+import 'service_history_screen.dart';
 
 /// Vehicle Details: overview, information grid and quick actions.
 class VehicleDetailScreen extends StatelessWidget {
@@ -120,6 +123,34 @@ class VehicleDetailScreen extends StatelessWidget {
               SizedBox(
                 height: 52,
                 child: OutlinedButton.icon(
+                  onPressed: () => context.push(ServiceHistoryScreen(vehicleId: v.id)),
+                  icon: const Icon(Icons.manage_history_rounded),
+                  label: const Text('Service History'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push(EvidencePassportScreen(vehicle: v)),
+                  icon: const Icon(Icons.shield_outlined),
+                  label: const Text('Evidence Passport'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navy,
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
                   onPressed: () => context.push(AddVehicleScreen(editId: v.id)),
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Edit details'),
@@ -140,7 +171,7 @@ class VehicleDetailScreen extends StatelessWidget {
                           icon: Icons.info_outline_rounded);
                       return;
                     }
-                    _snack(context, 'Book Service screen coming next', icon: Icons.event_available_rounded);
+                    context.push(BookServiceScreen(vehicleId: v.id));
                   },
                   icon: const Icon(Icons.event_available_rounded),
                   label: const Text('Book a Service'),

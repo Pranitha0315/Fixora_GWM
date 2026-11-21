@@ -8,6 +8,7 @@ import '../../../data/models/models.dart';
 import '../../../data/repositories/job_store.dart';
 import 'approval_request_screen.dart';
 import 'diagnosis_report_screen.dart';
+import 'repair_progress_screen.dart';
 import 'view_photos_screen.dart';
 
 /// "Estimate & Approval" hub with Service / Live Data / Media tabs.
@@ -166,6 +167,18 @@ class _ServiceTab extends StatelessWidget {
             label: const Text('Review & Approve Estimate'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton.icon(
+            onPressed: () => context.push(const RepairProgressScreen()),
+            icon: const Icon(Icons.timeline_rounded),
+            label: const Text('Repair Progress'),
+            style: OutlinedButton.styleFrom(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
           ),
