@@ -1,5 +1,6 @@
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Application.Staff;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
@@ -13,6 +14,7 @@ namespace Fixora.Manager.Application.Gateways;
 public sealed class WorkshopGateway(
     IManagerDb db,
     BookingService bookings,
+    JobService jobs,
     WorkshopSettingsService settings,
     WorkshopReadModel read,
     IClock clock) : IWorkshopGateway
@@ -39,4 +41,48 @@ public sealed class WorkshopGateway(
 
     public Task<BookingDto> RescheduleBookingAsync(Guid customerId, Guid bookingId, DateTime newSlotStart, CancellationToken ct = default)
         => bookings.RescheduleAsync(customerId, Roles.Customer, bookingId, newSlotStart, ct);
+
+    public Task<IReadOnlyList<JobSummaryDto>> ListJobsAsync(Guid customerId, bool activeOnly, CancellationToken ct = default)
+        => jobs.ListAsync(activeOnly, null, customerId, ct);
+
+    public Task<JobDetailDto> GetJobAsync(Guid customerId, Guid jobId, CancellationToken ct = default)
+        => jobs.GetAsync(jobId, WorkshopReadModel.Viewer.Customer, null, customerId, ct);
+
+    public async Task<QueueEstimateDto> GetQueueEstimateAsync(Guid customerId, Guid jobId, CancellationToken ct = default)
+    {
+        var job = await db.JobCards.AsNoTracking().FirstOrDefaultAsync(j => j.Id == jobId && j.CustomerId == customerId, ct) ?? throw new NotFoundException("Job");
+        return WorkshopReadModel.Queue(job);
+    }
+}
+
+/// <summary>Mechanic-facing gateway: only jobs assigned to the calling mechanic.</summary>
+public sealed class WorkshopJobGateway(IManagerDb db, JobService jobs, WorkshopReadModel read) : IWorkshopJobGateway
+{
+    public Task<IReadOnlyList<JobSummaryDto>> ListAssignedJobsAsync(Guid mechanicId, CancellationToken ct = default) => jobs.ListAsync(false, mechanicId, null, ct);
+
+    public Task<IReadOnlyList<JobSummaryDto>> GetQueueBoardAsync(CancellationToken ct = default) => jobs.ListAsync(true, null, null, ct);
+
+    public Task<JobDetailDto> GetJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default)
+        => jobs.GetAsync(jobId, WorkshopReadModel.Viewer.Mechanic, mechanicId, null, ct);
+
+    public Task<JobSummaryDto> ApplyJobActionAsync(Guid mechanicId, Guid jobId, JobActionRequest request, CancellationToken ct = default)
+        => jobs.ApplyMechanicActionAsync(mechanicId, jobId, request, ct);
+
+    public async Task<Guid?> GetVehicleIdForJobAsync(Guid mechanicId, Guid jobId, CancellationToken ct = default)
+        => await db.JobCards.AsNoTracking().Where(j => j.Id == jobId && j.MechanicId == mechanicId).Select(j => (Guid?)j.VehicleId).FirstOrDefaultAsync(ct);
+}
+
+/// <summary>Who may join job:{id}: staff always; the assigned mechanic; the owning customer.</summary>
+public sealed class RealtimeAccessPolicy(IManagerDb db) : IRealtimeAccessPolicy
+{
+    public async Task<bool> CanJoinJobAsync(Guid userId, string role, Guid jobId, CancellationToken ct = default)
+    {
+        if (Roles.IsStaff(role)) return true;
+        return role switch
+        {
+            Roles.Mechanic => await db.JobCards.AnyAsync(j => j.Id == jobId && j.MechanicId == userId, ct),
+            Roles.Customer => await db.JobCards.AnyAsync(j => j.Id == jobId && j.CustomerId == userId, ct),
+            _ => false,
+        };
+    }
 }

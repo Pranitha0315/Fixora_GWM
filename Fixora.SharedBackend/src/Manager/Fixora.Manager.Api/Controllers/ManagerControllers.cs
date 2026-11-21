@@ -1,6 +1,7 @@
 using Fixora.Customer.Contracts;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Application.Staff;
 using Fixora.Manager.Contracts;
 using Fixora.Shared.Contracts;
@@ -40,6 +41,19 @@ public sealed class BookingsController(BookingService bookings) : StaffControlle
     [HttpPost("{id:guid}/decline")] public Task<BookingDto> Decline(Guid id, DeclineBookingRequest req, CancellationToken ct) => bookings.DeclineAsync(StaffId, id, req.Reason, ct);
     [HttpPost("{id:guid}/reschedule")] public Task<BookingDto> Reschedule(Guid id, RescheduleRequest req, CancellationToken ct) => bookings.RescheduleAsync(StaffId, Roles.Manager, id, req.SlotStart, ct);
     [HttpPost("{id:guid}/cancel")] public Task<BookingDto> Cancel(Guid id, CancellationToken ct) => bookings.CancelAsync(StaffId, Roles.Manager, id, ct);
+    [HttpPost("{id:guid}/check-in")] public Task<BookingDto> CheckIn(Guid id, CancellationToken ct) => bookings.CheckInAsync(StaffId, id, ct);
+    [HttpPost("{id:guid}/no-show")] public Task<BookingDto> NoShow(Guid id, CancellationToken ct) => bookings.MarkNoShowAsync(id, ct);
+    [HttpPost("walk-in")] public Task<JobSummaryDto> WalkIn(WalkInRequest req, CancellationToken ct) => bookings.WalkInAsync(StaffId, req, ct);
+}
+
+[Route("api/v1/manager/jobs")]
+public sealed class JobsController(JobService jobs) : StaffControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<JobSummaryDto>> List([FromQuery] bool activeOnly = true, [FromQuery] Guid? customerId = null, CancellationToken ct = default) => jobs.ListAsync(activeOnly, null, customerId, ct);
+    [HttpGet("{id:guid}")] public Task<JobDetailDto> Get(Guid id, CancellationToken ct) => jobs.GetAsync(id, WorkshopReadModel.Viewer.Staff, null, null, ct);
+    [HttpPost("{id:guid}/assign")] public Task<JobSummaryDto> Assign(Guid id, AssignJobRequest req, CancellationToken ct) => jobs.AssignAsync(StaffId, id, req, ct);
+    [HttpPost("{id:guid}/reorder")] public Task<JobSummaryDto> Reorder(Guid id, ReorderJobRequest req, CancellationToken ct) => jobs.ReorderAsync(id, req, ct);
+    [HttpPost("{id:guid}/extend")] public Task<JobSummaryDto> Extend(Guid id, ExtendJobRequest req, CancellationToken ct) => jobs.ExtendAsync(id, req, ct);
 }
 
 [Route("api/v1/manager/mechanics")]

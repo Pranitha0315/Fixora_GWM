@@ -4,6 +4,7 @@ using Fixora.Customer.Infrastructure;
 using Fixora.Customer.Infrastructure.Persistence;
 using Fixora.Manager.Api.Controllers;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Infrastructure;
 using Fixora.Manager.Infrastructure.Persistence;
 using Fixora.Mechanic.Api.Controllers;
@@ -13,6 +14,7 @@ using Fixora.Shared.Contracts;
 using Fixora.Shared.Infrastructure;
 using Fixora.Shared.Infrastructure.Api;
 using Fixora.Shared.Infrastructure.Persistence;
+using Fixora.Shared.Infrastructure.Realtime;
 using Fixora.Shared.Infrastructure.Web;
 using Fixora.SharedKernel;
 using Fixora.Host;
@@ -45,7 +47,7 @@ builder.Services.AddControllers()
     .AddApplicationPart(typeof(CustomerControllerBase).Assembly)
     .AddApplicationPart(typeof(MechanicControllerBase).Assembly)
     .AddApplicationPart(typeof(StaffControllerBase).Assembly)
-    .AddApplicationPart(typeof(SessionController).Assembly)
+    .AddApplicationPart(typeof(NotificationsController).Assembly)
     .AddJsonOptions(o => o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddOpenApi();
@@ -70,6 +72,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<FixoraHub>("/hubs/fixora");
 app.MapOpenApi();
 app.MapFixoraSwagger();   // Swagger UI → http://localhost:5080/swagger
 app.MapHealthChecks("/health");
@@ -106,6 +109,7 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
         await CustomerSeeder.SeedAsync(sp.GetRequiredService<CustomerDbContext>(), passwords, clock);
         await MechanicSeeder.SeedAsync(sp.GetRequiredService<MechanicDbContext>(), passwords);
         await ManagerSeeder.SeedAsync(sp.GetRequiredService<ManagerDbContext>(), passwords, clock);
+        await sp.GetRequiredService<QueueService>().RecalculateAsync();
         logger.LogInformation("Demo garage seeded (see DemoIds for logins)");
     }
 }

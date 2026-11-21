@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Fixora.Shared.Contracts;
 using Fixora.Shared.Infrastructure.Persistence;
+using Fixora.Shared.Infrastructure.Realtime;
 using Fixora.Shared.Infrastructure.Security;
 using Fixora.SharedKernel;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -31,6 +32,8 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordService, PasswordService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<ITokenService, TokenService>();
+        services.AddScoped<INotificationService, NotificationService>();
+        services.AddSingleton<IPushSender, LoggingPushSender>();
         services.AddFixoraDbContext<SharedDbContext>(config);
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -75,6 +78,7 @@ public static class DependencyInjection
                 PartitionKey(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
         });
 
+        services.AddSignalR();
         return services;
     }
 

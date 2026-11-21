@@ -1,6 +1,7 @@
 using Fixora.Customer.Contracts;
 using Fixora.Manager.Contracts;
 using Fixora.Mechanic.Application.Auth;
+using Fixora.Mechanic.Application.Jobs;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.AspNetCore.Authorization;
@@ -37,4 +38,15 @@ public sealed class MechanicProfileController(MechanicAuthService auth) : Mechan
     [HttpGet] public Task<MechanicProfileDto> Get(CancellationToken ct) => auth.ProfileAsync(MechanicId, ct);
     [HttpPost("pin")] public async Task<IActionResult> ChangePin(ChangePinRequest req, CancellationToken ct) { await auth.ChangePinAsync(MechanicId, req, ct); return NoContent(); }
     [HttpPut("duty")] public Task<MechanicProfileDto> Duty(DutyRequest req, CancellationToken ct) => auth.SetDutyAsync(MechanicId, req.OnDuty, ct);
+}
+
+[Route("api/v1/mechanic/jobs")]
+public sealed class AssignedJobsController(MechanicJobService jobs) : MechanicControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<JobSummaryDto>> Assigned(CancellationToken ct) => jobs.AssignedAsync(MechanicId, ct);
+    [HttpGet("queue")] public Task<IReadOnlyList<JobSummaryDto>> Queue(CancellationToken ct) => jobs.QueueBoardAsync(ct);
+    [HttpGet("{jobId:guid}")] public Task<MechanicJobDetailDto> Get(Guid jobId, CancellationToken ct) => jobs.DetailAsync(MechanicId, jobId, ct);
+
+    /// <summary>start | pause | resume | progress | complete — progress reaches customer and manager in real time.</summary>
+    [HttpPost("{jobId:guid}/actions")] public Task<JobSummaryDto> Action(Guid jobId, JobActionRequest req, CancellationToken ct) => jobs.ActionAsync(MechanicId, jobId, req, ct);
 }

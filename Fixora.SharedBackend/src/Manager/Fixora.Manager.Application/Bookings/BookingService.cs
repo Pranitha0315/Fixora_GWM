@@ -1,5 +1,6 @@
 using Fixora.Customer.Contracts;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
 using Fixora.Shared.Contracts;
@@ -11,11 +12,14 @@ namespace Fixora.Manager.Application.Bookings;
 public sealed record ConfirmBookingRequest(Guid BayId, Guid MechanicId, string? Note);
 public sealed record DeclineBookingRequest(string Reason);
 public sealed record RescheduleRequest(DateTime SlotStart);
+public sealed record WalkInRequest(Guid? CustomerId, string CustomerName, Guid? VehicleId, string VehicleLabel, Guid ServiceId, Guid BayId, Guid MechanicId, int Priority, string? Complaint);
 
 /// <summary>Customer → Manager → (Customer + Mechanic) booking flow with server-side capacity (USP 5).</summary>
 public sealed class BookingService(
     IManagerDb db,
     WorkshopReadModel read,
+    INotificationService notifier,
+    QueueService queue,
     ICustomerDirectory customers,
     IClock clock)
 {
@@ -89,7 +93,15 @@ public sealed class BookingService(
             CapacityLock.Release();
         }
 
+        await notifier.NotifyAsync(new NotificationMessage(
+                NotificationTypes.BookingRequested,
+                "New booking request",
+                $"{customerName} · {vehicleLabel} · {service.Name} · {LocalTime.Format(appt.SlotStart)}",
+                "booking", appt.Id, null,
+                new Dictionary<string, string> { ["route"] = "bookings" }),
+            new[] { Recipient.AllStaff() }, ct);
         var dto = await read.BookingAsync(appt, ct);
+        await notifier.PublishAsync(RealtimeEvents.BookingUpdated, dto, new[] { RealtimeGroups.Staff }, ct);
         return dto;
     }
 
@@ -101,6 +113,19 @@ public sealed class BookingService(
         await db.SaveChangesAsync(ct);
 
         var dto = await read.BookingAsync(appt, ct);
+        await notifier.NotifyAsync(new NotificationMessage(
+                NotificationTypes.BookingConfirmed,
+                "Booking confirmed",
+                $"{appt.ServiceName} on {LocalTime.Format(appt.SlotStart)} · {dto.BayName}. Mechanic: {dto.MechanicName}.",
+                "booking", appt.Id),
+            new[] { Recipient.User(Roles.Customer, appt.CustomerId) }, ct);
+        await notifier.NotifyAsync(new NotificationMessage(
+                NotificationTypes.JobAssigned,
+                "New booking assigned to you",
+                $"{appt.VehicleLabel} · {appt.ServiceName} · {LocalTime.Format(appt.SlotStart)} · {dto.BayName}",
+                "booking", appt.Id),
+            new[] { Recipient.User(Roles.Mechanic, req.MechanicId) }, ct);
+        await PublishAsync(dto, ct);
         return dto;
     }
 
@@ -109,7 +134,11 @@ public sealed class BookingService(
         var appt = await db.Appointments.FirstOrDefaultAsync(a => a.Id == bookingId, ct) ?? throw new NotFoundException("Booking");
         appt.Decline(reason, clock.UtcNow);
         await db.SaveChangesAsync(ct);
+        await notifier.NotifyAsync(new NotificationMessage(
+                NotificationTypes.BookingDeclined, "Booking could not be accepted", $"{appt.ServiceName} on {LocalTime.Format(appt.SlotStart)}: {reason}", "booking", appt.Id),
+            new[] { Recipient.User(Roles.Customer, appt.CustomerId) }, ct);
         var dto = await read.BookingAsync(appt, ct);
+        await PublishAsync(dto, ct);
         return dto;
     }
 
@@ -122,7 +151,13 @@ public sealed class BookingService(
         appt.Cancel(clock.UtcNow, workshop.CancelCutoffHours, byStaff);
         await db.SaveChangesAsync(ct);
 
+        var msg = new NotificationMessage(NotificationTypes.BookingCancelled, "Booking cancelled",
+            $"{appt.CustomerName} · {appt.ServiceName} on {LocalTime.Format(appt.SlotStart)}", "booking", appt.Id);
+        var to = new List<Recipient> { byStaff ? Recipient.User(Roles.Customer, appt.CustomerId) : Recipient.AllStaff() };
+        if (appt.MechanicId is { } m) to.Add(Recipient.User(Roles.Mechanic, m));
+        await notifier.NotifyAsync(msg, to, ct);
         var dto = await read.BookingAsync(appt, ct);
+        await PublishAsync(dto, ct);
         return dto;
     }
 
@@ -151,6 +186,68 @@ public sealed class BookingService(
         }
 
         var dto = await read.BookingAsync(appt, ct);
+        await notifier.NotifyAsync(new NotificationMessage(
+                NotificationTypes.BookingRequested, "Booking moved", $"{appt.CustomerName} · {appt.ServiceName} → {LocalTime.Format(newStart)}", "booking", appt.Id),
+            new[] { byStaff ? Recipient.User(Roles.Customer, appt.CustomerId) : Recipient.AllStaff() }, ct);
+        await PublishAsync(dto, ct);
+        return dto;
+    }
+
+    /// <summary>Vehicle arrived: the confirmed booking becomes a job card in today's queue.</summary>
+    public async Task<BookingDto> CheckInAsync(Guid staffId, Guid bookingId, CancellationToken ct = default)
+    {
+        var appt = await db.Appointments.FirstOrDefaultAsync(a => a.Id == bookingId, ct) ?? throw new NotFoundException("Booking");
+        if (appt.Status != AppointmentStatus.Confirmed) throw new ConflictException("booking_not_confirmed", "Confirm the booking before check-in.");
+        var job = await CreateJobAsync(appt, ct);
+        appt.Status = AppointmentStatus.CheckedIn;
+        appt.JobCardId = job.Id;
+        await db.SaveChangesAsync(ct);
+        await AfterJobCreatedAsync(job, ct);
+        var dto = await read.BookingAsync(appt, ct);
+        await PublishAsync(dto, ct);
+        return dto;
+    }
+
+    /// <summary>Walk-in inserted by the manager; ETAs of everyone behind it move (BR-AQ-05).</summary>
+    public async Task<JobSummaryDto> WalkInAsync(Guid staffId, WalkInRequest req, CancellationToken ct = default)
+    {
+        var service = await db.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == req.ServiceId, ct) ?? throw new NotFoundException("Service");
+        var now = clock.UtcNow;
+        var appt = new Appointment
+        {
+            CustomerId = req.CustomerId ?? Guid.Empty,
+            CustomerName = req.CustomerName,
+            VehicleId = req.VehicleId ?? Guid.Empty,
+            VehicleLabel = req.VehicleLabel,
+            ServiceId = service.Id,
+            ServiceName = service.Name,
+            SlotStart = now,
+            SlotEnd = now.AddMinutes(service.StandardMinutes),
+            Status = AppointmentStatus.CheckedIn,
+            Source = BookingSource.WalkIn,
+            BayId = req.BayId,
+            MechanicId = req.MechanicId,
+            Notes = req.Complaint,
+            CreatedAt = now,
+            DecidedAt = now,
+        };
+        db.Appointments.Add(appt);
+        var job = await CreateJobAsync(appt, ct);
+        job.Priority = req.Priority;
+        appt.JobCardId = job.Id;
+        await db.SaveChangesAsync(ct);
+        await AfterJobCreatedAsync(job, ct);
+        return await read.JobAsync(job, ct);
+    }
+
+    public async Task<BookingDto> MarkNoShowAsync(Guid bookingId, CancellationToken ct = default)
+    {
+        var appt = await db.Appointments.FirstOrDefaultAsync(a => a.Id == bookingId, ct) ?? throw new NotFoundException("Booking");
+        if (appt.Status != AppointmentStatus.Confirmed) throw new ConflictException("booking_not_confirmed", "Only confirmed bookings can be marked as no-show.");
+        appt.Status = AppointmentStatus.NoShow;
+        await db.SaveChangesAsync(ct);
+        var dto = await read.BookingAsync(appt, ct);
+        await PublishAsync(dto, ct);
         return dto;
     }
 
@@ -190,5 +287,38 @@ public sealed class BookingService(
             (a.Status == AppointmentStatus.Requested || a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.CheckedIn), ct);
         if (used >= bays)
             throw new ConflictException("slot_full", "That slot was just taken. Please pick another time."); // 409 → app refreshes slots
+    }
+
+    private async Task<JobCard> CreateJobAsync(Appointment appt, CancellationToken ct)
+    {
+        var now = clock.UtcNow;
+        var service = await db.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == appt.ServiceId, ct);
+        var order = (await db.JobCards.MaxAsync(j => (int?)j.QueueOrder, ct) ?? 0) + 1;
+        var job = JobNumbers.NewJob(appt, await JobNumbers.NextJobNumberAsync(db, now, ct), service?.StandardMinutes ?? 60, order, now);
+        db.JobCards.Add(job);
+        db.ProgressUpdates.Add(new ProgressUpdate { JobCardId = job.Id, Stage = "Checked in", Message = "Vehicle received at the workshop.", Percent = 5, ActorRole = Roles.Manager, At = now });
+        return job;
+    }
+
+    private async Task AfterJobCreatedAsync(JobCard job, CancellationToken ct)
+    {
+        if (job.MechanicId is { } mech)
+            await notifier.NotifyAsync(new NotificationMessage(
+                    NotificationTypes.JobAssigned, "Vehicle in your queue", $"{job.Number} · {job.VehicleLabel} · {job.Complaint}", "job", job.Id, job.Id,
+                    new Dictionary<string, string> { ["route"] = "job", ["jobId"] = job.Id.ToString() }),
+                new[] { Recipient.User(Roles.Mechanic, mech) }, ct);
+        if (job.CustomerId != Guid.Empty)
+            await notifier.NotifyAsync(new NotificationMessage(
+                    NotificationTypes.JobProgress, "Vehicle checked in", $"{job.VehicleLabel} is in the queue. Track it live in the app.", "job", job.Id, job.Id),
+                new[] { Recipient.User(Roles.Customer, job.CustomerId) }, ct);
+        await queue.RecalculateAsync(ct);
+    }
+
+    private Task PublishAsync(BookingDto dto, CancellationToken ct)
+    {
+        var groups = new List<string> { RealtimeGroups.Staff };
+        if (dto.CustomerId != Guid.Empty) groups.Add(RealtimeGroups.User(dto.CustomerId));
+        if (dto.MechanicId is { } m) groups.Add(RealtimeGroups.User(m));
+        return notifier.PublishAsync(RealtimeEvents.BookingUpdated, dto, groups, ct);
     }
 }

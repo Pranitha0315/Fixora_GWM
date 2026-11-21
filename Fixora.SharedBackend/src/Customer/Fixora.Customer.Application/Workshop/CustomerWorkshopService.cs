@@ -26,4 +26,7 @@ public sealed class CustomerWorkshopService(IWorkshopGateway workshop, VehicleSe
     public Task<IReadOnlyList<BookingDto>> BookingsAsync(Guid customerId, CancellationToken ct) => workshop.ListBookingsAsync(customerId, ct);
     public Task<BookingDto> CancelAsync(Guid customerId, Guid id, CancellationToken ct) => workshop.CancelBookingAsync(customerId, id, ct);
     public Task<BookingDto> RescheduleAsync(Guid customerId, Guid id, DateTime start, CancellationToken ct) => workshop.RescheduleBookingAsync(customerId, id, start, ct);
+    public Task<IReadOnlyList<JobSummaryDto>> JobsAsync(Guid customerId, bool activeOnly, CancellationToken ct) => workshop.ListJobsAsync(customerId, activeOnly, ct);
+    public Task<JobDetailDto> JobAsync(Guid customerId, Guid jobId, CancellationToken ct) => workshop.GetJobAsync(customerId, jobId, ct);
+    public Task<QueueEstimateDto> QueueAsync(Guid customerId, Guid jobId, CancellationToken ct) => workshop.GetQueueEstimateAsync(customerId, jobId, ct);
 }

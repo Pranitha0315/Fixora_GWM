@@ -1,6 +1,7 @@
 using Fixora.Manager.Application;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Infrastructure.Persistence;
+using Fixora.Manager.Infrastructure.Workers;
 using Fixora.Shared.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,10 @@ public static class DependencyInjection
         services.AddFixoraDbContext<ManagerDbContext>(config);
         services.AddScoped<IManagerDb>(sp => sp.GetRequiredService<ManagerDbContext>());
         services.AddManagerApplication();
+        if (config.GetValue("Workers:Enabled", true))
+        {
+            services.AddHostedService<QueueTickWorker>();
+        }
         return services;
     }
 }

@@ -77,3 +77,19 @@ public sealed class AppointmentsController(CustomerWorkshopService workshop) : C
     [HttpPost("{id:guid}/reschedule")] public Task<BookingDto> Reschedule(Guid id, RescheduleBody req, CancellationToken ct) => workshop.RescheduleAsync(CustomerId, id, req.SlotStart, ct);
 }
 public sealed record RescheduleBody(DateTime SlotStart);
+
+// 6
+[Route("api/v1/customer/queue")]
+public sealed class QueueController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    /// <summary>Indicative ETA; the response always carries indicative: true (BR-AQ-07).</summary>
+    [HttpGet("{jobId:guid}")] public Task<QueueEstimateDto> Get(Guid jobId, CancellationToken ct) => workshop.QueueAsync(CustomerId, jobId, ct);
+}
+
+// 7
+[Route("api/v1/customer/jobs")]
+public sealed class JobsController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<JobSummaryDto>> List([FromQuery] bool activeOnly = false, CancellationToken ct = default) => workshop.JobsAsync(CustomerId, activeOnly, ct);
+    [HttpGet("{id:guid}")] public Task<JobDetailDto> Get(Guid id, CancellationToken ct) => workshop.JobAsync(CustomerId, id, ct);
+}
