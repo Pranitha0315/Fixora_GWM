@@ -65,3 +65,15 @@ public sealed class GarageController(CustomerWorkshopService workshop) : Custome
     [HttpGet] public Task<GarageDto> Get(CancellationToken ct) => workshop.GarageAsync(ct);
     [HttpGet("services")] public Task<IReadOnlyList<ServiceDto>> Services(CancellationToken ct) => workshop.ServicesAsync(ct);
 }
+
+// 5
+[Route("api/v1/customer/appointments")]
+public sealed class AppointmentsController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet("slots")] public Task<IReadOnlyList<SlotDto>> Slots([FromQuery] DateOnly date, [FromQuery] Guid serviceId, CancellationToken ct) => workshop.SlotsAsync(date, serviceId, ct);
+    [HttpGet] public Task<IReadOnlyList<BookingDto>> List(CancellationToken ct) => workshop.BookingsAsync(CustomerId, ct);
+    [HttpPost] public Task<BookingDto> Book(BookingRequest req, [FromHeader(Name = "Idempotency-Key")] string? key, CancellationToken ct) => workshop.BookAsync(CustomerId, req, key ?? "", ct);
+    [HttpPost("{id:guid}/cancel")] public Task<BookingDto> Cancel(Guid id, CancellationToken ct) => workshop.CancelAsync(CustomerId, id, ct);
+    [HttpPost("{id:guid}/reschedule")] public Task<BookingDto> Reschedule(Guid id, RescheduleBody req, CancellationToken ct) => workshop.RescheduleAsync(CustomerId, id, req.SlotStart, ct);
+}
+public sealed record RescheduleBody(DateTime SlotStart);

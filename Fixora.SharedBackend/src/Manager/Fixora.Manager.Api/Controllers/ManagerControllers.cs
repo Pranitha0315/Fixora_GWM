@@ -1,4 +1,5 @@
 using Fixora.Customer.Contracts;
+using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Staff;
 using Fixora.Manager.Contracts;
@@ -28,6 +29,17 @@ public sealed class ManagerAuthController(StaffAuthService auth) : ControllerBas
     [AllowAnonymous]
     [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public Task<AuthTokens> Login(StaffLoginRequest req, CancellationToken ct) => auth.LoginAsync(req, ct);
+}
+
+[Route("api/v1/manager/bookings")]
+public sealed class BookingsController(BookingService bookings) : StaffControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<BookingDto>> List([FromQuery] DateOnly? date, [FromQuery] string? status, CancellationToken ct) => bookings.ListForStaffAsync(date, status, ct);
+    [HttpGet("slots")] public Task<IReadOnlyList<SlotDto>> Slots([FromQuery] DateOnly date, [FromQuery] Guid serviceId, CancellationToken ct) => bookings.GetSlotsAsync(date, serviceId, ct);
+    [HttpPost("{id:guid}/confirm")] public Task<BookingDto> Confirm(Guid id, ConfirmBookingRequest req, CancellationToken ct) => bookings.ConfirmAsync(StaffId, id, req, ct);
+    [HttpPost("{id:guid}/decline")] public Task<BookingDto> Decline(Guid id, DeclineBookingRequest req, CancellationToken ct) => bookings.DeclineAsync(StaffId, id, req.Reason, ct);
+    [HttpPost("{id:guid}/reschedule")] public Task<BookingDto> Reschedule(Guid id, RescheduleRequest req, CancellationToken ct) => bookings.RescheduleAsync(StaffId, Roles.Manager, id, req.SlotStart, ct);
+    [HttpPost("{id:guid}/cancel")] public Task<BookingDto> Cancel(Guid id, CancellationToken ct) => bookings.CancelAsync(StaffId, Roles.Manager, id, ct);
 }
 
 [Route("api/v1/manager/mechanics")]

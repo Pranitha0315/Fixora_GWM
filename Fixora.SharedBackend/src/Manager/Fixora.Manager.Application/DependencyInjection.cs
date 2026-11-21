@@ -1,3 +1,4 @@
+using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Gateways;
 using Fixora.Manager.Application.Staff;
@@ -11,6 +12,8 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddManagerApplication(this IServiceCollection services)
     {
+        services.AddScoped<WorkshopReadModel>();
+        services.AddScoped<BookingService>();
         services.AddScoped<StaffAuthService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<WorkshopSettingsService>();
