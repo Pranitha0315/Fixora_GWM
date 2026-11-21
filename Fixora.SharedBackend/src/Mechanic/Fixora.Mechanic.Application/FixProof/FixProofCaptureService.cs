@@ -47,9 +47,26 @@ public sealed class FixProofCaptureService(
         return rows.Select(r => new MediaUploadResult(r.Id, r.MediaRef, media.GetSignedUrl(r.MediaRef, TimeSpan.FromMinutes(15)), r.Phase.ToString(), r.CapturedAt)).ToList();
     }
 
-    /// <summary>Transcribe a voice note (server STT) — returns null when no STT provider is configured.</summary>
-    public Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
-        => stt.TranscribeAsync(audio, contentType, language, ct);
+    /// <summary>
+    /// Transcribe a voice note (server STT). Returns null when no provider is configured or the
+    /// provider fails/times out so FixProof never blocks on AI (BR-FP-13). Request cancellation is not swallowed.
+    /// </summary>
+    public async Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
+    {
+        try
+        {
+            return await stt.TranscribeAsync(audio, contentType, language, ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Provider fault or timeout (e.g. TaskCanceledException without caller cancel) → unavailable.
+            return null;
+        }
+    }
 
     public async Task<DraftDto> CreateDraftAsync(Guid mechanicId, Guid jobId, CreateDraftRequest req, CancellationToken ct = default)
     {
