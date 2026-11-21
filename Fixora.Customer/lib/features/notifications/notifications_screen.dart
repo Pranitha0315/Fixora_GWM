@@ -6,6 +6,10 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/job_store.dart';
 import '../bookings/live_queue_screen.dart';
+import '../job/screens/job_tracker_screen.dart';
+import '../job/screens/repair_progress_screen.dart';
+import '../job/screens/service_completed_screen.dart';
+import '../job/screens/view_photos_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -51,18 +55,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _open(BuildContext context, AppNotification n) {
     JobStore.instance.markRead(n.id);
     switch (n.kind) {
+      case NotificationKind.estimate: // approval / change
+      case NotificationKind.received:
+        context.push(const JobTrackerScreen());
+      case NotificationKind.progress: // job progress
+        context.push(const RepairProgressScreen());
+      case NotificationKind.completed:
+        context.push(const ServiceCompletedScreen());
+      case NotificationKind.media:
+        context.push(const ViewPhotosScreen());
       case NotificationKind.queue:
         context.push(const LiveQueueScreen());
       case NotificationKind.booking:
         NavController.goToTab(context, 1);
-      case NotificationKind.estimate:
-      case NotificationKind.progress:
-      case NotificationKind.media:
       case NotificationKind.payment:
       case NotificationKind.reminder:
       case NotificationKind.sos:
-      case NotificationKind.received:
-      case NotificationKind.completed:
       case NotificationKind.serviceDue:
       case NotificationKind.offer:
       case NotificationKind.subscription:
