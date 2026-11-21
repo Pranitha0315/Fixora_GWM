@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../models/models.dart';
 import '../models/vehicle.dart';
+import '../remote/customer_backend.dart';
 import 'app_state.dart';
 
 /// In-memory job + notification store (demo). Screens listen to this.
@@ -49,9 +50,11 @@ class JobStore extends ChangeNotifier {
   }
 
   void markRead(String id) {
+    // local unread=false + CustomerBackend.markRead(id)
     final i = notifications.indexWhere((n) => n.id == id);
     if (i >= 0 && notifications[i].unread) {
       notifications[i] = notifications[i].copyWith(unread: false);
+      CustomerBackend.instance.markRead(id);
       notifyListeners();
     }
   }
@@ -60,6 +63,7 @@ class JobStore extends ChangeNotifier {
     for (var i = 0; i < notifications.length; i++) {
       notifications[i] = notifications[i].copyWith(unread: false);
     }
+    CustomerBackend.instance.markAllRead();
     notifyListeners();
   }
 

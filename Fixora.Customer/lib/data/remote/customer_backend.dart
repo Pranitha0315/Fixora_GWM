@@ -292,6 +292,18 @@ class CustomerBackend extends ChangeNotifier {
     JobStore.instance.replaceNotifications(list.map(notificationFrom).toList());
   }
 
+  void markRead(String id) {
+    if (live && id.length == 36) {
+      unawaited(api.post('/notifications/$id/read').catchError((Object _) => <String, dynamic>{}));
+    }
+  }
+
+  void markAllRead() {
+    if (live) {
+      unawaited(api.post('/notifications/read-all').catchError((Object _) => <String, dynamic>{}));
+    }
+  }
+
   static AppNotification notificationFrom(Map<String, dynamic> n) {
     final type = (n['type'] as String?) ?? '';
     final kind = switch (type.split('.').first) {
