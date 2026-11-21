@@ -4,6 +4,7 @@ import '../../core/navigation/nav.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/app_state.dart';
+import '../rewards/my_rewards_screen.dart';
 import 'account_details_screen.dart';
 import 'privacy_security_screen.dart';
 
@@ -102,6 +103,16 @@ class ProfileScreen extends StatelessWidget {
                   subtitle: Text('Password, location and sessions', style: AppText.small),
                   trailing: Icon(Icons.chevron_right_rounded, color: AppColors.navy),
                   onTap: () => context.push(const PrivacySecurityScreen()),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.surface,
+                  leading: Icon(Icons.stars_rounded, color: AppColors.link),
+                  title: Text('My Rewards', style: AppText.label),
+                  subtitle: Text('Points, DriveSense and bill savings', style: AppText.small),
+                  trailing: Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+                  onTap: () => context.push(const MyRewardsScreen()),
                 ),
               ],
             );

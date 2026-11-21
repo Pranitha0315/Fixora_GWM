@@ -10,6 +10,7 @@ import '../models/models.dart';
 import '../models/vehicle.dart';
 import '../repositories/app_state.dart';
 import '../repositories/job_store.dart';
+import '../repositories/loyalty_store.dart';
 
 /// Customer auth + session bridge to the garage `/api/v1` backend.
 ///
@@ -105,7 +106,20 @@ class CustomerBackend extends ChangeNotifier {
     live = false;
     pendingProposal = null;
     sos.value = null;
+    LoyaltyStore.instance.resetDemo();
     notifyListeners();
+  }
+
+  /// Points balance and ledger from `/customer/loyalty` (+ garage discount rules).
+  Future<void> refreshLoyalty() async {
+    if (!live) return;
+    final results = await Future.wait([
+      api.get('/customer/loyalty'),
+      api.get('/customer/garage'),
+    ]);
+    LoyaltyStore.instance
+      ..applyGarage(results[1] as Map<String, dynamic>)
+      ..applyRemote(results[0] as Map<String, dynamic>);
   }
 
   /// Saves a vehicle on the server (POST, or PUT when [id] is a server GUID).
@@ -349,6 +363,9 @@ class CustomerBackend extends ChangeNotifier {
         unawaited(refreshJob().catchError((Object _) {}));
       }
       if (type.startsWith('booking')) unawaited(refreshBookings().catchError((Object _) {}));
+      if (type.startsWith('invoice') || type.startsWith('drivesense') || type.startsWith('loyalty')) {
+        unawaited(refreshLoyalty().catchError((Object _) {}));
+      }
     });
     // A realtime event never proves completion: re-read the authoritative state.
     hub.on('approval.updated', (_) => unawaited(refreshJob().catchError((Object _) {})));
@@ -358,6 +375,7 @@ class CustomerBackend extends ChangeNotifier {
     hub.onConnected(() {
       unawaited(refreshJob().catchError((Object _) {}));
       unawaited(refreshNotifications().catchError((Object _) {}));
+      unawaited(refreshLoyalty().catchError((Object _) {}));
     });
   }
 
@@ -380,6 +398,7 @@ class CustomerBackend extends ChangeNotifier {
         refreshBookings(),
         refreshJob(),
         refreshNotifications(),
+        refreshLoyalty(),
       ]);
     } on ApiException {
       // Profile sync still succeeds even if catalog/bookings are temporarily down.
