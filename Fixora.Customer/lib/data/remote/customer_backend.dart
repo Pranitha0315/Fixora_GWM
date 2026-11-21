@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../../core/backend/api_client.dart';
 import '../../core/backend/fixora_config.dart';
@@ -156,6 +157,9 @@ class CustomerBackend extends ChangeNotifier {
       fuel: (v['fuel'] as String?) ?? 'Petrol',
       color: (v['color'] as String?) ?? 'White',
       active: true,
+      nextServiceNote: v['driveSenseOptIn'] == true
+          ? 'DriveSense is watching wear on rough roads'
+          : 'Turn on DriveSense for early-wear alerts',
     );
   }
 
@@ -384,5 +388,80 @@ class CustomerBackend extends ChangeNotifier {
     unawaited(hub.start());
     app.notifyListeners();
     notifyListeners();
+  }
+
+  // ------------------------------------------------------------------ SOS (USP 4)
+
+  static const Map<String, String> sosCategories = {
+    'Breakdown': 'WontStart',
+    'Flat tyre': 'FlatTyre',
+    'Battery': 'WontStart',
+    'Overheating': 'Overheating',
+    'Locked out': 'Other',
+    'Accident': 'Accident',
+  };
+
+  /// Sends the SOS and returns the server receipt (SosReceipt).
+  /// Retries with the same idempotency key never create a second request.
+  Future<Map<String, dynamic>> raiseSos({
+    required String problem,
+    String? note,
+    String? idempotencyKey,
+  }) async {
+    final pos = await _position();
+    final key = idempotencyKey ?? ApiClient.newIdempotencyKey();
+    final vehicleId = AppState.instance.selectedVehicle.id;
+    final r = await api.post(
+      '/customer/sos/requests',
+      body: {
+        'lat': pos.$1,
+        'lng': pos.$2,
+        'category': sosCategories[problem] ?? 'Other',
+        'vehicleId': vehicleId.length == 36 ? vehicleId : null,
+        'note': [
+          problem,
+          if (!pos.$3) 'GPS unavailable: location is approximate',
+          if (note != null && note.isNotEmpty) note,
+        ].join(' · '),
+        'locationConsent': true, // SOS body
+      },
+      headers: {'Idempotency-Key': key},
+    ) as Map<String, dynamic>;
+    await refreshSos(r['receiptId'] as String);
+    return r;
+  }
+
+  Future<void> refreshSos(String id) async {
+    sos.value = await api.get('/customer/sos/requests/$id') as Map<String, dynamic>;
+  }
+
+  Future<void> cancelSos() async {
+    final id = sos.value?['id'] as String?;
+    if (id == null) return;
+    sos.value = await api.post('/customer/sos/requests/$id/cancel') as Map<String, dynamic>;
+  }
+
+  /// (lat, lng, fromGps). Denied / unavailable → fallback town coords.
+  Future<(double, double, bool)> _position() async {
+    try {
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      // denied → fallback town coords
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        throw StateError('no permission');
+      }
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10),
+        ),
+      );
+      return (p.latitude, p.longitude, true);
+    } catch (_) {
+      return (9.6615, 80.0255, false);
+    }
   }
 }
