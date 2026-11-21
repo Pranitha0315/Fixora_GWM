@@ -59,6 +59,17 @@ class AppState extends ChangeNotifier {
   int bookingCount = 5;
   double totalSpentLkr = 48500;
 
+  // Privacy & security preferences
+  bool twoFactor = false;
+  bool biometric = false;
+  String visibility = 'Garages I visit';
+  String locationPermission = 'While using app';
+
+  void update(VoidCallback fn) {
+    fn();
+    notifyListeners();
+  }
+
   final List<Vehicle> vehicles = [
     const Vehicle(
       id: 'v1',

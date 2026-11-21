@@ -5,6 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/repositories/app_state.dart';
 import 'account_details_screen.dart';
+import 'privacy_security_screen.dart';
 
 /// Profile tab: account card (name / email / phone + stats) opens Account Details.
 class ProfileScreen extends StatelessWidget {
@@ -91,6 +92,16 @@ class ProfileScreen extends StatelessWidget {
                   subtitle: Text('Name, email and phone number', style: AppText.small),
                   trailing: Icon(Icons.chevron_right_rounded, color: AppColors.navy),
                   onTap: () => context.push(const AccountDetailsScreen()),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  tileColor: AppColors.surface,
+                  leading: Icon(Icons.shield_outlined, color: AppColors.link),
+                  title: Text('Privacy & Security', style: AppText.label),
+                  subtitle: Text('Password, location and sessions', style: AppText.small),
+                  trailing: Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+                  onTap: () => context.push(const PrivacySecurityScreen()),
                 ),
               ],
             );
