@@ -18,6 +18,7 @@ class BookServiceScreen extends StatefulWidget {
   final List<String> symptoms;
   final String? note;
   final String? garage;
+  final DateTime? preferredDate;
 
   const BookServiceScreen({
     super.key,
@@ -26,6 +27,7 @@ class BookServiceScreen extends StatefulWidget {
     this.symptoms = const [],
     this.note,
     this.garage,
+    this.preferredDate,
   });
 
   @override
@@ -94,10 +96,17 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
         : (active.isNotEmpty ? active.first.id : app.selectedVehicle.id);
     final idx = _services.indexWhere((s) => s.$2 == widget.service);
     _service = idx >= 0 ? idx : 0;
-    final today = DateTime.now();
-    var d = DateTime(today.year, today.month, today.day).add(const Duration(days: 1));
-    if (d.weekday == DateTime.sunday) d = d.add(const Duration(days: 1));
-    _date = d;
+    final preferred = widget.preferredDate;
+    if (preferred != null) {
+      var d = DateTime(preferred.year, preferred.month, preferred.day);
+      if (d.weekday == DateTime.sunday) d = d.add(const Duration(days: 1));
+      _date = d.isBefore(_firstDate) ? _firstDate : d;
+    } else {
+      final today = DateTime.now();
+      var d = DateTime(today.year, today.month, today.day).add(const Duration(days: 1));
+      if (d.weekday == DateTime.sunday) d = d.add(const Duration(days: 1));
+      _date = d;
+    }
   }
 
   @override

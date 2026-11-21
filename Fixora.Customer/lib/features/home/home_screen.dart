@@ -14,6 +14,7 @@ import '../notifications/notifications_screen.dart';
 import '../profile/profile_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
 import '../vehicles/my_vehicles_screen.dart';
+import '../vehicles/service_history_screen.dart';
 import '../vehicles/vehicle_detail_screen.dart';
 import 'garage_sheet.dart';
 
@@ -385,7 +386,7 @@ class _QuickTiles extends StatelessWidget {
   Widget build(BuildContext context) {
     final items = <(String, IconData, VoidCallback)>[
       ('Diagnosis', Icons.health_and_safety_outlined, () => HomeScreen._soon(context, 'Diagnosis')),
-      ('History', Icons.manage_history_rounded, () => HomeScreen._soon(context, 'Service History')),
+      ('History', Icons.manage_history_rounded, () => context.push(ServiceHistoryScreen(vehicleId: vehicle.id))),
       ('Plans', Icons.workspace_premium_outlined, () => HomeScreen._soon(context, 'Plans')),
       ('Offers', Icons.local_offer_outlined, () => HomeScreen._soon(context, 'Offers')),
     ];

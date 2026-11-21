@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../models/models.dart';
+import '../models/vehicle.dart';
+import 'app_state.dart';
 
 /// In-memory job + notification store (demo). Screens listen to this.
 class JobStore extends ChangeNotifier {
@@ -75,13 +77,70 @@ class JobStore extends ChangeNotifier {
 
   /// Active remote job id from the garage API, if any.
   String? remoteJobId;
+  String? _vehicleId = 'v1';
   String jobId = 'FX-1042';
   String statusLabel = 'In progress';
   String currentStepLabel = 'Diagnosis';
   double journey = 0.2;
   JobStatus status = JobStatus.diagnosis;
 
+  /// Index of the current step in [progressSteps].
+  int _progress = 2;
+  int get progress => _progress;
+
+  static const progressSteps = [
+    'Parts Ordered',
+    'Repair Started',
+    'Parts Installed',
+    'Quality Check',
+    'Ready for Pickup',
+  ];
+
+  static final progressTimes = [
+    DateTime(2026, 8, 27, 13, 0),
+    DateTime(2026, 8, 27, 14, 0),
+    DateTime(2026, 8, 27, 14, 50),
+    DateTime(2026, 8, 27, 15, 40),
+    DateTime(2026, 8, 27, 16, 30),
+  ];
+
+  Vehicle get vehicle => AppState.instance.vehicleById(_vehicleId ?? 'v1');
+
   bool get isLive => remoteJobId != null;
+
+  void advance() {
+    if (status == JobStatus.awaitingApproval || status == JobStatus.changesRequested) {
+      approve();
+      return;
+    }
+    if (status == JobStatus.inProgress) {
+      if (_progress < progressSteps.length - 1) {
+        _progress++;
+        currentStepLabel = progressSteps[_progress];
+        journey = 0.45 + (_progress / progressSteps.length) * 0.45;
+      } else {
+        status = JobStatus.completed;
+        statusLabel = 'Completed';
+        currentStepLabel = 'Ready for Pickup';
+        journey = 1;
+        notifications.insert(
+          0,
+          AppNotification(
+            id: nextNotificationId(),
+            title: 'Your vehicle is ready!',
+            body: '${vehicle.name} (${vehicle.plate}) is ready for pickup.',
+            time: DateTime.now(),
+            kind: NotificationKind.completed,
+            unread: true,
+          ),
+        );
+      }
+    } else if (status == JobStatus.completed) {
+      status = JobStatus.paid;
+      statusLabel = 'Paid';
+    }
+    notifyListeners();
+  }
 
   final List<EstimateItem> items = [
     EstimateItem(
@@ -114,7 +173,8 @@ class JobStore extends ChangeNotifier {
     approvalRemarks = remarks;
     status = JobStatus.inProgress;
     statusLabel = 'In progress';
-    currentStepLabel = 'Repair';
+    _progress = 2;
+    currentStepLabel = progressSteps[_progress];
     journey = 0.45;
     notifications.insert(
       0,
@@ -201,7 +261,12 @@ class JobStore extends ChangeNotifier {
       0,
       (m, t) => ((t['percent'] as num?)?.toInt() ?? 0) > m ? (t['percent'] as num).toInt() : m,
     );
+    final last = progressSteps.length - 1;
+    _progress = ((pct / 100) * last).round().clamp(0, last).toInt();
     journey = (pct / 100).clamp(0.0, 1.0);
+    if (_progress >= 0 && _progress < progressSteps.length) {
+      currentStepLabel = progressSteps[_progress];
+    }
     if (pending != null) {
       statusLabel = 'Approval needed';
       status = JobStatus.awaitingApproval;

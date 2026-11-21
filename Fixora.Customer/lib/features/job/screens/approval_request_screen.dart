@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../core/backend/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/navigation/nav.dart';
 import '../../../data/remote/customer_backend.dart';
 import '../../../data/repositories/job_store.dart';
+import 'repair_progress_screen.dart';
 
 /// "Approval Request" - final confirmation of the estimate.
 class ApprovalRequestScreen extends StatefulWidget {
@@ -61,7 +63,7 @@ class _ApprovalRequestScreenState extends State<ApprovalRequestScreen> {
       message: 'Thank you. Kasun Perera will start the repair now. You can follow every step live.',
     );
     if (!mounted) return;
-    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacement(fxRoute(const RepairProgressScreen()));
   }
 
   /// Customer → service manager. The manager releases the approved items to the mechanic.
@@ -96,7 +98,7 @@ class _ApprovalRequestScreenState extends State<ApprovalRequestScreen> {
           'work to the mechanic. You will be notified the moment it starts.',
     );
     if (!mounted) return;
-    Navigator.of(context).pop();
+    Navigator.of(context).pushReplacement(fxRoute(const RepairProgressScreen()));
   }
 
   Future<void> _showDone({required String title, required String message}) async {

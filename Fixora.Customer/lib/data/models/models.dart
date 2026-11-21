@@ -127,6 +127,65 @@ class LiveReading {
   const LiveReading(this.label, this.value, this.unit, {this.warning = false});
 }
 
+class ServiceRecord {
+  final String title;
+  final String subtitle;
+  final String jobId;
+  final DateTime date;
+  final int mileageKm;
+  final double amount;
+  final List<String> work;
+  final String garage;
+  final IconData icon;
+  const ServiceRecord({
+    required this.title,
+    this.subtitle = '',
+    required this.jobId,
+    required this.date,
+    required this.mileageKm,
+    required this.amount,
+    required this.work,
+    this.garage = 'Fixora Garage',
+    this.icon = Icons.handyman_outlined,
+  });
+}
+
+class UpcomingService {
+  final String title;
+  final String subtitle;
+  final DateTime date;
+  final String garage;
+  final IconData icon;
+  final String service; // maps to a Book Service type
+  const UpcomingService({
+    required this.title,
+    required this.subtitle,
+    required this.date,
+    this.garage = 'Fixora Garage',
+    required this.icon,
+    required this.service,
+  });
+}
+
+enum PassportStatus { unresolved, confirmed, ruledOut, stillUnresolved }
+
+class PassportEntry {
+  final String title;
+  final String detail;
+  final String foundOn;
+  final String jobId;
+  final PassportStatus status;
+  final String linkedSymptom;
+  const PassportEntry({
+    required this.title,
+    required this.detail,
+    required this.foundOn,
+    required this.jobId,
+    required this.status,
+    required this.linkedSymptom,
+  });
+}
+
 enum JobStatus {
   diagnosis,
   awaitingApproval,
