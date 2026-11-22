@@ -14,11 +14,14 @@ public static class DependencyInjection
     {
         services.AddFixoraDbContext<ManagerDbContext>(config);
         services.AddScoped<IManagerDb>(sp => sp.GetRequiredService<ManagerDbContext>());
+        services.AddFixoraDbContext<ControlDbContext>(config);
+        services.AddScoped<IControlDb>(sp => sp.GetRequiredService<ControlDbContext>());
         services.AddManagerApplication();
         if (config.GetValue("Workers:Enabled", true))
         {
             services.AddHostedService<AdvisorWeeklyWorker>();
             services.AddHostedService<QueueTickWorker>();
+            services.AddHostedService<AutoPilotWorker>();
         }
         return services;
     }

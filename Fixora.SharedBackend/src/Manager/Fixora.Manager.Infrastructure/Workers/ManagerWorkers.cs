@@ -66,3 +66,27 @@ public sealed class QueueTickWorker(IServiceScopeFactory scopes, ILogger<QueueTi
         }
     }
 }
+
+/// <summary>
+/// Manager mode / Auto mode loop: every 5 seconds it checks whether a manager is online and,
+/// while Auto mode is in effect, moves approvals, change requests, bookings and SOS along.
+/// </summary>
+public sealed class AutoPilotWorker(IServiceScopeFactory scopes, ILogger<AutoPilotWorker> logger) : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(5));
+        while (await timer.WaitForNextTickAsync(stoppingToken))
+        {
+            try
+            {
+                using var scope = scopes.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<Fixora.Manager.Application.Control.AutoPilotService>().TickAsync(stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Auto mode tick failed; it will retry in 5 seconds");
+            }
+        }
+    }
+}

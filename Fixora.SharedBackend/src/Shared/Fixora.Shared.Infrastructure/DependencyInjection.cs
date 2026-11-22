@@ -31,6 +31,8 @@ public static class DependencyInjection
 
         services.AddHttpContextAccessor();
         services.AddSingleton<IClock, SystemClock>();
+        services.AddSingleton<StaffPresence>();
+        services.AddSingleton<IStaffPresence>(sp => sp.GetRequiredService<StaffPresence>());
         services.AddSingleton<IPasswordService, PasswordService>();
         services.AddScoped<ICurrentUser, CurrentUser>();
         services.AddScoped<ITokenService, TokenService>();

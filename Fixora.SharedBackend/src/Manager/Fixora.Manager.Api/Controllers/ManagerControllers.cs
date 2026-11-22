@@ -4,6 +4,7 @@ using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Control;
 using Fixora.Manager.Application.Inventory;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Application.Staff;
@@ -154,4 +155,13 @@ public sealed class AdvisorController(AdvisorService advisor) : StaffControllerB
     [HttpPost("insights/{id:guid}/act")] public Task<AdvisorActResult> Act(Guid id, AdvisorActRequest req, CancellationToken ct) => advisor.ActAsync(StaffId, id, req, ct);
     [HttpPost("insights/{id:guid}/feedback")] public async Task<IActionResult> Feedback(Guid id, FeedbackRequest req, CancellationToken ct) { await advisor.FeedbackAsync(id, req.Vote, ct); return NoContent(); }
     [HttpPost("chat")] public Task<ChatAnswer> Chat(ChatRequest req, CancellationToken ct) => advisor.ChatAsync(req, ct);
+}
+
+/// <summary>Manager mode / Auto mode switch and what Auto mode did.</summary>
+[Route("api/v1/manager/control")]
+public sealed class ControlModeController(AutoPilotService autoPilot) : StaffControllerBase
+{
+    [HttpGet] public Task<ControlStatusDto> Get(CancellationToken ct) => autoPilot.StatusAsync(ct);
+    [HttpPut] public Task<ControlStatusDto> Update(ControlUpdateRequest req, CancellationToken ct) => autoPilot.UpdateAsync(StaffId, req, ct);
+    [HttpPost("seen")] public async Task<IActionResult> Seen(CancellationToken ct) { await autoPilot.MarkSeenAsync(ct); return NoContent(); }
 }

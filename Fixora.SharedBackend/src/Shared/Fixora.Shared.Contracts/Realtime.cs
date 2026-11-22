@@ -14,6 +14,19 @@ public static class RealtimeEvents
     public const string BookingUpdated = "booking.updated";
     public const string SosUpdated = "sos.updated";
     public const string InventoryUpdated = "inventory.updated";
+    /// <summary>Manager mode / Auto mode changed, or Auto mode handled something.</summary>
+    public const string ControlUpdated = "control.updated";
+}
+
+/// <summary>
+/// Which managers / owners have the web dashboard open right now (live SignalR connections).
+/// Auto mode uses it to tell "manager is here" from "manager is away".
+/// </summary>
+public interface IStaffPresence
+{
+    int OnlineCount { get; }
+    /// <summary>When the last staff connection closed (or the server started, if nobody has connected since).</summary>
+    DateTime LastSeenUtc { get; }
 }
 
 /// <summary>SignalR group naming. Users join their own group and their role group on connect.</summary>
@@ -72,6 +85,7 @@ public static class NotificationTypes
     public const string PaymentRecorded = "invoice.paid";
     public const string LowStock = "inventory.lowStock";
     public const string AdvisorBriefing = "advisor.briefing";
+    public const string ControlModeChanged = "control.modeChanged";   // Manager mode <-> Auto mode
 }
 
 public sealed record NotificationMessage(

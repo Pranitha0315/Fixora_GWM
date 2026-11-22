@@ -31,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<DashboardService>();
         services.AddScoped<MechanicRosterService>();
         services.AddScoped<AdvisorService>();
+        services.AddSingleton<Control.AutoPilotState>();
+        services.AddScoped<Control.AutoPilotService>();
 
         services.AddScoped<IWorkshopGateway, WorkshopGateway>();
         services.AddScoped<IWorkshopJobGateway, WorkshopJobGateway>();

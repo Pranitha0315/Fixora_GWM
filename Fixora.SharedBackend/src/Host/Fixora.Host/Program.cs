@@ -102,6 +102,7 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
     await sp.GetRequiredService<CustomerDbContext>().EnsureSchemaAsync(CustomerDbContext.Schema);
     await sp.GetRequiredService<MechanicDbContext>().EnsureSchemaAsync(MechanicDbContext.Schema);
     await sp.GetRequiredService<ManagerDbContext>().EnsureSchemaAsync(ManagerDbContext.Schema);
+    await sp.GetRequiredService<ControlDbContext>().EnsureSchemaAsync(ControlDbContext.Schema);   // Manager / Auto mode
 
     if (cfg.GetValue("Database:Seed", true))
     {

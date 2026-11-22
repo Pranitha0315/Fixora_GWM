@@ -80,7 +80,7 @@ public sealed class ApprovalWorkflowService(
     }
 
     // ---------------------------------------------------------------- 2b. Manager → Customer
-    public async Task<ProposalDto> ForwardToCustomerAsync(Guid staffId, Guid proposalId, string? note, CancellationToken ct = default)
+    public async Task<ProposalDto> ForwardToCustomerAsync(Guid staffId, Guid proposalId, string? note, CancellationToken ct = default, bool auto = false)
     {
         var (p, job) = await LoadAsync(proposalId, ct);
         var now = clock.UtcNow;
@@ -91,7 +91,7 @@ public sealed class ApprovalWorkflowService(
         var issues = await db.Issues.Where(i => i.JobCardId == job.Id && !i.PublishedToCustomer).ToListAsync(ct);
         foreach (var i in issues) { i.PublishedToCustomer = true; i.ReportVersion = p.ReportVersion; }
 
-        Audit(p, Roles.Manager, staffId, "Sent to customer", note);
+        Audit(p, auto ? AutoPilot.ActorRole : Roles.Manager, staffId, auto ? "Sent to customer (Auto mode)" : "Sent to customer", note);
         await db.SaveChangesAsync(ct);
 
         await notifier.NotifyAsync(new NotificationMessage(
@@ -104,7 +104,7 @@ public sealed class ApprovalWorkflowService(
 
         await notifier.NotifyAsync(new NotificationMessage(
                 NotificationTypes.ProposalForwarded,
-                "Manager sent your proposal to the customer",
+                auto ? "Your proposal was sent to the customer (Auto mode)" : "Manager sent your proposal to the customer",
                 $"{job.Number}: waiting for the customer's decision. Do not start these items yet.",
                 "proposal", p.Id, job.Id),
             new[] { Recipient.User(Roles.Mechanic, p.MechanicId) }, ct);
@@ -189,7 +189,7 @@ public sealed class ApprovalWorkflowService(
     }
 
     // ---------------------------------------------------------------- 4. Manager → Mechanic (release) + Customer (confirm)
-    public async Task<ProposalDto> ReleaseAsync(Guid staffId, Guid proposalId, string? note, CancellationToken ct = default)
+    public async Task<ProposalDto> ReleaseAsync(Guid staffId, Guid proposalId, string? note, CancellationToken ct = default, bool auto = false)
     {
         var (p, job) = await LoadAsync(proposalId, ct);
         var now = clock.UtcNow;
@@ -200,13 +200,13 @@ public sealed class ApprovalWorkflowService(
             await inventory.ConsumeForJobAsync(item.PartId!.Value, item.Qty, job.Id, $"{job.Number}: {item.Title}", ct);
 
         var skipped = p.Items.Where(i => i.Status == RepairItemStatus.Rejected).ToList();
-        Audit(p, Roles.Manager, staffId, "Released to mechanic", $"{released.Count} item(s) · Rs {released.Sum(i => i.Amount):N0}");
+        Audit(p, auto ? AutoPilot.ActorRole : Roles.Manager, staffId, auto ? "Released to mechanic (Auto mode)" : "Released to mechanic", $"{released.Count} item(s) · Rs {released.Sum(i => i.Amount):N0}");
         db.ProgressUpdates.Add(new ProgressUpdate
         {
             JobCardId = job.Id,
             Stage = "Approved work",
             Percent = 40,
-            ActorRole = Roles.Manager,
+            ActorRole = auto ? AutoPilot.ActorRole : Roles.Manager,
             ActorId = staffId,
             At = now,
             Message = released.Count > 0 ? $"Approved: {Names(released)}" : "No extra repairs approved; continuing the booked service.",

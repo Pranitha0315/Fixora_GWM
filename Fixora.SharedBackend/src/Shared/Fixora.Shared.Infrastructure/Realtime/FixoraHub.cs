@@ -11,7 +11,7 @@ namespace Fixora.Shared.Infrastructure.Realtime;
 /// Clients call JoinJob(jobId) to follow a job card (access is checked per role).
 /// </summary>
 [Authorize]
-public sealed class FixoraHub(IRealtimeAccessPolicy accessPolicy) : Hub
+public sealed class FixoraHub(IRealtimeAccessPolicy accessPolicy, StaffPresence presence) : Hub
 {
     public override async Task OnConnectedAsync()
     {
@@ -23,9 +23,16 @@ public sealed class FixoraHub(IRealtimeAccessPolicy accessPolicy) : Hub
             if (Roles.IsStaff(role))
             {
                 await Groups.AddToGroupAsync(Context.ConnectionId, RealtimeGroups.Staff);
+                presence.Connected(Context.ConnectionId, userId);   // manager is here → Manager mode
             }
         }
         await base.OnConnectedAsync();
+    }
+
+    public override Task OnDisconnectedAsync(Exception? exception)
+    {
+        presence.Disconnected(Context.ConnectionId);
+        return base.OnDisconnectedAsync(exception);
     }
 
     public async Task<bool> JoinJob(Guid jobId)

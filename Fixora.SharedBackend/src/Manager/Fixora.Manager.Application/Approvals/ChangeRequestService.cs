@@ -38,7 +38,7 @@ public sealed class ChangeRequestService(IManagerDb db, INotificationService not
         return WorkshopReadModel.ChangeRequest(cr, job.Number);
     }
 
-    public async Task<ChangeRequestDto> ForwardAsync(Guid staffId, Guid id, string? note, CancellationToken ct = default)
+    public async Task<ChangeRequestDto> ForwardAsync(Guid staffId, Guid id, string? note, CancellationToken ct = default, bool auto = false)
     {
         var (cr, job) = await LoadAsync(id, ct);
         cr.Forward(note, clock.UtcNow);
@@ -47,14 +47,14 @@ public sealed class ChangeRequestService(IManagerDb db, INotificationService not
         if (job.MechanicId is { } mech)
             await notifier.NotifyAsync(new NotificationMessage(
                     NotificationTypes.ChangeForwarded,
-                    "Customer change approved by manager",
+                    auto ? "Customer change forwarded (Auto mode)" : "Customer change approved by manager",
                     $"{job.Number}: {string.Join(", ", cr.Changes)}" + (string.IsNullOrWhiteSpace(note) ? "" : $" — {note}"),
                     "changeRequest", cr.Id, job.Id),
                 new[] { Recipient.User(Roles.Mechanic, mech) }, ct);
         await notifier.NotifyAsync(new NotificationMessage(
                 NotificationTypes.ChangeForwarded,
                 "Your request was sent to the mechanic",
-                $"{cr.Number}: the manager approved it and passed it to the mechanic.",
+                auto ? $"{cr.Number}: the garage passed it to your mechanic." : $"{cr.Number}: the manager approved it and passed it to the mechanic.",
                 "changeRequest", cr.Id, job.Id),
             new[] { Recipient.User(Roles.Customer, job.CustomerId) }, ct);
         await Publish(cr, job, toMechanic: true, ct);
