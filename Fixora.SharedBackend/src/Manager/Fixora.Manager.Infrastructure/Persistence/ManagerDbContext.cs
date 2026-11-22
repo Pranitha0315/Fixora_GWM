@@ -24,6 +24,12 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
     public DbSet<ApprovalDecisionRecord> ApprovalDecisions => Set<ApprovalDecisionRecord>();
     public DbSet<ApprovalAuditEntry> ApprovalAudit => Set<ApprovalAuditEntry>();
     public DbSet<CustomerChangeRequest> ChangeRequests => Set<CustomerChangeRequest>();
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+    public DbSet<InvoiceLine> InvoiceLines => Set<InvoiceLine>();
+    public DbSet<Part> Parts => Set<Part>();
+    public DbSet<StockMovement> StockMovements => Set<StockMovement>();
+    public DbSet<PartsOrder> PartsOrders => Set<PartsOrder>();
+    public DbSet<EarningsEntry> Earnings => Set<EarningsEntry>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder c)
     {
@@ -95,6 +101,16 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             e.Ignore(x => x.Changes);
         });
+
+        b.Entity<Invoice>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(10);
+            e.HasMany(x => x.Lines).WithOne().HasForeignKey(l => l.InvoiceId);
+            e.HasIndex(x => x.JobCardId).IsUnique();
+        });
+
+        b.Entity<Part>(e => { e.Ignore(x => x.IsLow); e.HasIndex(x => x.Sku); });
+        b.Entity<PartsOrder>().Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
 
         b.UseClientGeneratedGuids();
     }

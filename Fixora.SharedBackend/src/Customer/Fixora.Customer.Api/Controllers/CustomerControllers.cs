@@ -194,3 +194,43 @@ public sealed class LoyaltyController(CustomerDirectory directory) : CustomerCon
 {
     [HttpGet] public Task<LoyaltyDto> Get(CancellationToken ct) => directory.GetLoyaltyAsync(CustomerId, ct);
 }
+
+// 16
+[Route("api/v1/customer/invoices")]
+public sealed class InvoicesController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<InvoiceDto>> List(CancellationToken ct) => workshop.InvoicesAsync(CustomerId, ct);
+}
+
+// 17
+[Route("api/v1/customer/service-history")]
+public sealed class ServiceHistoryController(CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<ServiceHistoryDto>> List([FromQuery] Guid? vehicleId, CancellationToken ct) => workshop.HistoryAsync(CustomerId, vehicleId, ct);
+}
+
+// 18
+[Route("api/v1/customer/home")]
+public sealed class HomeController(CustomerWorkshopService workshop, DriveSenseService drivesense, VehicleService vehicles) : CustomerControllerBase
+{
+    /// <summary>Home dashboard: active job, pending approvals, next booking, open suggestions, drive score.</summary>
+    [HttpGet]
+    public async Task<object> Get(CancellationToken ct)
+    {
+        var jobs = await workshop.JobsAsync(CustomerId, true, ct);
+        var approvals = await workshop.PendingApprovalsAsync(CustomerId, ct);
+        var bookings = await workshop.BookingsAsync(CustomerId, ct);
+        var suggestions = (await drivesense.ListSuggestionsAsync(CustomerId, ct)).Where(s => s.Status == "Open").ToList();
+        var myVehicles = await vehicles.ListAsync(CustomerId, ct);
+        var ds = myVehicles.FirstOrDefault(v => v.DriveSenseOptIn);
+        var score = ds is null ? null : await drivesense.GetSummaryAsync(CustomerId, ds.Id, ct);
+        return new
+        {
+            activeJobs = jobs,
+            pendingApprovals = approvals,
+            nextBooking = bookings.Where(b => b.Status is "Requested" or "Confirmed").OrderBy(b => b.SlotStart).FirstOrDefault(),
+            suggestions,
+            driveScore = score is null ? null : new { score.VehicleId, score.CurrentScore, score.RoughRoadPct, score.LoyaltyPoints },
+        };
+    }
+}

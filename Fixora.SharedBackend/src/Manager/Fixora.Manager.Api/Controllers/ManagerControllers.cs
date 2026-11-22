@@ -1,7 +1,9 @@
 using Fixora.Customer.Contracts;
 using Fixora.Manager.Application.Approvals;
+using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Inventory;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Application.Staff;
 using Fixora.Manager.Contracts;
@@ -36,6 +38,12 @@ public sealed class ManagerAuthController(StaffAuthService auth) : ControllerBas
     [AllowAnonymous]
     [Microsoft.AspNetCore.RateLimiting.EnableRateLimiting("auth")]
     public Task<AuthTokens> Login(StaffLoginRequest req, CancellationToken ct) => auth.LoginAsync(req, ct);
+}
+
+[Route("api/v1/manager/dashboard")]
+public sealed class DashboardController(DashboardService dashboard) : StaffControllerBase
+{
+    [HttpGet] public Task<DashboardDto> Get(CancellationToken ct) => dashboard.GetAsync(ct);
 }
 
 [Route("api/v1/manager/bookings")]
@@ -85,6 +93,26 @@ public sealed class SosDispatchController(ISosOperations sos) : StaffControllerB
     [HttpPost("{id:guid}/acknowledge")] public Task<SosDto> Acknowledge(Guid id, NoteRequest req, CancellationToken ct) => sos.AcknowledgeAsync(id, StaffId, req.Note, ct);
     [HttpPost("{id:guid}/dispatch")] public Task<SosDto> Dispatch(Guid id, DispatchRequest req, CancellationToken ct) => sos.DispatchAsync(id, StaffId, req.MechanicId, req.Note, ct);
     [HttpPost("{id:guid}/status")] public Task<SosDto> Status(Guid id, SosStatusRequest req, CancellationToken ct) => sos.UpdateStatusAsync(id, Roles.Manager, StaffId, req.Status, req.Note, ct);
+}
+
+[Route("api/v1/manager/billing")]
+public sealed class BillingController(BillingService billing) : StaffControllerBase
+{
+    [HttpGet("invoices")] public Task<IReadOnlyList<InvoiceDto>> Invoices([FromQuery] string? status, CancellationToken ct) => billing.ListAsync(null, status, ct);
+    [HttpPost("invoices/{id:guid}/payments")] public Task<InvoiceDto> Pay(Guid id, RecordPaymentRequest req, CancellationToken ct) => billing.RecordPaymentAsync(StaffId, id, req, ct);
+    [HttpPost("jobs/{jobId:guid}/invoice")] public Task<InvoiceDto> CreateForJob(Guid jobId, CancellationToken ct) => billing.CreateInvoiceForJobAsync(jobId, ct);
+}
+
+[Route("api/v1/manager/inventory")]
+public sealed class InventoryController(InventoryService inventory) : StaffControllerBase
+{
+    [HttpGet("parts")] public Task<IReadOnlyList<PartDto>> Parts([FromQuery] bool lowOnly = false, CancellationToken ct = default) => inventory.ListAsync(lowOnly, ct);
+    [HttpPost("parts")] public Task<PartDto> Create(PartUpsert req, CancellationToken ct) => inventory.UpsertAsync(null, req, ct);
+    [HttpPut("parts/{id:guid}")] public Task<PartDto> Update(Guid id, PartUpsert req, CancellationToken ct) => inventory.UpsertAsync(id, req, ct);
+    [HttpPost("parts/{id:guid}/adjust")] public Task<PartDto> Adjust(Guid id, StockAdjust req, CancellationToken ct) => inventory.AdjustAsync(id, req, ct);
+    [HttpGet("orders")] public Task<IReadOnlyList<PartsOrderDto>> Orders(CancellationToken ct) => inventory.ListOrdersAsync(ct);
+    [HttpPost("orders")] public Task<PartsOrderDto> Order(PartsOrderCreate req, CancellationToken ct) => inventory.PlaceOrderAsync(req, ct);
+    [HttpPost("orders/{id:guid}/delivered")] public Task<PartsOrderDto> Delivered(Guid id, CancellationToken ct) => inventory.MarkDeliveredAsync(id, ct);
 }
 
 [Route("api/v1/manager/mechanics")]

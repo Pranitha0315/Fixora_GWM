@@ -17,6 +17,8 @@ public sealed record WorkshopSettingsDto(string Name, string Phone, string Emerg
     int SlotMinutes, int CancelCutoffHours, int EtaShiftNotifyMinutes, bool LoyaltyEnabled, decimal LoyaltyPercent, decimal LoyaltyCapRupees);
 public sealed record BayDto(Guid Id, string Name, bool Active);
 public sealed record ServiceUpsert(string Name, string Category, int StandardMinutes, decimal BasePrice, bool Active);
+public sealed record DashboardDto(int TodayBookings, int PendingBookings, int ActiveJobs, int ProposalsToReview, int ApprovalsToRelease,
+    int ChangeRequestsToReview, int OpenSos, int LowStockParts, int UnpaidInvoices, decimal RevenueThisWeek, decimal RevenueLastWeek, decimal PlatformEarningsThisMonth);
 
 public sealed class StaffAuthService(IManagerDb db, IPasswordService passwords, ITokenService tokens)
 {
@@ -111,6 +113,31 @@ public sealed class WorkshopSettingsService(IManagerDb db)
 
     public static WorkshopSettingsDto ToDto(Workshop w) => new(w.Name, w.Phone, w.EmergencyPhone, w.Address, w.OpenTime.ToString("HH:mm"), w.CloseTime.ToString("HH:mm"),
         w.SlotMinutes, w.CancelCutoffHours, w.EtaShiftNotifyMinutes, w.LoyaltyEnabled, w.LoyaltyPercent, w.LoyaltyCapRupees);
+}
+
+public sealed class DashboardService(IManagerDb db, ISosOperations sos, IClock clock)
+{
+    public async Task<DashboardDto> GetAsync(CancellationToken ct = default)
+    {
+        var now = clock.UtcNow;
+        var today = now.Date;
+        var weekStart = today.AddDays(-7);
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+        var openSos = (await sos.ListAsync(true, ct)).Count;
+        return new DashboardDto(
+            await db.Appointments.CountAsync(a => a.SlotStart >= today && a.SlotStart < today.AddDays(1) && a.Status != AppointmentStatus.Cancelled && a.Status != AppointmentStatus.Declined, ct),
+            await db.Appointments.CountAsync(a => a.Status == AppointmentStatus.Requested, ct),
+            await db.JobCards.CountAsync(j => j.Status != JobStatus.Completed && j.Status != JobStatus.Closed, ct),
+            await db.Proposals.CountAsync(p => p.Status == ProposalStatus.PendingManagerReview, ct),
+            await db.Proposals.CountAsync(p => p.Status == ProposalStatus.CustomerResponded, ct),
+            await db.ChangeRequests.CountAsync(c => c.Status == ChangeRequestStatus.PendingManagerReview, ct),
+            openSos,
+            await db.Parts.CountAsync(p => p.Quantity <= p.ReorderLevel, ct),
+            await db.Invoices.CountAsync(i => i.Status == InvoiceStatus.Unpaid, ct),
+            await db.Invoices.Where(i => i.Status == InvoiceStatus.Paid && i.PaidAt >= weekStart).SumAsync(i => (decimal?)i.Total, ct) ?? 0,
+            await db.Invoices.Where(i => i.Status == InvoiceStatus.Paid && i.PaidAt >= weekStart.AddDays(-7) && i.PaidAt < weekStart).SumAsync(i => (decimal?)i.Total, ct) ?? 0,
+            await db.Earnings.Where(e => e.At >= monthStart).SumAsync(e => (decimal?)e.Amount, ct) ?? 0);
+    }
 }
 
 public sealed record MechanicRosterDto(Guid Id, string Name, string Phone, string EmployeeCode, bool OnDuty, int ActiveJobs);

@@ -1,4 +1,5 @@
 using Fixora.Manager.Application.Approvals;
+using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Jobs;
@@ -18,6 +19,7 @@ public sealed class WorkshopGateway(
     JobService jobs,
     ApprovalWorkflowService approvals,
     ChangeRequestService changes,
+    BillingService billing,
     WorkshopSettingsService settings,
     WorkshopReadModel read,
     IClock clock) : IWorkshopGateway
@@ -72,6 +74,21 @@ public sealed class WorkshopGateway(
 
     public Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default)
         => changes.CreateAsync(customerId, jobId, request, ct);
+
+    public Task<IReadOnlyList<InvoiceDto>> ListInvoicesAsync(Guid customerId, CancellationToken ct = default) => billing.ListAsync(customerId, null, ct);
+
+    public async Task<IReadOnlyList<ServiceHistoryDto>> GetServiceHistoryAsync(Guid customerId, Guid? vehicleId, CancellationToken ct = default)
+    {
+        var q = db.JobCards.AsNoTracking().Where(j => j.CustomerId == customerId && (j.Status == JobStatus.Completed || j.Status == JobStatus.Closed));
+        if (vehicleId is { } v) q = q.Where(j => j.VehicleId == v);
+        var done = await q.OrderByDescending(j => j.CompletedAt).ToListAsync(ct);
+        var ids = done.Select(j => j.Id).ToList();
+        var items = await db.RepairItems.AsNoTracking().Where(i => ids.Contains(i.JobCardId) && i.Status == RepairItemStatus.Released).ToListAsync(ct);
+        var invoices = await db.Invoices.AsNoTracking().Where(i => ids.Contains(i.JobCardId)).ToDictionaryAsync(i => i.JobCardId, i => i.Total, ct);
+        return done.Select(j => new ServiceHistoryDto(j.Id, j.Number, j.VehicleId, j.VehicleLabel, j.CompletedAt ?? j.CreatedAt,
+            new[] { j.Complaint ?? "Service" }.Concat(items.Where(i => i.JobCardId == j.Id).Select(i => i.Title)).ToList(),
+            invoices.GetValueOrDefault(j.Id))).ToList();
+    }
 }
 
 /// <summary>Mechanic-facing gateway: only jobs assigned to the calling mechanic.</summary>

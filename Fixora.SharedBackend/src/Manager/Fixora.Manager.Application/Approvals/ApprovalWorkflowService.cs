@@ -1,4 +1,5 @@
 using Fixora.Manager.Application.Common;
+using Fixora.Manager.Application.Inventory;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
@@ -22,6 +23,7 @@ public sealed class ApprovalWorkflowService(
     WorkshopReadModel read,
     INotificationService notifier,
     QueueService queue,
+    InventoryService inventory,
     IClock clock)
 {
     /// <summary>Price increase above this fraction after approval needs renewed customer approval.</summary>
@@ -193,6 +195,9 @@ public sealed class ApprovalWorkflowService(
         var now = clock.UtcNow;
         var released = p.Release(staffId, note, now);
         job.BeginApprovedWork(now);
+
+        foreach (var item in released.Where(i => i.PartId is not null))
+            await inventory.ConsumeForJobAsync(item.PartId!.Value, item.Qty, job.Id, $"{job.Number}: {item.Title}", ct);
 
         var skipped = p.Items.Where(i => i.Status == RepairItemStatus.Rejected).ToList();
         Audit(p, Roles.Manager, staffId, "Released to mechanic", $"{released.Count} item(s) · Rs {released.Sum(i => i.Amount):N0}");

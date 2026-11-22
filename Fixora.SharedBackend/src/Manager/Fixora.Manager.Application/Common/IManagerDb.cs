@@ -20,6 +20,12 @@ public interface IManagerDb
     DbSet<ApprovalDecisionRecord> ApprovalDecisions { get; }
     DbSet<ApprovalAuditEntry> ApprovalAudit { get; }
     DbSet<CustomerChangeRequest> ChangeRequests { get; }
+    DbSet<Invoice> Invoices { get; }
+    DbSet<InvoiceLine> InvoiceLines { get; }
+    DbSet<Part> Parts { get; }
+    DbSet<StockMovement> StockMovements { get; }
+    DbSet<PartsOrder> PartsOrders { get; }
+    DbSet<EarningsEntry> Earnings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

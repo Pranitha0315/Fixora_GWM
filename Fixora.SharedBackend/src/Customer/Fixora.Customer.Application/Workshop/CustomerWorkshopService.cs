@@ -32,4 +32,11 @@ public sealed class CustomerWorkshopService(IWorkshopGateway workshop, VehicleSe
     public Task<IReadOnlyList<ProposalDto>> PendingApprovalsAsync(Guid customerId, CancellationToken ct) => workshop.ListPendingApprovalsAsync(customerId, ct);
     public Task<ProposalDto> DecideAsync(Guid customerId, Guid proposalId, DecideItemsRequest req, string key, CancellationToken ct) => workshop.DecideItemsAsync(customerId, proposalId, req, key, ct);
     public Task<ChangeRequestDto> ChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate req, CancellationToken ct) => workshop.CreateChangeRequestAsync(customerId, jobId, req, ct);
+    public Task<IReadOnlyList<InvoiceDto>> InvoicesAsync(Guid customerId, CancellationToken ct) => workshop.ListInvoicesAsync(customerId, ct);
+
+    public async Task<IReadOnlyList<ServiceHistoryDto>> HistoryAsync(Guid customerId, Guid? vehicleId, CancellationToken ct)
+    {
+        if (vehicleId is { } v) await vehicles.GetOwnedAsync(customerId, v, ct);
+        return await workshop.GetServiceHistoryAsync(customerId, vehicleId, ct);
+    }
 }

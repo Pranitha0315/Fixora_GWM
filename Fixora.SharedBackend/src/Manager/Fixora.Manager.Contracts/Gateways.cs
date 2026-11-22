@@ -19,6 +19,8 @@ public interface IWorkshopGateway
     Task<IReadOnlyList<ProposalDto>> ListPendingApprovalsAsync(Guid customerId, CancellationToken ct = default);
     Task<ProposalDto> DecideItemsAsync(Guid customerId, Guid proposalId, DecideItemsRequest request, string idempotencyKey, CancellationToken ct = default);
     Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default);
+    Task<IReadOnlyList<InvoiceDto>> ListInvoicesAsync(Guid customerId, CancellationToken ct = default);
+    Task<IReadOnlyList<ServiceHistoryDto>> GetServiceHistoryAsync(Guid customerId, Guid? vehicleId, CancellationToken ct = default);
 }
 
 /// <summary>The "job / inspection gateway" used by the Mechanic application.</summary>

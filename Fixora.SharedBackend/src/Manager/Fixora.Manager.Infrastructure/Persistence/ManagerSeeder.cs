@@ -46,8 +46,16 @@ public static class ManagerSeeder
             new StaffUser { Id = DemoIds.Owner, Name = "Suresh", Email = "owner@fixora.lk", Phone = "+94 77 123 0001", Role = Roles.Owner, PasswordHash = passwords.Hash("Fixora@123") },
             new StaffUser { Id = DemoIds.Manager, Name = "Nirosha", Email = "manager@fixora.lk", Phone = "+94 77 123 0002", Role = Roles.Manager, PasswordHash = passwords.Hash("Fixora@123") });
 
+        db.Parts.AddRange(
+            new Part { Id = DemoIds.PartBrakePads, Sku = "BP-AQUA-F", Name = "Aqua front brake pads", Category = "Brakes", Quantity = 2, ReorderLevel = 4, UnitCost = 3200, SellPrice = 4200, AvgWeeklyUsage = 7 },
+            new Part { Id = DemoIds.PartEngineOil, Sku = "OIL-5W30-4L", Name = "Engine oil 5W-30 (4 L)", Category = "Service", Quantity = 18, ReorderLevel = 6, UnitCost = 5200, SellPrice = 6500, AvgWeeklyUsage = 6 },
+            new Part { Id = DemoIds.PartOilFilter, Sku = "OF-SUZ", Name = "Oil filter (Suzuki)", Category = "Service", Quantity = 12, ReorderLevel = 5, UnitCost = 650, SellPrice = 950, AvgWeeklyUsage = 4 },
+            new Part { Id = DemoIds.PartWiper, Sku = "WB-18", Name = "Wiper blades 18\" (pair)", Category = "Body", Quantity = 6, ReorderLevel = 2, UnitCost = 1100, SellPrice = 1800, AvgWeeklyUsage = 1 },
+            new Part { Id = DemoIds.PartShock, Sku = "SA-WGR-F", Name = "Front shock absorber (Wagon R)", Category = "Suspension", Quantity = 4, ReorderLevel = 2, UnitCost = 9800, SellPrice = 12500, AvgWeeklyUsage = 1 });
+
         SeedToday(db, ws, now);
 
+        db.Earnings.Add(new EarningsEntry { Kind = "ProSubscription", Amount = 5000, Reference = "Pro plan · this month", At = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc) });
         await db.SaveChangesAsync(ct);
     }
 

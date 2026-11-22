@@ -77,6 +77,10 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
     public static ChangeRequestDto ChangeRequest(CustomerChangeRequest c, string jobNumber) => new(
         c.Id, c.JobCardId, jobNumber, c.Number, c.Changes, c.Details, c.Status.ToString(), c.ManagerNote, c.MechanicNote, c.CreatedAt);
 
+    public static InvoiceDto Invoice(Invoice i) => new(
+        i.Id, i.Number, i.JobCardId, i.CustomerId, i.Subtotal, i.Tax, i.LoyaltyDiscount, i.Total, i.Status.ToString(), i.PaymentMethod,
+        i.IssuedAt, i.PaidAt, i.Lines.Select(l => new InvoiceLineDto(l.Description, l.Qty, l.UnitPrice, l.Amount)).ToList());
+
     public static QueueEstimateDto Queue(JobCard j) => new(j.Id, j.QueuePosition, j.IsActive ? j.EtaAt : null, j.Status.ToString());
 
     public enum Viewer { Staff, Mechanic, Customer }
@@ -106,7 +110,9 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
             changesQ = changesQ.Where(c => c.Status == ChangeRequestStatus.ForwardedToMechanic || c.Status == ChangeRequestStatus.Acknowledged);
         var changes = (await changesQ.OrderByDescending(c => c.CreatedAt).ToListAsync(ct)).Select(c => ChangeRequest(c, job.Number)).ToList();
 
+        var invoice = await db.Invoices.Include(i => i.Lines).AsNoTracking().FirstOrDefaultAsync(i => i.JobCardId == job.Id, ct);
+
         return new JobDetailDto(await JobAsync(job, ct), timeline, issues, proposals, changes,
-            null, Queue(job)); // invoices arrive on Day 11
+            invoice is null ? null : Invoice(invoice), Queue(job));
     }
 }

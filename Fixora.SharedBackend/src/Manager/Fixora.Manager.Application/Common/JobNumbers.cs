@@ -8,6 +8,9 @@ public static class JobNumbers
     public static async Task<string> NextJobNumberAsync(IManagerDb db, DateTime now, CancellationToken ct)
         => $"JC-{now:yyyy}-{await db.JobCards.CountAsync(ct) + 1:0000}";
 
+    public static async Task<string> NextInvoiceNumberAsync(IManagerDb db, DateTime now, CancellationToken ct)
+        => $"INV-{now:yyyy}-{await db.Invoices.CountAsync(ct) + 1:0000}";
+
     public static async Task<string> NextChangeNumberAsync(IManagerDb db, DateTime now, CancellationToken ct)
         => $"CR-{now:yyyy}-{await db.ChangeRequests.CountAsync(ct) + 1:0000}";
 

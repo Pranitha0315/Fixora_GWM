@@ -1,3 +1,4 @@
+using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
@@ -17,6 +18,7 @@ public sealed class JobService(
     WorkshopReadModel read,
     INotificationService notifier,
     QueueService queue,
+    BillingService billing,
     IClock clock)
 {
     public async Task<JobSummaryDto> ApplyMechanicActionAsync(Guid mechanicId, Guid jobId, JobActionRequest req, CancellationToken ct = default)
@@ -56,6 +58,8 @@ public sealed class JobService(
 
         db.ProgressUpdates.Add(new ProgressUpdate { JobCardId = job.Id, Stage = stage, Message = message, Percent = percent, ActorRole = Roles.Mechanic, ActorId = mechanicId, At = now });
         await db.SaveChangesAsync(ct);
+
+        if (action == "complete") await billing.CreateInvoiceForJobAsync(job.Id, ct);
 
         var type = action == "complete" ? NotificationTypes.JobCompleted : NotificationTypes.JobProgress;
         var title = action == "complete" ? "Your vehicle is ready" : $"{job.VehicleLabel}: {stage}";

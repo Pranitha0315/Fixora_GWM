@@ -1,7 +1,9 @@
 using Fixora.Manager.Application.Approvals;
+using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Gateways;
+using Fixora.Manager.Application.Inventory;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Application.Staff;
 using Fixora.Manager.Contracts;
@@ -16,6 +18,8 @@ public static class DependencyInjection
     {
         services.AddScoped<WorkshopReadModel>();
         services.AddScoped<QueueService>();
+        services.AddScoped<InventoryService>();
+        services.AddScoped<BillingService>();
         services.AddScoped<JobService>();
         services.AddScoped<BookingService>();
         services.AddScoped<ApprovalWorkflowService>();
@@ -23,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<StaffAuthService>();
         services.AddScoped<InvitationService>();
         services.AddScoped<WorkshopSettingsService>();
+        services.AddScoped<DashboardService>();
         services.AddScoped<MechanicRosterService>();
 
         services.AddScoped<IWorkshopGateway, WorkshopGateway>();
