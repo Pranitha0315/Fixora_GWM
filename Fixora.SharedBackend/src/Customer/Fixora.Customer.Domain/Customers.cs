@@ -49,3 +49,13 @@ public sealed class Vehicle : Entity
 
     public string Label => $"{Make} {Model} ({RegistrationNo})";
 }
+
+public sealed class LoyaltyEntry : Entity
+{
+    public Guid CustomerId { get; set; }
+    public int Points { get; set; }
+    public string Source { get; set; } = "";
+    public string Description { get; set; } = "";
+    public DateTime CreatedAt { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+}

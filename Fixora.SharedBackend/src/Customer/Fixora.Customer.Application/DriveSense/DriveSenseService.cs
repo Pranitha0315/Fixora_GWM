@@ -15,6 +15,7 @@ public sealed record WeeklyScoreDto(DateOnly WeekStart, int DriveScore, double R
 public sealed record SuggestionDto(Guid Id, Guid VehicleId, string Component, string Reason, double WearFactor, Guid SuggestedServiceId, string Status, DateTime CreatedAt);
 public sealed record DriveSenseSummaryDto(Guid VehicleId, bool OptedIn, int CurrentScore, double RoughRoadPct, int PotholeHits, IReadOnlyList<WeeklyScoreDto> History, IReadOnlyList<SuggestionDto> OpenSuggestions, int LoyaltyPoints);
 public sealed record ReplayResult(TripDto Trip, int ScoreBefore, int ScoreAfter, IReadOnlyList<SuggestionDto> NewSuggestions);
+public sealed record BookSuggestionRequest(DateTime SlotStart);
 
 /// <summary>
 /// DriveSense (USP 2): trip summaries in → weekly wear profile → rule engine → one open suggestion per component →
@@ -71,7 +72,7 @@ public sealed class DriveSenseService(
         var history = await db.WearProfiles.AsNoTracking().Where(p => p.VehicleId == vehicleId).OrderByDescending(p => p.WeekStart).Take(12).ToListAsync(ct);
         var current = history.FirstOrDefault();
         var suggestions = await db.Suggestions.AsNoTracking().Where(s => s.VehicleId == vehicleId && s.Status == SuggestionStatus.Open).ToListAsync(ct);
-        var points = 0; // loyalty points arrive on Day 9
+        var points = await db.Loyalty.Where(l => l.CustomerId == customerId && (l.ExpiresAt == null || l.ExpiresAt > clock.UtcNow)).SumAsync(l => (int?)l.Points, ct) ?? 0;
         return new DriveSenseSummaryDto(vehicleId, vehicle.DriveSenseOptIn, current?.DriveScore ?? 100, current?.RoughRoadPct ?? 0, current?.PotholeHits ?? 0,
             history.OrderBy(h => h.WeekStart).Select(h => new WeeklyScoreDto(h.WeekStart, h.DriveScore, h.RoughRoadPct, h.PotholeHits, h.DistanceKm)).ToList(),
             suggestions.Select(ToDto).ToList(), points);
@@ -93,6 +94,16 @@ public sealed class DriveSenseService(
         return ToDto(s);
     }
 
+    /// <summary>One-tap booking from a suggestion (BR-DS-08): goes to the manager like any booking.</summary>
+    public async Task<BookingDto> BookAsync(Guid customerId, string customerName, Guid suggestionId, BookSuggestionRequest req, string idempotencyKey, CancellationToken ct = default)
+    {
+        var s = await db.Suggestions.AsNoTracking().FirstOrDefaultAsync(x => x.Id == suggestionId && x.CustomerId == customerId, ct) ?? throw new NotFoundException("Suggestion");
+        if (s.Status != SuggestionStatus.Open) throw new ConflictException("suggestion_closed", "This suggestion is already booked or dismissed.");
+        var vehicle = await db.Vehicles.AsNoTracking().FirstAsync(v => v.Id == s.VehicleId, ct);
+        return await workshop.RequestBookingAsync(customerId, customerName, vehicle.Label,
+            new BookingRequest(vehicle.Id, s.SuggestedServiceId, req.SlotStart, $"DriveSense: {s.Reason}", null, s.Id), idempotencyKey, ct);
+    }
+
     /// <summary>PDPA: removes every trip, wear profile and open suggestion for the customer (BR-DS-16, AC-11).</summary>
     public async Task<int> DeleteAllAsync(Guid customerId, CancellationToken ct = default)
     {
@@ -106,6 +117,36 @@ public sealed class DriveSenseService(
         foreach (var v in await db.Vehicles.Where(v => v.CustomerId == customerId).ToListAsync(ct)) { v.DriveSenseOptIn = false; v.DriveSenseConsentAt = null; }
         await db.SaveChangesAsync(ct);
         return trips.Count + profiles.Count + suggestions.Count;
+    }
+
+    /// <summary>Weekly worker: aggregate every opted-in vehicle, evaluate rules, award points, purge old trips.</summary>
+    public async Task RunWeeklyAsync(CancellationToken ct = default)
+    {
+        var o = options.Value;
+        var vehicles = await db.Vehicles.Where(v => v.DriveSenseOptIn && v.Active).ToListAsync(ct);
+        foreach (var v in vehicles)
+        {
+            var profile = await RecomputeWeekAsync(v.Id, ct);
+            await db.SaveChangesAsync(ct);
+            await EvaluateRulesAsync(v, ct);
+            if (profile is { DriveScore: >= 80 } && profile.DistanceKm >= 20)
+            {
+                var source = $"drivescore:{profile.WeekStart:yyyy-MM-dd}:{v.Id}";
+                if (!await db.Loyalty.AnyAsync(l => l.Source == source, ct))
+                    db.Loyalty.Add(new LoyaltyEntry
+                    {
+                        CustomerId = v.CustomerId,
+                        Points = profile.DriveScore >= 90 ? o.LoyaltyPointsPerScoreWeek * 2 : o.LoyaltyPointsPerScoreWeek,
+                        Source = source,
+                        Description = $"Gentle driving week · score {profile.DriveScore}",
+                        CreatedAt = clock.UtcNow,
+                        ExpiresAt = clock.UtcNow.AddMonths(6),
+                    });
+            }
+        }
+        var cutoff = clock.UtcNow.AddDays(-o.TripRetentionDays);
+        db.Trips.RemoveRange(await db.Trips.Where(t => t.StartedAt < cutoff).ToListAsync(ct)); // 90-day retention
+        await db.SaveChangesAsync(ct);
     }
 
     // ------------------------------------------------------------------ internals
@@ -178,6 +219,8 @@ public sealed class DriveSenseService(
         var created = new List<MaintenanceSuggestion>();
         foreach (var rule in DriveSenseRules.Evaluate(profile, vehicle.Type, BrakeServiceId, SuspensionServiceId, DiagnosisServiceId))
         {
+            var open = await db.Suggestions.AnyAsync(s => s.VehicleId == vehicle.Id && s.Component == rule.Component && s.Status == SuggestionStatus.Open, ct);
+            if (open) continue;
             var s = new MaintenanceSuggestion
             {
                 CustomerId = vehicle.CustomerId,

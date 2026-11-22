@@ -164,4 +164,14 @@ public sealed class MaintenanceSuggestionsController(DriveSenseService drivesens
 {
     [HttpGet] public Task<IReadOnlyList<SuggestionDto>> List(CancellationToken ct) => drivesense.ListSuggestionsAsync(CustomerId, ct);
     [HttpPost("{id:guid}/dismiss")] public Task<SuggestionDto> Dismiss(Guid id, CancellationToken ct) => drivesense.DismissAsync(CustomerId, id, ct);
+    [HttpPost("{id:guid}/book")]
+    public Task<BookingDto> Book(Guid id, BookSuggestionRequest req, [FromHeader(Name = "Idempotency-Key")] string? key, CancellationToken ct)
+        => drivesense.BookAsync(CustomerId, Me.Name, id, req, key ?? "", ct);
+}
+
+// 15
+[Route("api/v1/customer/loyalty")]
+public sealed class LoyaltyController(CustomerDirectory directory) : CustomerControllerBase
+{
+    [HttpGet] public Task<LoyaltyDto> Get(CancellationToken ct) => directory.GetLoyaltyAsync(CustomerId, ct);
 }

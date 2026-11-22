@@ -93,6 +93,8 @@ public sealed class BookingService(
             CapacityLock.Release();
         }
 
+        if (appt.SuggestionId is { } sid) await customers.MarkSuggestionBookedAsync(sid, appt.Id, ct);
+
         await notifier.NotifyAsync(new NotificationMessage(
                 NotificationTypes.BookingRequested,
                 "New booking request",

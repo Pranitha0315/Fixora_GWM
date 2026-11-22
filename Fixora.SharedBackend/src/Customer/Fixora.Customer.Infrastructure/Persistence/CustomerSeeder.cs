@@ -52,6 +52,12 @@ public static class CustomerSeeder
             Reason = "Suspension check recommended — 62% of your driving was on rough roads",
             CreatedAt = now.AddDays(-3),
         });
+        db.Loyalty.AddRange(
+            new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 200, Source = "drivescore:seed1", Description = "Gentle driving week · score 84", CreatedAt = now.AddDays(-28), ExpiresAt = now.AddMonths(5) },
+            new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 100, Source = "drivescore:seed2", Description = "Gentle driving week · score 80", CreatedAt = now.AddDays(-21), ExpiresAt = now.AddMonths(5) },
+            new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 45, Source = "spend:INV-DEMO-0007", Description = "Spend on INV-DEMO-0007", CreatedAt = now.AddMonths(-11), ExpiresAt = now.AddDays(24) },
+            new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = -60, Source = "redeem:INV-DEMO-0007", Description = "Discount on INV-DEMO-0007", CreatedAt = now.AddMonths(-11) },
+            new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 120, Source = "drivescore:seed0", Description = "Gentle driving week · score 86", CreatedAt = now.AddMonths(-13), ExpiresAt = now.AddMonths(-7) });
 
         await db.SaveChangesAsync(ct);
     }

@@ -2,6 +2,7 @@ using Fixora.Customer.Application;
 using Fixora.Customer.Application.Common;
 using Fixora.Customer.Infrastructure.Persistence;
 using Fixora.Customer.Infrastructure.Services;
+using Fixora.Customer.Infrastructure.Workers;
 using Fixora.Shared.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +18,8 @@ public static class DependencyInjection
         services.AddScoped<ICustomerDb>(sp => sp.GetRequiredService<CustomerDbContext>());
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddCustomerApplication();
+        if (config.GetValue("Workers:Enabled", true))
+            services.AddHostedService<DriveSenseWeeklyWorker>();
         return services;
     }
 }

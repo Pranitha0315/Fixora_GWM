@@ -6,6 +6,9 @@ using Microsoft.Extensions.Options;
 
 namespace Fixora.Customer.Application.Common;
 
+public sealed record LoyaltyEntryDto(int Points, string Source, string Description, DateTime CreatedAt, DateTime? ExpiresAt);
+public sealed record LoyaltyDto(int Balance, IReadOnlyList<LoyaltyEntryDto> History, decimal RupeesPerPoint);
+
 /// <summary>Read-only customer facts for the Manager and Mechanic contexts, plus loyalty ledger operations.</summary>
 public sealed class CustomerDirectory(ICustomerDb db, IOptions<CustomerOptions> options, IClock clock) : ICustomerDirectory
 {
@@ -43,4 +46,44 @@ public sealed class CustomerDirectory(ICustomerDb db, IOptions<CustomerOptions> 
     public async Task<IReadOnlyList<CustomerSummary>> ListCustomersAsync(CancellationToken ct = default)
         => await db.Customers.AsNoTracking().Where(c => c.EmailVerified).OrderBy(c => c.Name)
             .Select(c => new CustomerSummary(c.Id, c.Name, c.Email, c.Phone, c.PreferredLanguage)).ToListAsync(ct);
+
+    public async Task MarkSuggestionBookedAsync(Guid suggestionId, Guid appointmentId, CancellationToken ct = default)
+    {
+        var s = await db.Suggestions.FirstOrDefaultAsync(x => x.Id == suggestionId, ct);
+        if (s is null || s.Status != SuggestionStatus.Open) return;
+        s.Status = SuggestionStatus.Booked;
+        s.AppointmentId = appointmentId;
+        s.ClosedAt = clock.UtcNow;
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>Garage-only points become an automatic invoice discount line, capped by the owner's % and rupee cap.</summary>
+    public async Task<LoyaltyRedemption> RedeemForInvoiceAsync(Guid customerId, decimal invoiceSubtotal, decimal percent, decimal cap, string invoiceNumber, CancellationToken ct = default)
+    {
+        var balance = await BalanceAsync(customerId, ct);
+        if (balance <= 0 || percent <= 0) return new LoyaltyRedemption(0, 0);
+        var maxDiscount = Math.Min(cap, Math.Round(invoiceSubtotal * percent / 100m, 0));
+        var points = (int)Math.Min(balance, Math.Floor(maxDiscount / options.Value.RupeesPerPoint));
+        if (points <= 0) return new LoyaltyRedemption(0, 0);
+        db.Loyalty.Add(new LoyaltyEntry { CustomerId = customerId, Points = -points, Source = $"redeem:{invoiceNumber}", Description = $"Discount on {invoiceNumber}", CreatedAt = clock.UtcNow });
+        await db.SaveChangesAsync(ct);
+        return new LoyaltyRedemption(points * options.Value.RupeesPerPoint, points);
+    }
+
+    public async Task AwardSpendPointsAsync(Guid customerId, decimal paidAmount, string invoiceNumber, CancellationToken ct = default)
+    {
+        var points = (int)Math.Floor(paidAmount / 100m); // 1 point per Rs 100 spent
+        if (points <= 0 || await db.Loyalty.AnyAsync(l => l.Source == $"spend:{invoiceNumber}", ct)) return;
+        db.Loyalty.Add(new LoyaltyEntry { CustomerId = customerId, Points = points, Source = $"spend:{invoiceNumber}", Description = $"Spend on {invoiceNumber}", CreatedAt = clock.UtcNow, ExpiresAt = clock.UtcNow.AddMonths(12) });
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<LoyaltyDto> GetLoyaltyAsync(Guid customerId, CancellationToken ct = default)
+    {
+        var rows = await db.Loyalty.AsNoTracking().Where(l => l.CustomerId == customerId).OrderByDescending(l => l.CreatedAt).Take(100).ToListAsync(ct);
+        return new LoyaltyDto(await BalanceAsync(customerId, ct), rows.Select(l => new LoyaltyEntryDto(l.Points, l.Source, l.Description, l.CreatedAt, l.ExpiresAt)).ToList(), options.Value.RupeesPerPoint);
+    }
+
+    private async Task<int> BalanceAsync(Guid customerId, CancellationToken ct)
+        => await db.Loyalty.Where(l => l.CustomerId == customerId && (l.ExpiresAt == null || l.ExpiresAt > clock.UtcNow)).SumAsync(l => (int?)l.Points, ct) ?? 0;
 }

@@ -12,6 +12,7 @@ public interface ICustomerDb
     DbSet<Trip> Trips { get; }
     DbSet<VehicleWearProfile> WearProfiles { get; }
     DbSet<MaintenanceSuggestion> Suggestions { get; }
+    DbSet<LoyaltyEntry> Loyalty { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

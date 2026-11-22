@@ -15,6 +15,7 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<VehicleWearProfile> WearProfiles => Set<VehicleWearProfile>();
     public DbSet<MaintenanceSuggestion> Suggestions => Set<MaintenanceSuggestion>();
+    public DbSet<LoyaltyEntry> Loyalty => Set<LoyaltyEntry>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -43,6 +44,7 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(12);
             e.HasIndex(x => new { x.VehicleId, x.Component, x.Status });
         });
+        b.Entity<LoyaltyEntry>().HasIndex(x => x.CustomerId);
 
         b.UseClientGeneratedGuids();
     }

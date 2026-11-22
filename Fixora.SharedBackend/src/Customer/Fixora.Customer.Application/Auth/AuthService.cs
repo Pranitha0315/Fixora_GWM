@@ -92,7 +92,7 @@ public sealed class AuthService(ICustomerDb db, IPasswordService passwords, ITok
     public async Task<ProfileDto> GetProfileAsync(Guid customerId, CancellationToken ct = default)
     {
         var c = await db.Customers.AsNoTracking().FirstOrDefaultAsync(x => x.Id == customerId, ct) ?? throw new NotFoundException("Account");
-        var points = 0; // loyalty points arrive on Day 9
+        var points = await db.Loyalty.Where(l => l.CustomerId == customerId && (l.ExpiresAt == null || l.ExpiresAt > clock.UtcNow)).SumAsync(l => (int?)l.Points, ct) ?? 0;
         return new ProfileDto(c.Id, c.Name, c.Email, c.Phone, c.PreferredLanguage, points);
     }
 
