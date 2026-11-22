@@ -13,7 +13,7 @@ public static class DependencyInjection
     public static IServiceCollection AddMechanicModule(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<AiOptions>(config.GetSection("Ai"));
-        services.AddFixoraDbContext<MechanicDbContext>(config);
+        services.AddFixoraDbContext<MechanicDbContext>(config, MechanicDbContext.Schema);
         services.AddScoped<IMechanicDb>(sp => sp.GetRequiredService<MechanicDbContext>());
         services.AddSingleton<TemplateInspectionDrafter>();
         services.AddSingleton<ISpeechToText, NullSpeechToText>();

@@ -12,9 +12,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddManagerModule(this IServiceCollection services, IConfiguration config)
     {
-        services.AddFixoraDbContext<ManagerDbContext>(config);
+        services.AddFixoraDbContext<ManagerDbContext>(config, ManagerDbContext.Schema);
         services.AddScoped<IManagerDb>(sp => sp.GetRequiredService<ManagerDbContext>());
-        services.AddFixoraDbContext<ControlDbContext>(config);
+        services.AddFixoraDbContext<ControlDbContext>(config, ControlDbContext.Schema);
         services.AddScoped<IControlDb>(sp => sp.GetRequiredService<ControlDbContext>());
         services.AddManagerApplication();
         if (config.GetValue("Workers:Enabled", true))

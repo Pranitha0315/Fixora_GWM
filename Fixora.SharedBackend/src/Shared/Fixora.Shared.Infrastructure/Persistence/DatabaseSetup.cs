@@ -1,6 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -10,9 +8,11 @@ public static class DatabaseSetup
 {
     /// <summary>
     /// Registers a team DbContext against the ONE Fixora SQL Server database.
+    /// Each context keeps its own EF Core migrations history table inside its own schema
+    /// (shared.__EFMigrationsHistory, customer.__EFMigrationsHistory, ...).
     /// Set Database:Provider = InMemory to run the demo without SQL Server.
     /// </summary>
-    public static IServiceCollection AddFixoraDbContext<TContext>(this IServiceCollection services, IConfiguration config)
+    public static IServiceCollection AddFixoraDbContext<TContext>(this IServiceCollection services, IConfiguration config, string schema)
         where TContext : DbContext
     {
         var provider = config["Database:Provider"] ?? "SqlServer";
@@ -24,34 +24,21 @@ public static class DatabaseSetup
             if (provider.Equals("InMemory", StringComparison.OrdinalIgnoreCase))
                 options.UseInMemoryDatabase(config["Database:InMemoryName"] ?? "fixora");
             else
-                options.UseSqlServer(connectionString);
+                options.UseSqlServer(connectionString,
+                    sql => sql.MigrationsHistoryTable("__EFMigrationsHistory", schema));
         });
         return services;
     }
 
     /// <summary>
-    /// Several bounded-context DbContexts share one database, each in its own schema.
-    /// EnsureCreated only works for the first context, so each context creates its own
-    /// tables when its schema is still empty. Replace with EF migrations for production
-    /// (see database/README.md).
+    /// SQL Server: apply this context's EF Core migrations (creates the database on first run).
+    /// In-memory demo / tests: just create the tables.
     /// </summary>
-    public static async Task EnsureSchemaAsync(this DbContext db, string schema, CancellationToken ct = default)
+    public static async Task MigrateOrCreateAsync(this DbContext db, CancellationToken ct = default)
     {
-        if (!db.Database.IsRelational())
-        {
+        if (db.Database.IsRelational())
+            await db.Database.MigrateAsync(ct);
+        else
             await db.Database.EnsureCreatedAsync(ct);
-            return;
-        }
-
-        var creator = db.GetService<IRelationalDatabaseCreator>();
-        if (!await creator.ExistsAsync(ct))
-            await creator.CreateAsync(ct);
-
-        var tables = await db.Database
-            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = {schema}")
-            .SingleAsync(ct);
-
-        if (tables == 0)
-            await creator.CreateTablesAsync(ct);
     }
 }
