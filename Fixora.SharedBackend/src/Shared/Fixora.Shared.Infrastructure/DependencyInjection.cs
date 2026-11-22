@@ -19,6 +19,7 @@ namespace Fixora.Shared.Infrastructure;
 public static class RateLimitPolicies
 {
     public const string Auth = "auth";
+    public const string Sos = "sos";
 }
 
 public static class DependencyInjection
@@ -78,6 +79,8 @@ public static class DependencyInjection
             // Partitioned per caller (user id, else IP) so one customer cannot exhaust another's quota.
             o.AddPolicy(RateLimitPolicies.Auth, ctx => RateLimitPartition.GetFixedWindowLimiter(
                 PartitionKey(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(1) }));
+            o.AddPolicy(RateLimitPolicies.Sos, ctx => RateLimitPartition.GetFixedWindowLimiter(
+                PartitionKey(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = 5, Window = TimeSpan.FromMinutes(1) }));
         });
 
         services.AddSignalR();

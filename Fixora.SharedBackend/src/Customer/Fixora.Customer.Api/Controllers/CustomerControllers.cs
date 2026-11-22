@@ -1,6 +1,7 @@
 using Fixora.Customer.Application.Auth;
 using Fixora.Customer.Application.Common;
 using Fixora.Customer.Application.DriveSense;
+using Fixora.Customer.Application.Sos;
 using Fixora.Customer.Application.Vehicles;
 using Fixora.Customer.Application.Workshop;
 using Fixora.Customer.Contracts;
@@ -145,6 +146,24 @@ public sealed class EvidenceController(CustomerWorkshopService workshop) : Custo
         }
         return list;
     }
+}
+
+// 12
+[Route("api/v1/customer/sos")]
+public sealed class SosController(SosService sos, CustomerWorkshopService workshop) : CustomerControllerBase
+{
+    /// <summary>"Delivered" is shown only after this returns a receipt (BR-SOS-03). Same Idempotency-Key → same receipt.</summary>
+    [HttpPost("requests")]
+    [EnableRateLimiting("sos")]
+    public async Task<SosReceipt> Create(CreateSosRequest req, [FromHeader(Name = "Idempotency-Key")] string? key, CancellationToken ct)
+    {
+        var garage = await workshop.GarageAsync(ct);
+        return await sos.CreateAsync(CustomerId, req, key ?? "", garage.EmergencyPhone, ct);
+    }
+
+    [HttpGet("requests")] public Task<IReadOnlyList<SosDto>> List(CancellationToken ct) => sos.ListForCustomerAsync(CustomerId, ct);
+    [HttpGet("requests/{id:guid}")] public Task<SosDto> Get(Guid id, CancellationToken ct) => sos.GetForCustomerAsync(CustomerId, id, ct);
+    [HttpPost("requests/{id:guid}/cancel")] public Task<SosDto> Cancel(Guid id, CancellationToken ct) => sos.CancelByCustomerAsync(CustomerId, id, ct);
 }
 
 // 13

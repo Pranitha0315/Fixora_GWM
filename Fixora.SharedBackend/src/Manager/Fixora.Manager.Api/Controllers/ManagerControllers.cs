@@ -26,6 +26,8 @@ public abstract class StaffControllerBase : ControllerBase
 
 public sealed record NoteRequest(string? Note);
 public sealed record PriceRequest(decimal UnitPrice, int Qty);
+public sealed record DispatchRequest(Guid MechanicId, string? Note);
+public sealed record SosStatusRequest(string Status, string? Note);
 
 [Route("api/v1/manager/auth")]
 public sealed class ManagerAuthController(StaffAuthService auth) : ControllerBase
@@ -74,6 +76,15 @@ public sealed class ApprovalsController(ApprovalWorkflowService approvals, Chang
     [HttpGet("change-requests")] public Task<IReadOnlyList<ChangeRequestDto>> ChangeRequests([FromQuery] bool pendingOnly = false, CancellationToken ct = default) => changes.ListForStaffAsync(pendingOnly, ct);
     [HttpPost("change-requests/{id:guid}/forward")] public Task<ChangeRequestDto> ForwardChange(Guid id, NoteRequest req, CancellationToken ct) => changes.ForwardAsync(StaffId, id, req.Note, ct);
     [HttpPost("change-requests/{id:guid}/decline")] public Task<ChangeRequestDto> DeclineChange(Guid id, NoteRequest req, CancellationToken ct) => changes.DeclineAsync(StaffId, id, req.Note ?? "", ct);
+}
+
+[Route("api/v1/manager/sos")]
+public sealed class SosDispatchController(ISosOperations sos) : StaffControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<SosDto>> List([FromQuery] bool openOnly = true, CancellationToken ct = default) => sos.ListAsync(openOnly, ct);
+    [HttpPost("{id:guid}/acknowledge")] public Task<SosDto> Acknowledge(Guid id, NoteRequest req, CancellationToken ct) => sos.AcknowledgeAsync(id, StaffId, req.Note, ct);
+    [HttpPost("{id:guid}/dispatch")] public Task<SosDto> Dispatch(Guid id, DispatchRequest req, CancellationToken ct) => sos.DispatchAsync(id, StaffId, req.MechanicId, req.Note, ct);
+    [HttpPost("{id:guid}/status")] public Task<SosDto> Status(Guid id, SosStatusRequest req, CancellationToken ct) => sos.UpdateStatusAsync(id, Roles.Manager, StaffId, req.Status, req.Note, ct);
 }
 
 [Route("api/v1/manager/mechanics")]

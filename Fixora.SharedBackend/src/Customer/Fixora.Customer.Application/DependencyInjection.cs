@@ -1,6 +1,7 @@
 using Fixora.Customer.Application.Auth;
 using Fixora.Customer.Application.Common;
 using Fixora.Customer.Application.DriveSense;
+using Fixora.Customer.Application.Sos;
 using Fixora.Customer.Application.Vehicles;
 using Fixora.Customer.Application.Workshop;
 using Fixora.Customer.Contracts;
@@ -14,6 +15,8 @@ public static class DependencyInjection
     {
         services.AddScoped<AuthService>();
         services.AddScoped<VehicleService>();
+        services.AddScoped<SosService>();
+        services.AddScoped<ISosOperations>(sp => sp.GetRequiredService<SosService>());
         services.AddScoped<DriveSenseService>();
         services.AddScoped<CustomerDirectory>();
         services.AddScoped<ICustomerDirectory>(sp => sp.GetRequiredService<CustomerDirectory>());

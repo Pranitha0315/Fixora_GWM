@@ -6,7 +6,7 @@ namespace Fixora.Mechanic.Application.Jobs;
 public sealed record MechanicJobDetailDto(JobDetailDto Detail, DriveSenseHintDto? DriveSense);
 
 /// <summary>Assigned jobs, progress, proposals and SOS alerts — all through manager / customer gateways.</summary>
-public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirectory customers)
+public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirectory customers, ISosOperations sos)
 {
     public Task<IReadOnlyList<JobSummaryDto>> AssignedAsync(Guid mechanicId, CancellationToken ct) => jobs.ListAssignedJobsAsync(mechanicId, ct);
     public Task<IReadOnlyList<JobSummaryDto>> QueueBoardAsync(CancellationToken ct) => jobs.GetQueueBoardAsync(ct);
@@ -25,4 +25,8 @@ public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirect
     public Task<ProposalDto> SubmitProposalAsync(Guid mechanicId, Guid jobId, SubmitProposalRequest req, CancellationToken ct) => jobs.SubmitProposalAsync(mechanicId, jobId, req, ct);
     public Task<IReadOnlyList<ProposalDto>> ProposalsAsync(Guid mechanicId, Guid jobId, CancellationToken ct) => jobs.ListProposalsAsync(mechanicId, jobId, ct);
     public Task<ChangeRequestDto> AcknowledgeChangeAsync(Guid mechanicId, Guid changeId, string? note, CancellationToken ct) => jobs.AcknowledgeChangeRequestAsync(mechanicId, changeId, note, ct);
+
+    public Task<IReadOnlyList<SosDto>> SosAlertsAsync(Guid mechanicId, CancellationToken ct) => sos.ListForMechanicAsync(mechanicId, ct);
+    public Task<SosDto> SosStatusAsync(Guid mechanicId, Guid sosId, string status, string? note, CancellationToken ct)
+        => sos.UpdateStatusAsync(sosId, Fixora.SharedKernel.Roles.Mechanic, mechanicId, status, note, ct);
 }

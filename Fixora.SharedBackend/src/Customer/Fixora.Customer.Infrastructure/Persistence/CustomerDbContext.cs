@@ -12,6 +12,8 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
     public DbSet<CustomerAccount> Customers => Set<CustomerAccount>();
     public DbSet<EmailOtpChallenge> OtpChallenges => Set<EmailOtpChallenge>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<SosRequest> SosRequests => Set<SosRequest>();
+    public DbSet<SosStatusHistory> SosHistory => Set<SosStatusHistory>();
     public DbSet<Trip> Trips => Set<Trip>();
     public DbSet<VehicleWearProfile> WearProfiles => Set<VehicleWearProfile>();
     public DbSet<MaintenanceSuggestion> Suggestions => Set<MaintenanceSuggestion>();
@@ -37,6 +39,15 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
             e.Property(x => x.RegistrationNo).HasMaxLength(20);
             e.Ignore(x => x.Label);
         });
+        b.Entity<SosRequest>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+            e.Property(x => x.IdempotencyKey).HasMaxLength(100);
+            e.HasIndex(x => new { x.CustomerId, x.IdempotencyKey }).IsUnique(); // duplicate SOS → one row (AC-03)
+            e.HasMany(x => x.History).WithOne().HasForeignKey(h => h.SosRequestId);
+            e.Ignore(x => x.IsOpen);
+        });
+        b.Entity<SosStatusHistory>().Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
         b.Entity<Trip>().HasIndex(x => new { x.VehicleId, x.StartedAt });
         b.Entity<VehicleWearProfile>().HasIndex(x => new { x.VehicleId, x.WeekStart }).IsUnique();
         b.Entity<MaintenanceSuggestion>(e =>

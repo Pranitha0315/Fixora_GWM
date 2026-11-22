@@ -25,6 +25,7 @@ public abstract class MechanicControllerBase : ControllerBase
 }
 
 public sealed record NoteBody(string? Note);
+public sealed record SosStatusBody(string Status, string? Note);
 
 [Route("api/v1/mechanic/auth")]
 [EnableRateLimiting("auth")]
@@ -85,4 +86,12 @@ public sealed class FixProofCaptureController(FixProofCaptureService fixproof) :
     [HttpPut("drafts/{draftId:guid}")] public Task<DraftDto> Update(Guid jobId, Guid draftId, UpdateDraftRequest req, CancellationToken ct) => fixproof.UpdateDraftAsync(MechanicId, draftId, req, ct);
     [HttpPost("drafts/{draftId:guid}/confirm")] public Task<DraftDto> Confirm(Guid jobId, Guid draftId, CancellationToken ct) => fixproof.ConfirmAsync(MechanicId, draftId, ct);
     [HttpDelete("drafts/{draftId:guid}")] public async Task<IActionResult> Discard(Guid jobId, Guid draftId, CancellationToken ct) { await fixproof.DiscardAsync(MechanicId, draftId, ct); return NoContent(); }
+}
+
+[Route("api/v1/mechanic/sos")]
+public sealed class SosAlertsController(MechanicJobService jobs) : MechanicControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<SosDto>> Mine(CancellationToken ct) => jobs.SosAlertsAsync(MechanicId, ct);
+    /// <summary>OnSite / Resolved for SOS requests the manager dispatched to you.</summary>
+    [HttpPost("{id:guid}/status")] public Task<SosDto> Status(Guid id, SosStatusBody req, CancellationToken ct) => jobs.SosStatusAsync(MechanicId, id, req.Status, req.Note, ct);
 }
