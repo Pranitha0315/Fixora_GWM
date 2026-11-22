@@ -87,6 +87,17 @@ public sealed class PartsOrder : Entity
     public DateTime? DeliveredAt { get; set; }
 }
 
+public sealed class Campaign : Entity
+{
+    public string Name { get; set; } = "";
+    public string PromoCode { get; set; } = "";
+    public string Message { get; set; } = "";
+    public int TargetCount { get; set; }
+    public decimal DiscountPercent { get; set; }
+    public Guid? InsightId { get; set; }
+    public DateTime SentAt { get; set; }
+}
+
 /// <summary>Platform earnings ledger: subscription, message fees and commissions (BR-SF-15).</summary>
 public sealed class EarningsEntry : Entity
 {

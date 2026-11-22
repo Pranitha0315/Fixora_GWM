@@ -1,3 +1,4 @@
+using Fixora.Manager.Application.Advisor;
 using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<WorkshopSettingsService>();
         services.AddScoped<DashboardService>();
         services.AddScoped<MechanicRosterService>();
+        services.AddScoped<AdvisorService>();
 
         services.AddScoped<IWorkshopGateway, WorkshopGateway>();
         services.AddScoped<IWorkshopJobGateway, WorkshopJobGateway>();

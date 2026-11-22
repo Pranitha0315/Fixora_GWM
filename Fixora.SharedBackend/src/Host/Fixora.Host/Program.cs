@@ -3,6 +3,7 @@ using Fixora.Customer.Api.Controllers;
 using Fixora.Customer.Infrastructure;
 using Fixora.Customer.Infrastructure.Persistence;
 using Fixora.Manager.Api.Controllers;
+using Fixora.Manager.Application.Advisor;
 using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Infrastructure;
@@ -110,6 +111,9 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
         await MechanicSeeder.SeedAsync(sp.GetRequiredService<MechanicDbContext>(), passwords);
         await ManagerSeeder.SeedAsync(sp.GetRequiredService<ManagerDbContext>(), passwords, clock);
         await sp.GetRequiredService<QueueService>().RecalculateAsync();
+        // First run: compute this week's Smart Advisor briefing so the dashboard opens with the planted insights.
+        var advisor = sp.GetRequiredService<AdvisorService>();
+        if ((await advisor.GetBriefingAsync()).Insights.Count == 0) await advisor.RunWeeklyAsync();
         logger.LogInformation("Demo garage seeded (see DemoIds for logins)");
     }
 }

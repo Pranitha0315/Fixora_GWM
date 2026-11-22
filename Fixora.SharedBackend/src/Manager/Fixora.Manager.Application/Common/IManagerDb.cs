@@ -25,7 +25,11 @@ public interface IManagerDb
     DbSet<Part> Parts { get; }
     DbSet<StockMovement> StockMovements { get; }
     DbSet<PartsOrder> PartsOrders { get; }
+    DbSet<Campaign> Campaigns { get; }
     DbSet<EarningsEntry> Earnings { get; }
+    DbSet<AdvisorInsight> Insights { get; }
+    DbSet<AdvisorAction> AdvisorActions { get; }
+    DbSet<DetectorSetting> DetectorSettings { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

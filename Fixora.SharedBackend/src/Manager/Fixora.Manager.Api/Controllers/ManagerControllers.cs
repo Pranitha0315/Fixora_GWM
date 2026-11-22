@@ -1,4 +1,5 @@
 using Fixora.Customer.Contracts;
+using Fixora.Manager.Application.Advisor;
 using Fixora.Manager.Application.Approvals;
 using Fixora.Manager.Application.Billing;
 using Fixora.Manager.Application.Bookings;
@@ -30,6 +31,7 @@ public sealed record NoteRequest(string? Note);
 public sealed record PriceRequest(decimal UnitPrice, int Qty);
 public sealed record DispatchRequest(Guid MechanicId, string? Note);
 public sealed record SosStatusRequest(string Status, string? Note);
+public sealed record FeedbackRequest(int Vote);
 
 [Route("api/v1/manager/auth")]
 public sealed class ManagerAuthController(StaffAuthService auth) : ControllerBase
@@ -140,4 +142,16 @@ public sealed class SettingsController(WorkshopSettingsService settings) : Staff
     [HttpGet("services")] public Task<IReadOnlyList<ServiceDto>> Services(CancellationToken ct) => settings.ServicesAsync(true, ct);
     [HttpPost("services")] public Task<ServiceDto> CreateService(ServiceUpsert req, CancellationToken ct) => settings.UpsertServiceAsync(null, req, ct);
     [HttpPut("services/{id:guid}")] public Task<ServiceDto> UpdateService(Guid id, ServiceUpsert req, CancellationToken ct) => settings.UpsertServiceAsync(id, req, ct);
+}
+
+[Route("api/v1/manager/advisor")]
+public sealed class AdvisorController(AdvisorService advisor) : StaffControllerBase
+{
+    [HttpGet("briefing")] public Task<BriefingDto> Briefing(CancellationToken ct) => advisor.GetBriefingAsync(ct);
+    [HttpGet("metrics")] public Task<WeeklyMetrics> Metrics(CancellationToken ct) => advisor.ComputeMetricsAsync(ct);
+    [HttpPost("run")] public Task<BriefingDto> Run(CancellationToken ct) => advisor.RunWeeklyAsync(ct);
+    [HttpPost("simulate-next-week")] public Task<BriefingDto> Simulate(CancellationToken ct) => advisor.SimulateNextWeekAsync(ct);
+    [HttpPost("insights/{id:guid}/act")] public Task<AdvisorActResult> Act(Guid id, AdvisorActRequest req, CancellationToken ct) => advisor.ActAsync(StaffId, id, req, ct);
+    [HttpPost("insights/{id:guid}/feedback")] public async Task<IActionResult> Feedback(Guid id, FeedbackRequest req, CancellationToken ct) { await advisor.FeedbackAsync(id, req.Vote, ct); return NoContent(); }
+    [HttpPost("chat")] public Task<ChatAnswer> Chat(ChatRequest req, CancellationToken ct) => advisor.ChatAsync(req, ct);
 }

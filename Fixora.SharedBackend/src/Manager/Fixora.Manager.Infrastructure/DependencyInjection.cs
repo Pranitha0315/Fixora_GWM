@@ -17,6 +17,7 @@ public static class DependencyInjection
         services.AddManagerApplication();
         if (config.GetValue("Workers:Enabled", true))
         {
+            services.AddHostedService<AdvisorWeeklyWorker>();
             services.AddHostedService<QueueTickWorker>();
         }
         return services;

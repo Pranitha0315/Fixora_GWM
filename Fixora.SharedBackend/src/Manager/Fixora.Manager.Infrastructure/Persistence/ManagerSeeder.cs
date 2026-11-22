@@ -13,6 +13,9 @@ namespace Fixora.Manager.Infrastructure.Persistence;
 /// </summary>
 public static class ManagerSeeder
 {
+    private static readonly string[] Names = { "Nimal", "Rajan", "Priya", "Sutharsan", "Mathi", "Kannan", "Lakshmi", "Dinesh", "Vithya", "Ganesh", "Shan", "Tharani" };
+    private static readonly string[] Cars = { "Suzuki Alto", "Toyota Vitz", "Toyota Axio", "Toyota Prius", "Mahindra Bolero", "Bajaj RE", "Honda Fit", "Nissan Leaf" };
+
     public static async Task SeedAsync(ManagerDbContext db, IPasswordService passwords, IClock clock, CancellationToken ct = default)
     {
         if (await db.Workshops.AnyAsync(ct)) return;
@@ -53,10 +56,127 @@ public static class ManagerSeeder
             new Part { Id = DemoIds.PartWiper, Sku = "WB-18", Name = "Wiper blades 18\" (pair)", Category = "Body", Quantity = 6, ReorderLevel = 2, UnitCost = 1100, SellPrice = 1800, AvgWeeklyUsage = 1 },
             new Part { Id = DemoIds.PartShock, Sku = "SA-WGR-F", Name = "Front shock absorber (Wagon R)", Category = "Suspension", Quantity = 4, ReorderLevel = 2, UnitCost = 9800, SellPrice = 12500, AvgWeeklyUsage = 1 });
 
+        SeedHistory(db, ws, services, now);
         SeedToday(db, ws, now);
 
         db.Earnings.Add(new EarningsEntry { Kind = "ProSubscription", Amount = 5000, Reference = "Pro plan · this month", At = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc) });
         await db.SaveChangesAsync(ct);
+    }
+
+    private static void SeedHistory(ManagerDbContext db, Workshop ws, ServiceItem[] services, DateTime now)
+    {
+        var rnd = new Random(2026);
+        var mechanics = new[] { DemoIds.MechanicRavi, DemoIds.MechanicSenthil, DemoIds.MechanicKumar };
+        var jobNo = 0;
+        var invNo = 0;
+        var brakePadJobs = 0;
+        var history = new List<JobCard>();
+        var localToday = ws.ToLocal(now).Date;
+
+        // Two bookings per window per day, except Thursday afternoon (one) → the planted IdleSlot insight.
+        var starts = new[] { (8, 30), (9, 0), (11, 30), (12, 0), (14, 30), (15, 0) };
+        for (var d = 35; d >= 1; d--)
+        {
+            var day = localToday.AddDays(-d);
+            if (day.DayOfWeek == DayOfWeek.Sunday) continue;
+            foreach (var (h, m) in starts)
+            {
+                if (day.DayOfWeek == DayOfWeek.Thursday && h == 15) continue;
+                var svc = services[rnd.Next(services.Length)];
+                var mech = mechanics[rnd.Next(mechanics.Length)];
+                var start = ws.ToUtc(day.AddHours(h).AddMinutes(m));
+                var noShow = rnd.Next(40) == 0;
+                var job = AddCompleted(db, ref jobNo, ref invNo, Guid.NewGuid(), $"{Names[rnd.Next(Names.Length)]}", Guid.NewGuid(),
+                    $"{Cars[rnd.Next(Cars.Length)]} (NP {(char)('A' + rnd.Next(26))}{(char)('A' + rnd.Next(26))}-{rnd.Next(1000, 9999)})",
+                    svc, mech, start, TimeSpan.FromHours(2), noShow);
+
+                if (job is null) continue;
+                history.Add(job);
+                if (svc.Id == DemoIds.ServiceBrake && d <= 28 && brakePadJobs < 4)
+                {
+                    brakePadJobs++;
+                    db.StockMovements.Add(new StockMovement { PartId = DemoIds.PartBrakePads, JobCardId = job.Id, Delta = -1, Reason = "Brake pads fitted", At = start.AddHours(1) });
+                }
+            }
+        }
+        // Guarantee the StockOut evidence even if the random mix had few brake jobs.
+        for (var i = brakePadJobs; i < 3; i++)
+            db.StockMovements.Add(new StockMovement { PartId = DemoIds.PartBrakePads, JobCardId = history[history.Count - 1 - 5 * (i + 1)].Id, Delta = -1, Reason = "Brake pads fitted", At = now.AddDays(-5 - i) });
+
+        // Planted ComebackSpike: three wheel alignments by Kumar came back within 30 days.
+        var alignment = services.First(s => s.Id == DemoIds.ServiceAlignment);
+        for (var i = 0; i < 3; i++)
+        {
+            var vehicle = Guid.NewGuid();
+            var customer = Guid.NewGuid();
+            var label = $"{Cars[i + 1]} (NP K{i}-77{i}{i})";
+            AddCompleted(db, ref jobNo, ref invNo, customer, Names[i + 3], vehicle, label, alignment, DemoIds.MechanicKumar,
+                ws.ToUtc(localToday.AddDays(-22 + i).AddHours(10)), TimeSpan.FromMinutes(45), false);
+            AddCompleted(db, ref jobNo, ref invNo, customer, Names[i + 3], vehicle, label, alignment, DemoIds.MechanicSenthil,
+                ws.ToUtc(localToday.AddDays(-9 + i).AddHours(10)), TimeSpan.FromMinutes(45), false);
+        }
+    }
+
+    private static JobCard? AddCompleted(ManagerDbContext db, ref int jobNo, ref int invNo, Guid customerId, string customerName, Guid vehicleId, string vehicleLabel,
+        ServiceItem svc, Guid mechanicId, DateTime start, TimeSpan length, bool noShow)
+    {
+        var appt = new Appointment
+        {
+            CustomerId = customerId,
+            CustomerName = customerName,
+            VehicleId = vehicleId,
+            VehicleLabel = vehicleLabel,
+            ServiceId = svc.Id,
+            ServiceName = svc.Name,
+            SlotStart = start,
+            SlotEnd = start + length,
+            Status = noShow ? AppointmentStatus.NoShow : AppointmentStatus.Completed,
+            BayId = jobNo % 2 == 0 ? DemoIds.Bay1 : DemoIds.Bay2,
+            MechanicId = mechanicId,
+            CreatedAt = start.AddDays(-2),
+            DecidedAt = start.AddDays(-2),
+        };
+        db.Appointments.Add(appt);
+        if (noShow) return null;
+
+        jobNo++;
+        var job = new JobCard
+        {
+            Number = $"JC-{start:yyyy}-H{jobNo:0000}",
+            AppointmentId = appt.Id,
+            CustomerId = customerId,
+            CustomerName = customerName,
+            VehicleId = vehicleId,
+            VehicleLabel = vehicleLabel,
+            MechanicId = mechanicId,
+            BayId = appt.BayId,
+            Status = JobStatus.Closed,
+            Complaint = svc.Name,
+            EstimatedMinutes = svc.StandardMinutes,
+            CreatedAt = start,
+            StartedAt = start,
+            WorkedMinutes = length.TotalMinutes,
+            CompletedAt = start + length,
+        };
+        appt.JobCardId = job.Id;
+        db.JobCards.Add(job);
+
+        invNo++;
+        var invoice = new Invoice
+        {
+            JobCardId = job.Id,
+            CustomerId = customerId,
+            Number = $"INV-{start:yyyy}-H{invNo:0000}",
+            Subtotal = svc.BasePrice,
+            Total = svc.BasePrice,
+            Status = InvoiceStatus.Paid,
+            PaymentMethod = invNo % 3 == 0 ? "BankTransfer" : "Cash",
+            IssuedAt = start + length,
+            PaidAt = start + length,
+        };
+        invoice.Lines.Add(new InvoiceLine { InvoiceId = invoice.Id, Description = svc.Name, Qty = 1, UnitPrice = svc.BasePrice, Amount = svc.BasePrice });
+        db.Invoices.Add(invoice);
+        return job;
     }
 
     private static void SeedToday(ManagerDbContext db, Workshop ws, DateTime now)

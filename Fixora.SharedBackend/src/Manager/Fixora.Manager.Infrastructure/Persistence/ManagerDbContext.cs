@@ -29,7 +29,11 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
     public DbSet<Part> Parts => Set<Part>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<PartsOrder> PartsOrders => Set<PartsOrder>();
+    public DbSet<Campaign> Campaigns => Set<Campaign>();
     public DbSet<EarningsEntry> Earnings => Set<EarningsEntry>();
+    public DbSet<AdvisorInsight> Insights => Set<AdvisorInsight>();
+    public DbSet<AdvisorAction> AdvisorActions => Set<AdvisorAction>();
+    public DbSet<DetectorSetting> DetectorSettings => Set<DetectorSetting>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder c)
     {
@@ -111,6 +115,12 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
 
         b.Entity<Part>(e => { e.Ignore(x => x.IsLow); e.HasIndex(x => x.Sku); });
         b.Entity<PartsOrder>().Property(x => x.Status).HasConversion<string>().HasMaxLength(16);
+
+        b.Entity<AdvisorInsight>(e =>
+        {
+            e.Property(x => x.Severity).HasConversion<string>().HasMaxLength(10);
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(10);
+        });
 
         b.UseClientGeneratedGuids();
     }
