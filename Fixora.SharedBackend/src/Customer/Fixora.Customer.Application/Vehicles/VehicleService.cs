@@ -7,6 +7,7 @@ namespace Fixora.Customer.Application.Vehicles;
 
 public sealed record VehicleDto(Guid Id, string RegistrationNo, string Make, string Model, int Year, string Type, int MileageKm, string? Color, string? Fuel, bool DriveSenseOptIn);
 public sealed record VehicleUpsert(string RegistrationNo, string Make, string Model, int Year, string Type, int MileageKm, string? Color, string? Fuel);
+public sealed record DriveSenseConsent(bool OptIn);
 
 public sealed class VehicleService(ICustomerDb db, IClock clock)
 {
@@ -45,6 +46,15 @@ public sealed class VehicleService(ICustomerDb db, IClock clock)
         v.Active = false;
         v.DriveSenseOptIn = false;
         await db.SaveChangesAsync(ct);
+    }
+
+    public async Task<VehicleDto> SetDriveSenseAsync(Guid customerId, Guid vehicleId, bool optIn, CancellationToken ct = default)
+    {
+        var v = await GetOwnedAsync(customerId, vehicleId, ct);
+        v.DriveSenseOptIn = optIn;
+        v.DriveSenseConsentAt = optIn ? clock.UtcNow : null;
+        await db.SaveChangesAsync(ct);
+        return ToDto(v);
     }
 
     private static void Validate(VehicleUpsert req)

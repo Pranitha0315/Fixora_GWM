@@ -26,6 +26,20 @@ public sealed class CustomerDirectory(ICustomerDb db, IOptions<CustomerOptions> 
         return v is null ? null : new VehicleSummary(v.Id, v.CustomerId, v.RegistrationNo, v.Make, v.Model, v.Year, v.Type.ToString(), v.DriveSenseOptIn);
     }
 
+    public async Task<DriveSenseHintDto?> GetDriveSenseHintAsync(Guid vehicleId, CancellationToken ct = default)
+    {
+        var v = await db.Vehicles.AsNoTracking().FirstOrDefaultAsync(x => x.Id == vehicleId, ct);
+        if (v is null || !v.DriveSenseOptIn) return null; // consent: no hint for opted-out vehicles
+        var p = await db.WearProfiles.AsNoTracking().Where(x => x.VehicleId == vehicleId).OrderByDescending(x => x.WeekStart).FirstOrDefaultAsync(ct);
+        if (p is null) return null;
+        var flags = new List<string>();
+        if (p.HarshBrakesPer100Km >= 8) flags.Add("Harsh braking");
+        if (p.PotholeHits >= 10) flags.Add("Pothole hits");
+        if (p.RoughRoadPct >= 60) flags.Add("Rough roads");
+        if (p.HarshAccelsPer100Km >= 10) flags.Add("Hard acceleration");
+        return new DriveSenseHintDto(vehicleId, p.RoughRoadPct, p.DriveScore, p.PotholeHits, flags.Take(3).ToList(), p.WeekStart);
+    }
+
     public async Task<IReadOnlyList<CustomerSummary>> ListCustomersAsync(CancellationToken ct = default)
         => await db.Customers.AsNoTracking().Where(c => c.EmailVerified).OrderBy(c => c.Name)
             .Select(c => new CustomerSummary(c.Id, c.Name, c.Email, c.Phone, c.PreferredLanguage)).ToListAsync(ct);

@@ -12,6 +12,9 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
     public DbSet<CustomerAccount> Customers => Set<CustomerAccount>();
     public DbSet<EmailOtpChallenge> OtpChallenges => Set<EmailOtpChallenge>();
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
+    public DbSet<Trip> Trips => Set<Trip>();
+    public DbSet<VehicleWearProfile> WearProfiles => Set<VehicleWearProfile>();
+    public DbSet<MaintenanceSuggestion> Suggestions => Set<MaintenanceSuggestion>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -32,6 +35,13 @@ public sealed class CustomerDbContext(DbContextOptions<CustomerDbContext> option
             e.Property(x => x.Type).HasConversion<string>().HasMaxLength(16);
             e.Property(x => x.RegistrationNo).HasMaxLength(20);
             e.Ignore(x => x.Label);
+        });
+        b.Entity<Trip>().HasIndex(x => new { x.VehicleId, x.StartedAt });
+        b.Entity<VehicleWearProfile>().HasIndex(x => new { x.VehicleId, x.WeekStart }).IsUnique();
+        b.Entity<MaintenanceSuggestion>(e =>
+        {
+            e.Property(x => x.Status).HasConversion<string>().HasMaxLength(12);
+            e.HasIndex(x => new { x.VehicleId, x.Component, x.Status });
         });
 
         b.UseClientGeneratedGuids();

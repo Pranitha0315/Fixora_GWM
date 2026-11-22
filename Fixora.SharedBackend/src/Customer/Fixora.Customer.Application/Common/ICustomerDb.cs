@@ -9,6 +9,9 @@ public interface ICustomerDb
     DbSet<CustomerAccount> Customers { get; }
     DbSet<EmailOtpChallenge> OtpChallenges { get; }
     DbSet<Vehicle> Vehicles { get; }
+    DbSet<Trip> Trips { get; }
+    DbSet<VehicleWearProfile> WearProfiles { get; }
+    DbSet<MaintenanceSuggestion> Suggestions { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 }

@@ -15,7 +15,7 @@ public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirect
     public async Task<MechanicJobDetailDto> DetailAsync(Guid mechanicId, Guid jobId, CancellationToken ct)
     {
         var detail = await jobs.GetJobAsync(mechanicId, jobId, ct);
-        DriveSenseHintDto? hint = null; // DriveSense hint card arrives on Day 8
+        var hint = detail.Job.VehicleId == Guid.Empty ? null : await customers.GetDriveSenseHintAsync(detail.Job.VehicleId, ct);
         return new MechanicJobDetailDto(detail, hint);
     }
 

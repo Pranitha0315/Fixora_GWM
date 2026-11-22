@@ -16,5 +16,6 @@ public interface ICustomerDirectory
     Task<CustomerSummary?> GetCustomerAsync(Guid customerId, CancellationToken ct = default);
     Task<IReadOnlyDictionary<Guid, CustomerSummary>> GetCustomersAsync(IEnumerable<Guid> ids, CancellationToken ct = default);
     Task<VehicleSummary?> GetVehicleAsync(Guid vehicleId, CancellationToken ct = default);
+    Task<DriveSenseHintDto?> GetDriveSenseHintAsync(Guid vehicleId, CancellationToken ct = default);
     Task<IReadOnlyList<CustomerSummary>> ListCustomersAsync(CancellationToken ct = default);
 }

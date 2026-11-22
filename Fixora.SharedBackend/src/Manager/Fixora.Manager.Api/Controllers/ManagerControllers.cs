@@ -89,6 +89,7 @@ public sealed class MechanicsController(MechanicRosterService roster, Invitation
 public sealed class CustomersController(ICustomerDirectory customers) : StaffControllerBase
 {
     [HttpGet] public Task<IReadOnlyList<CustomerSummary>> List(CancellationToken ct) => customers.ListCustomersAsync(ct);
+    [HttpGet("vehicles/{vehicleId:guid}/drivesense")] public Task<DriveSenseHintDto?> Hint(Guid vehicleId, CancellationToken ct) => customers.GetDriveSenseHintAsync(vehicleId, ct);
 }
 
 [Route("api/v1/manager/settings")]

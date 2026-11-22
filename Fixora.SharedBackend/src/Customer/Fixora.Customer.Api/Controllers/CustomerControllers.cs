@@ -1,5 +1,6 @@
 using Fixora.Customer.Application.Auth;
 using Fixora.Customer.Application.Common;
+using Fixora.Customer.Application.DriveSense;
 using Fixora.Customer.Application.Vehicles;
 using Fixora.Customer.Application.Workshop;
 using Fixora.Customer.Contracts;
@@ -56,6 +57,7 @@ public sealed class VehiclesController(VehicleService vehicles) : CustomerContro
     [HttpPost] public Task<VehicleDto> Add(VehicleUpsert req, CancellationToken ct) => vehicles.AddAsync(CustomerId, req, ct);
     [HttpPut("{id:guid}")] public Task<VehicleDto> Update(Guid id, VehicleUpsert req, CancellationToken ct) => vehicles.UpdateAsync(CustomerId, id, req, ct);
     [HttpDelete("{id:guid}")] public async Task<IActionResult> Remove(Guid id, CancellationToken ct) { await vehicles.RemoveAsync(CustomerId, id, ct); return NoContent(); }
+    [HttpPut("{id:guid}/drivesense")] public Task<VehicleDto> Consent(Guid id, DriveSenseConsent req, CancellationToken ct) => vehicles.SetDriveSenseAsync(CustomerId, id, req.OptIn, ct);
 }
 
 // 4
@@ -143,4 +145,23 @@ public sealed class EvidenceController(CustomerWorkshopService workshop) : Custo
         }
         return list;
     }
+}
+
+// 13
+[Route("api/v1/customer/drivesense")]
+public sealed class DriveSenseController(DriveSenseService drivesense) : CustomerControllerBase
+{
+    [HttpPost("trips")] public Task<IReadOnlyList<TripDto>> Upload(IReadOnlyList<TripSummaryUpload> trips, CancellationToken ct) => drivesense.UploadAsync(CustomerId, trips, ct);
+    [HttpGet("vehicles/{vehicleId:guid}")] public Task<DriveSenseSummaryDto> Summary(Guid vehicleId, CancellationToken ct) => drivesense.GetSummaryAsync(CustomerId, vehicleId, ct);
+    [HttpGet("vehicles/{vehicleId:guid}/trips")] public Task<IReadOnlyList<TripDto>> Trips(Guid vehicleId, CancellationToken ct) => drivesense.ListTripsAsync(CustomerId, vehicleId, ct);
+    [HttpPost("vehicles/{vehicleId:guid}/simulate")] public Task<ReplayResult> Simulate(Guid vehicleId, CancellationToken ct) => drivesense.ReplayDemoAsync(CustomerId, vehicleId, ct);
+    [HttpDelete("data")] public async Task<object> DeleteAll(CancellationToken ct) => new { deleted = await drivesense.DeleteAllAsync(CustomerId, ct) };
+}
+
+// 14
+[Route("api/v1/customer/suggestions")]
+public sealed class MaintenanceSuggestionsController(DriveSenseService drivesense) : CustomerControllerBase
+{
+    [HttpGet] public Task<IReadOnlyList<SuggestionDto>> List(CancellationToken ct) => drivesense.ListSuggestionsAsync(CustomerId, ct);
+    [HttpPost("{id:guid}/dismiss")] public Task<SuggestionDto> Dismiss(Guid id, CancellationToken ct) => drivesense.DismissAsync(CustomerId, id, ct);
 }
