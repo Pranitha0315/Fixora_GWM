@@ -112,6 +112,23 @@ class JobStore extends ChangeNotifier {
 
   bool get isLive => remoteJobId != null;
 
+  double? paidAmount;
+  String? paymentMethod;
+
+  /// Server invoice for the live job, once the garage has issued it (InvoiceDto).
+  String? invoiceNumber;
+  double? invoiceSubtotal;
+  double? invoiceTax;
+  double? invoiceTotal;
+
+  /// Loyalty discount the garage applied on the issued invoice (points already used).
+  double loyaltyDiscount = 0;
+  bool get invoiceIssued => invoiceTotal != null;
+
+  double get subtotal => invoiceSubtotal ?? items.fold(0.0, (s, i) => s + i.amount);
+  double get tax => invoiceTax ?? (isLive ? 0 : subtotal * 0.15);
+  double get total => invoiceTotal ?? subtotal + tax;
+
   void advance() {
     if (status == JobStatus.awaitingApproval || status == JobStatus.changesRequested) {
       approve();
@@ -142,7 +159,27 @@ class JobStore extends ChangeNotifier {
     } else if (status == JobStatus.completed) {
       status = JobStatus.paid;
       statusLabel = 'Paid';
+      paidAmount = total;
     }
+    notifyListeners();
+  }
+
+  void recordCashPayment(double amount, {String method = 'Card at counter'}) {
+    paymentMethod = method;
+    paidAmount = amount;
+    status = JobStatus.paid;
+    statusLabel = 'Paid';
+    notifications.insert(
+      0,
+      AppNotification(
+        id: nextNotificationId(),
+        title: 'Payment received',
+        body: 'Payment for $jobId received by $method. Thank you!',
+        time: DateTime.now(),
+        kind: NotificationKind.payment,
+        unread: true,
+      ),
+    );
     notifyListeners();
   }
 
@@ -277,6 +314,27 @@ class JobStore extends ChangeNotifier {
       items
         ..clear()
         ..addAll(((pending['items'] as List?) ?? const []).cast<Map<String, dynamic>>().map(_itemFrom));
+    }
+
+    final invoice = detail['invoice'];
+    if (invoice is Map) {
+      invoiceNumber = invoice['number'] as String?;
+      invoiceSubtotal = (invoice['subtotal'] as num?)?.toDouble();
+      invoiceTax = (invoice['tax'] as num?)?.toDouble();
+      invoiceTotal = (invoice['total'] as num?)?.toDouble();
+      loyaltyDiscount = (invoice['loyaltyDiscount'] as num?)?.toDouble() ?? 0;
+    } else {
+      invoiceNumber = null;
+      invoiceSubtotal = null;
+      invoiceTax = null;
+      invoiceTotal = null;
+      loyaltyDiscount = 0;
+    }
+    if (invoice is Map && invoice['status'] == 'Paid') {
+      paidAmount = (invoice['total'] as num?)?.toDouble();
+      paymentMethod = invoice['paymentMethod'] as String?;
+      status = JobStatus.paid;
+      statusLabel = 'Paid';
     }
     notifyListeners();
   }

@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/models.dart';
 import '../../data/repositories/job_store.dart';
 import '../bookings/live_queue_screen.dart';
+import '../job/screens/invoice_screen.dart';
 import '../job/screens/job_tracker_screen.dart';
 import '../job/screens/repair_progress_screen.dart';
 import '../job/screens/service_completed_screen.dart';
@@ -69,6 +70,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationKind.booking:
         NavController.goToTab(context, 1);
       case NotificationKind.payment:
+        context.push(const InvoiceScreen());
       case NotificationKind.reminder:
       case NotificationKind.sos:
       case NotificationKind.serviceDue:

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/navigation/nav.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/models.dart';
 import '../../../data/repositories/job_store.dart';
+import 'invoice_screen.dart';
 
 /// "Service Completed" - vehicle ready + pay options.
 class ServiceCompletedScreen extends StatelessWidget {
@@ -88,27 +90,18 @@ class ServiceCompletedScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              if (!paid)
-                SizedBox(
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      store.advance();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Payment recorded (demo)'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.payments_outlined),
-                    label: const Text('Pay at counter'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
+              SizedBox(
+                height: 50,
+                child: FilledButton.icon(
+                  onPressed: () => context.push(const InvoiceScreen()),
+                  icon: Icon(paid ? Icons.receipt_long_rounded : Icons.payments_outlined),
+                  label: Text(paid ? 'View Invoice' : 'View Invoice & Pay'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
+              ),
             ],
           ),
         );
