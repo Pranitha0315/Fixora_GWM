@@ -138,6 +138,12 @@ class InvoiceScreen extends StatelessWidget {
                       ),
                     const Divider(),
                     _kv('Subtotal', _lkr(subtotal)),
+                    if (store.loyaltyDiscount > 0)
+                      _kv(
+                        'Loyalty points',
+                        '− ${_lkr(store.loyaltyDiscount)}',
+                        valueColor: AppColors.successText,
+                      ),
                     _kv('Tax (VAT 15%)', _lkr(tax)),
                     const SizedBox(height: 6),
                     Container(
@@ -230,12 +236,18 @@ class InvoiceScreen extends StatelessWidget {
     );
   }
 
-  Widget _kv(String k, String v) => Padding(
+  Widget _kv(String k, String v, {Color? valueColor}) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Row(
           children: [
             Expanded(child: Text(k, style: AppText.small)),
-            Text(v, style: AppText.small.copyWith(fontWeight: FontWeight.w700, color: AppColors.navy)),
+            Text(
+              v,
+              style: AppText.small.copyWith(
+                fontWeight: FontWeight.w700,
+                color: valueColor ?? AppColors.navy,
+              ),
+            ),
           ],
         ),
       );

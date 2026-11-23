@@ -110,7 +110,7 @@ class CustomerBackend extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Points balance and ledger from `/customer/loyalty` (+ garage discount rules).
+  /// GET /customer/loyalty + /customer/garage → applyRemote / applyGarage.
   Future<void> refreshLoyalty() async {
     if (!live) return;
     final results = await Future.wait([

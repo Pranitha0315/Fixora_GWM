@@ -94,25 +94,7 @@ class _MyRewardsScreenState extends State<MyRewardsScreen> {
             children: [
               Text('Garage points that come off your bills', style: AppText.muted),
               const SizedBox(height: 14),
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: AppColors.primaryGradient,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Balance', style: TextStyle(color: Colors.white.o(0.85), fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${_digits(l.balance)} pts',
-                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w800),
-                    ),
-                    Text('≈ ${_lkr(l.balanceValue)}', style: TextStyle(color: Colors.white.o(0.9))),
-                  ],
-                ),
-              ),
+              _BalanceHero(l: l, digits: _digits, lkr: _lkr),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -122,20 +104,26 @@ class _MyRewardsScreenState extends State<MyRewardsScreen> {
                 ],
               ),
               const SizedBox(height: 18),
+              // Points history
               Text('Points history', style: AppText.h2.copyWith(fontSize: 15)),
               const SizedBox(height: 8),
-              Row(
-                children: [
-                  for (final (i, label) in const [(0, 'All'), (1, 'Earned'), (2, 'Used')])
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(label),
-                        selected: _tab == i,
-                        onSelected: (_) => setState(() => _tab = i),
+              // All | Earned | Used
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (final (i, label) in const [(0, 'All'), (1, 'Earned'), (2, 'Used')])
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(label),
+                          selected: _tab == i,
+                          selectedColor: AppColors.primarySoft,
+                          onSelected: (_) => setState(() => _tab = i),
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
               if (list.isEmpty)
@@ -201,6 +189,83 @@ class _MyRewardsScreenState extends State<MyRewardsScreen> {
           ),
         ),
       );
+}
+
+/// Teal hero: balance, rupee value, next expiry.
+class _BalanceHero extends StatelessWidget {
+  final LoyaltyStore l;
+  final String Function(num) digits;
+  final String Function(num) lkr;
+  const _BalanceHero({required this.l, required this.digits, required this.lkr});
+
+  @override
+  Widget build(BuildContext context) {
+    final next = l.nextExpiry;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(gradient: AppColors.primaryGradient, borderRadius: BorderRadius.circular(24)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.stars_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 6),
+              Text(
+                'Available balance',
+                style: TextStyle(color: Colors.white.o(0.9), fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              const Spacer(),
+              if (!l.live)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(color: Colors.white.o(0.18), borderRadius: BorderRadius.circular(20)),
+                  child: const Text('Demo', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700)),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                digits(l.balance),
+                style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -1),
+              ),
+              const SizedBox(width: 6),
+              Text('points', style: TextStyle(color: Colors.white.o(0.9), fontSize: 15, fontWeight: FontWeight.w600)),
+            ],
+          ),
+          Text('Worth ${lkr(l.balanceValue)} at your garage', style: TextStyle(color: Colors.white.o(0.9), fontSize: 13)),
+          if (next != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(color: Colors.white.o(0.16), borderRadius: BorderRadius.circular(12)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    l.expirySoon ? Icons.schedule_rounded : Icons.event_available_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      '${next.points} pts expire on ${next.expiresAt!.day}/${next.expiresAt!.month}/${next.expiresAt!.year}',
+                      style: const TextStyle(color: Colors.white, fontSize: 12.5, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _EntryRow extends StatelessWidget {

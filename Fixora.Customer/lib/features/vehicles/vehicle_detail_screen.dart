@@ -124,8 +124,8 @@ class VehicleDetailScreen extends StatelessWidget {
                 height: 52,
                 child: OutlinedButton.icon(
                   onPressed: () => context.push(ServiceHistoryScreen(vehicleId: v.id)),
-                  icon: const Icon(Icons.manage_history_rounded),
-                  label: const Text('Service History'),
+                  icon: const Icon(Icons.history_rounded),
+                  label: const Text('View Service History'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.navy,
                     side: BorderSide(color: AppColors.border),

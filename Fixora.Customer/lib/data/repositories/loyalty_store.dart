@@ -58,11 +58,34 @@ class LoyaltyStore extends ChangeNotifier {
 
   double get balanceValue => balance * rupeesPerPoint;
 
+  /// Discount the garage will apply to a bill with this subtotal (mirrors RedeemForInvoiceAsync).
   double discountFor(double subtotal) {
     if (!enabled || balance <= 0 || percent <= 0 || subtotal <= 0) return 0;
     final maxDiscount = math.min(cap, (subtotal * percent / 100).roundToDouble());
     final points = math.min(balance.toDouble(), (maxDiscount / rupeesPerPoint).floorToDouble());
     return points <= 0 ? 0 : points * rupeesPerPoint;
+  }
+
+  /// Points used for that discount.
+  int pointsFor(double subtotal) => (discountFor(subtotal) / rupeesPerPoint).round();
+
+  /// Smallest bill on which the whole balance (up to the cap) can be used.
+  double get billForFullUse {
+    if (percent <= 0) return 0;
+    final usable = math.min(balanceValue, cap);
+    return (usable * 100 / percent).ceilToDouble();
+  }
+
+  List<PointsEntry> get activeEarned => history
+      .where((e) => e.earned && !e.expired && e.expiresAt != null)
+      .toList()
+    ..sort((a, b) => a.expiresAt!.compareTo(b.expiresAt!));
+
+  PointsEntry? get nextExpiry => activeEarned.isEmpty ? null : activeEarned.first;
+
+  bool get expirySoon {
+    final n = nextExpiry;
+    return n != null && n.expiresAt!.difference(DateTime.now()).inDays <= 30;
   }
 
   int get totalEarned => history.where((e) => e.earned).fold(0, (s, e) => s + e.points);
