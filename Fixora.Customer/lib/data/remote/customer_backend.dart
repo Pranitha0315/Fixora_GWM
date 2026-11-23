@@ -421,6 +421,7 @@ class CustomerBackend extends ChangeNotifier {
   };
 
   /// Sends the SOS and returns the server receipt (SosReceipt).
+  /// "Delivered" may only be shown after this returns.
   /// Retries with the same idempotency key never create a second request.
   Future<Map<String, dynamic>> raiseSos({
     required String problem,

@@ -59,7 +59,8 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     );
   }
 
-  /// Manager acknowledged / dispatched / resolved: follows the server state live.
+  /// Live hub updates. status: Acknowledged | Dispatched | OnSite | Resolved | Cancelled
+  /// UI: searching → matched → Help is on the way / resolved.
   void _onSosUpdate() {
     final s = CustomerBackend.instance.sos.value;
     if (!mounted || s == null || _receipt == null || s['id'] != _receipt) return;
@@ -104,13 +105,16 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           idempotencyKey: _sosKey,
         );
         if (!mounted) return;
+        final at = DateTime.tryParse((r['receivedAt'] as String?) ?? '')?.toLocal() ?? DateTime.now();
         _sosKey = null;
         setState(() {
           _receipt = r['receiptId'] as String?;
           _state = _SosState.matched;
         });
-        final id = (_receipt ?? '').length >= 8 ? (_receipt!.substring(0, 8).toUpperCase()) : (_receipt ?? '');
-        _snack('Delivered · receipt $id');
+        final receiptShort = (_receipt ?? '').length >= 8
+            ? (_receipt!.substring(0, 8).toUpperCase())
+            : (_receipt ?? '').toUpperCase();
+        _snack('Delivered ${_time12(at)} · receipt $receiptShort');
         return;
       } on ApiException catch (e) {
         if (!e.isNetwork) {
@@ -171,6 +175,13 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     final m = (_escalateSecs ~/ 60).toString().padLeft(2, '0');
     final s = (_escalateSecs % 60).toString().padLeft(2, '0');
     return '$m:$s';
+  }
+
+  String _time12(DateTime d) {
+    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
+    final m = d.minute.toString().padLeft(2, '0');
+    final ap = d.hour >= 12 ? 'PM' : 'AM';
+    return '$h:$m $ap';
   }
 
   @override
@@ -401,8 +412,15 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     );
   }
 
+  /// Finding capable garages... / Waiting for a garage to accept /
+  /// Help is on the way! + matched garages + auto-reassign timer + Cancel SOS
   Widget _active() {
     final searching = _state == _SosState.searching;
+    const matched = [
+      ('Fixora Garage', '2.1 km · ETA 12 min'),
+      ('Peradeniya Motors', '3.4 km · ETA 18 min'),
+      ('Kandy Auto Care', '4.0 km · ETA 22 min'),
+    ];
     return Column(
       key: const ValueKey('active'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -439,7 +457,9 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${_problems[_problem].$2} · location shared with consent',
+                      _accepted >= 0
+                          ? '${matched[0].$1} accepted · arriving soon'
+                          : '${_problems[_problem].$2} · Peradeniya Rd, Kandy',
                       style: TextStyle(color: Colors.white.o(0.88), fontSize: 12.5),
                     ),
                   ],
@@ -449,45 +469,139 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           ),
         ),
         const SizedBox(height: 12),
-        if (_accepted < 0)
-          Text('Auto-reassign in $_countdown', style: AppText.small.copyWith(color: AppColors.warningText)),
-        const SizedBox(height: 10),
-        if (searching)
-          for (var i = 0; i < 2; i++)
-            Container(
-              height: 64,
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
-              child: const Center(child: LinearProgressIndicator(minHeight: 2)),
-            )
-        else
+        if (_offline)
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: _accepted >= 0 ? AppColors.successSoft : AppColors.surface,
+              color: AppColors.surfaceSolid,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _accepted >= 0 ? AppColors.success : AppColors.border),
+              border: Border.all(color: AppColors.border),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.garage_outlined, color: _accepted >= 0 ? AppColors.success : AppColors.link),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  children: [
+                    Icon(Icons.bluetooth_searching_rounded, color: AppColors.link),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text('Bluetooth relay (best-effort)', style: AppText.h3)),
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary.o(0.8)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Looking for nearby phones with Fixora that have internet to pass your SOS on. '
+                  'We also retry by SMS every 30 seconds.',
+                  style: AppText.muted.copyWith(fontSize: 12.5),
+                ),
+                const SizedBox(height: 10),
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() => _offline = false);
+                    _send();
+                  },
+                  icon: const Icon(Icons.wifi_rounded),
+                  label: const Text('I am back online - send now'),
+                ),
+              ],
+            ),
+          )
+        else ...[
+          Row(
+            children: [
+              Expanded(child: Text('Matched garages', style: AppText.h3)),
+              if (_accepted < 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.o(0.12),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Fixora Garage', style: AppText.label),
+                      Icon(Icons.timer_outlined, size: 14, color: AppColors.warning),
+                      const SizedBox(width: 4),
                       Text(
-                        _accepted >= 0 ? 'Accepted · arriving soon' : 'Matched for ${_problems[_problem].$2}',
-                        style: AppText.small,
+                        'Auto-reassign in $_countdown',
+                        style: TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700, fontSize: 11),
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
+            ],
           ),
-        const SizedBox(height: 16),
+          const SizedBox(height: 10),
+          if (searching)
+            for (var i = 0; i < 2; i++)
+              Container(
+                height: 76,
+                margin: const EdgeInsets.only(bottom: 10),
+                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
+                child: const Center(child: LinearProgressIndicator(minHeight: 2)),
+              )
+          else
+            for (var i = 0; i < matched.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _accepted == i ? AppColors.successSoft : AppColors.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: _accepted == i ? AppColors.success : AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.garage_outlined,
+                        color: _accepted == i ? AppColors.success : AppColors.link,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(matched[i].$1, style: AppText.label),
+                            Text(
+                              _accepted == i ? 'Accepted · arriving soon' : matched[i].$2,
+                              style: AppText.small,
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (_accepted == i)
+                        Icon(Icons.check_circle_rounded, color: AppColors.success),
+                    ],
+                  ),
+                ),
+              ),
+        ],
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.warningSoft,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.alarm_rounded, color: AppColors.warning),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'We will remind you in 5 hours to call emergency services if you are still stuck.',
+                  style: AppText.small.copyWith(fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _cancel,
           icon: Icon(_accepted >= 0 ? Icons.check_rounded : Icons.close_rounded),
