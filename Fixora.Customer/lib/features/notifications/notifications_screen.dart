@@ -4,13 +4,17 @@ import '../../core/navigation/nav.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/models.dart';
+import '../../data/repositories/app_state.dart';
 import '../../data/repositories/job_store.dart';
+import '../bookings/book_service_screen.dart';
 import '../bookings/live_queue_screen.dart';
 import '../job/screens/invoice_screen.dart';
 import '../job/screens/job_tracker_screen.dart';
 import '../job/screens/repair_progress_screen.dart';
 import '../job/screens/service_completed_screen.dart';
 import '../job/screens/view_photos_screen.dart';
+import '../plans/offers_plans_screen.dart';
+import '../vehicles/vehicle_detail_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -56,27 +60,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void _open(BuildContext context, AppNotification n) {
     JobStore.instance.markRead(n.id);
     switch (n.kind) {
-      case NotificationKind.estimate: // approval / change
+      case NotificationKind.estimate:
       case NotificationKind.received:
         context.push(const JobTrackerScreen());
-      case NotificationKind.progress: // job progress
+      case NotificationKind.progress:
         context.push(const RepairProgressScreen());
       case NotificationKind.completed:
         context.push(const ServiceCompletedScreen());
       case NotificationKind.media:
         context.push(const ViewPhotosScreen());
+      case NotificationKind.payment:
+        context.push(const InvoiceScreen());
       case NotificationKind.queue:
         context.push(const LiveQueueScreen());
       case NotificationKind.booking:
         NavController.goToTab(context, 1);
-      case NotificationKind.payment:
-        context.push(const InvoiceScreen());
-      case NotificationKind.reminder:
-      case NotificationKind.sos:
       case NotificationKind.serviceDue:
+        context.push(BookServiceScreen(
+          vehicleId: AppState.instance.selectedVehicle.id,
+          service: 'General Service',
+        ));
+      case NotificationKind.reminder:
+        context.push(VehicleDetailScreen(vehicleId: AppState.instance.selectedVehicle.id));
       case NotificationKind.offer:
+        context.push(const OffersPlansScreen());
       case NotificationKind.subscription:
-        break;
+        context.push(const OffersPlansScreen(initialTab: 1));
+      case NotificationKind.sos:
+        break; // no push yet
     }
   }
 

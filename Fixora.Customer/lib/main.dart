@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-//import 'app.dart';
+import 'app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -10,6 +10,6 @@ void main() {
     statusBarIconBrightness: Brightness.dark,
     statusBarBrightness: Brightness.light,
   ));
-  //runApp(const FixoraApp());
+  runApp(const FixoraApp());
 }
 
