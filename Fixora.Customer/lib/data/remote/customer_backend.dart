@@ -210,7 +210,7 @@ class CustomerBackend extends ChangeNotifier {
         'slotStart': slotStart.toUtc().toIso8601String(),
         'notes': notes,
         'promoCode': null,
-        'suggestionId': null,
+        'suggestionId': null, // always null — no suggestion book API call
       },
       headers: {'Idempotency-Key': ApiClient.newIdempotencyKey()},
     );

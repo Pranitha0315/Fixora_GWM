@@ -4,6 +4,7 @@ import '../../core/backend/api_client.dart';
 import '../../core/navigation/nav.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/models.dart';
 import '../../data/models/vehicle.dart';
 import '../../data/remote/customer_backend.dart';
 import '../../data/repositories/app_state.dart';
@@ -17,8 +18,9 @@ class BookServiceScreen extends StatefulWidget {
   final String? service;
   final List<String> symptoms;
   final String? note;
-  final String? garage;
+  final ServiceOffer? offer;
   final DateTime? preferredDate;
+  final String? garage;
 
   const BookServiceScreen({
     super.key,
@@ -26,8 +28,9 @@ class BookServiceScreen extends StatefulWidget {
     this.service,
     this.symptoms = const [],
     this.note,
-    this.garage,
+    this.offer,
     this.preferredDate,
+    this.garage,
   });
 
   @override
@@ -283,6 +286,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
       service: _services[_service].$2,
       date: d,
       symptoms: _picked.toList(),
+      offer: widget.offer == null ? null : '${widget.offer!.percent}% OFF - ${widget.offer!.title}',
       garage: _garage,
     );
     setState(() => _loading = false);
@@ -611,6 +615,8 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                 _kv('Expected duration', service.$3),
                 _kv('Garage', _garage),
                 _kv('Estimated cost', service.$4),
+                if (widget.offer != null && widget.offer!.service == service.$2)
+                  _kv('Offer (${widget.offer!.percent}% OFF)', widget.offer!.title),
                 if (_picked.isNotEmpty) _kv('Symptoms', '${_picked.length} selected'),
               ],
             ),

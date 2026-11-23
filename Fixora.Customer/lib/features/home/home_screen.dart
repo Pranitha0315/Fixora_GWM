@@ -9,8 +9,10 @@ import '../../data/repositories/app_state.dart';
 import '../bookings/book_service_screen.dart';
 import '../bookings/bookings_screen.dart';
 import '../bookings/live_queue_screen.dart';
+import '../diagnosis/instant_diagnosis_screen.dart';
 import '../job/screens/job_tracker_screen.dart';
 import '../notifications/notifications_screen.dart';
+import '../plans/offers_plans_screen.dart';
 import '../profile/profile_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
 import '../vehicles/my_vehicles_screen.dart';
@@ -385,10 +387,10 @@ class _QuickTiles extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <(String, IconData, VoidCallback)>[
-      ('Diagnosis', Icons.health_and_safety_outlined, () => HomeScreen._soon(context, 'Diagnosis')),
+      ('Diagnosis', Icons.health_and_safety_outlined, () => context.push(InstantDiagnosisScreen(vehicleId: vehicle.id))),
       ('History', Icons.manage_history_rounded, () => context.push(ServiceHistoryScreen(vehicleId: vehicle.id))),
-      ('Plans', Icons.workspace_premium_outlined, () => HomeScreen._soon(context, 'Plans')),
-      ('Offers', Icons.local_offer_outlined, () => HomeScreen._soon(context, 'Offers')),
+      ('Plans', Icons.workspace_premium_outlined, () => context.push(const OffersPlansScreen(initialTab: 1))),
+      ('Offers', Icons.local_offer_outlined, () => context.push(const OffersPlansScreen())),
     ];
     return Row(
       children: [

@@ -334,6 +334,7 @@ class AppState extends ChangeNotifier {
     required DateTime date,
     List<String> symptoms = const [],
     String? garage,
+    String? offer,
     BookingState state = BookingState.upcoming,
     String? statusLabel,
     int? queuePosition,
@@ -347,6 +348,7 @@ class AppState extends ChangeNotifier {
       statusLabel: statusLabel ?? 'Confirmed',
       garage: garage ?? 'Fixora Garage',
       symptoms: symptoms,
+      offer: offer,
       queuePosition: queuePosition,
     );
     bookings.insert(0, b);

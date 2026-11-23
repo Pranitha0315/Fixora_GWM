@@ -241,3 +241,21 @@ class Booking {
         offer: offer,
       );
 }
+
+/// Promo / plan offer that can pre-fill Book a Service.
+class ServiceOffer {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String image;
+  final int percent;
+  final String service; // maps to a Book Service type
+  const ServiceOffer({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.image,
+    required this.percent,
+    required this.service,
+  });
+}
