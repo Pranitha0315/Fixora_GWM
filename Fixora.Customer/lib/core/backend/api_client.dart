@@ -76,10 +76,12 @@ class ApiClient {
   /// Dedupes concurrent refresh calls so only one POST /auth/refresh is in flight.
   Future<String?>? _refreshInFlight;
 
+  static final Random _rnd = Random.secure();
+
+  /// Client-generated key that makes a repeated write safe (approvals, SOS, bookings).
   static String newIdempotencyKey() {
-    final r = Random.secure();
-    final bytes = List<int>.generate(16, (_) => r.nextInt(256));
-    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    String hex(int n) => List.generate(n, (_) => _rnd.nextInt(16).toRadixString(16)).join();
+    return '${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}';
   }
 
   Uri _uri(String path) {

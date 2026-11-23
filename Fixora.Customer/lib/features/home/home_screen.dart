@@ -14,6 +14,7 @@ import '../job/screens/job_tracker_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../plans/offers_plans_screen.dart';
 import '../profile/profile_screen.dart';
+import '../sos/sos_screen.dart';
 import '../vehicles/add_vehicle_screen.dart';
 import '../vehicles/my_vehicles_screen.dart';
 import '../vehicles/service_history_screen.dart';
@@ -64,7 +65,7 @@ class HomeScreen extends StatelessWidget {
                         title: 'Roadside\nSOS',
                         icon: Icons.sos_rounded,
                         color: AppColors.dangerSoft,
-                        onTap: () => _soon(context, 'Roadside SOS'),
+                        onTap: () => context.push(const SosScreen()),
                       ),
                     ),
                   ],

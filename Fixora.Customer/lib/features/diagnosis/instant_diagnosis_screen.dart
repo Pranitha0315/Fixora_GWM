@@ -6,6 +6,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/vehicle.dart';
 import '../../data/repositories/app_state.dart';
 import '../bookings/book_service_screen.dart';
+import '../sos/sos_screen.dart';
 
 /// A possible cause with its weight, related service and cost hint.
 class _Cause {
@@ -450,14 +451,7 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
               SizedBox(
                 height: 48,
                 child: FilledButton.icon(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Roadside SOS screen coming soon'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onPressed: () => context.push(const SosScreen()),
                   icon: const Icon(Icons.sos_rounded),
                   label: const Text('Get Roadside Help'),
                   style: FilledButton.styleFrom(
