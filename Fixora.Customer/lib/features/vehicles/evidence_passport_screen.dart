@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
-import '../../data/models/models.dart';
-import '../../data/models/vehicle.dart';
-import '../../data/repositories/app_state.dart';
+import '../../core/core.dart';
 
 String passportLabel(PassportStatus s) {
   switch (s) {
@@ -46,36 +42,25 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final all = AppState.instance.passportFor(widget.vehicle.id);
+    final all = MockData.passport[widget.vehicle.id] ?? const <PassportEntry>[];
     final open = all
         .where((e) => e.status == PassportStatus.unresolved || e.status == PassportStatus.stillUnresolved)
         .toList();
     final closed = all.where((e) => !open.contains(e)).toList();
     final list = [all, open, closed][_filter];
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('Evidence Passport'),
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.navy,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
-          Text('${widget.vehicle.name} · ${widget.vehicle.plate}', style: AppText.muted),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF7B5CFF), Color(0xFF4F3BD6)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(22),
+    return FxPage(
+      title: 'Evidence Passport',
+      subtitle: '${widget.vehicle.name} · ${widget.vehicle.plate}',
+      children: [
+        FadeSlide(
+          child: FxCard(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF7B5CFF), Color(0xFF4F3BD6)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderColor: Colors.transparent,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -92,10 +77,8 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
                     ),
                     const SizedBox(width: 12),
                     const Expanded(
-                      child: Text(
-                        'Your car remembers what was suspected',
-                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
-                      ),
+                      child: Text('Your car remembers what was suspected',
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
                     ),
                   ],
                 ),
@@ -116,69 +99,38 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
               ],
             ),
           ),
-          const SizedBox(height: 14),
-          // All / Open / Closed filters
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final e in [
-                  (0, 'All (${all.length})'),
-                  (1, 'Open (${open.length})'),
-                  (2, 'Closed (${closed.length})'),
-                ])
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(e.$2),
-                      selected: _filter == e.$1,
-                      onSelected: (_) => setState(() => _filter = e.$1),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          for (final entry in list)
-            Padding(
+        ),
+        const SizedBox(height: 14),
+        FxChipTabs(
+          labels: ['All (${all.length})', 'Open (${open.length})', 'Closed (${closed.length})'],
+          index: _filter,
+          onChanged: (i) => setState(() => _filter = i),
+        ),
+        const SizedBox(height: 12),
+        for (var i = 0; i < list.length; i++)
+          FadeSlide(
+            index: i,
+            child: Padding(
               padding: const EdgeInsets.only(bottom: 10),
-              child: _EntryCard(entry: entry),
-            ),
-          if (list.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40),
-              child: Center(child: Text('Nothing here.', style: AppText.muted)),
-            ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 52,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFF8B6DFF), Color(0xFF4F3BD6)]),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: FilledButton.icon(
-                // Share Passport by QR
-                onPressed: () => _share(context),
-                icon: const Icon(Icons.qr_code_2_rounded),
-                label: const Text('Share Passport by QR'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
-              ),
+              child: _EntryCard(entry: list[i]),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'You decide who sees it. Links expire automatically.',
-            textAlign: TextAlign.center,
-            style: AppText.small,
+        if (list.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(child: Text('Nothing here.', style: AppText.muted)),
           ),
-        ],
-      ),
+        const SizedBox(height: 8),
+        PrimaryButton(
+          label: 'Share Passport by QR',
+          icon: Icons.qr_code_2_rounded,
+          gradient: const LinearGradient(colors: [Color(0xFF8B6DFF), Color(0xFF4F3BD6)]),
+          onPressed: () => _share(context),
+        ),
+        const SizedBox(height: 8),
+        Text('You decide who sees it. Links expire automatically.',
+            textAlign: TextAlign.center, style: AppText.small),
+      ],
     );
   }
 
@@ -203,7 +155,7 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
     var includeClosed = false;
     var includePhotos = true;
     var expiry = 1;
-    showModalBottomSheet<void>(
+    showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -211,7 +163,7 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
         builder: (ctx, setSheet) => Container(
           margin: const EdgeInsets.all(12),
           padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(color: AppColors.surfaceSolid, borderRadius: BorderRadius.circular(26)),
+          decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(26)),
           child: SafeArea(
             top: false,
             child: Column(
@@ -223,26 +175,16 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
                 Text('Show this QR to any garage. They see only what you allow.', style: AppText.muted),
                 const SizedBox(height: 16),
                 Center(
+                  // White tile in both themes so the QR stays sharp in dark mode.
                   child: Container(
-                    width: 190,
-                    height: 190,
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(22),
-                      border: Border.all(color: AppColors.border),
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.qr_code_2_rounded, size: 96, color: AppColors.navy),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${widget.vehicle.plate}-$includeClosed-$includePhotos-$expiry',
-                          textAlign: TextAlign.center,
-                          style: AppText.small.copyWith(fontSize: 10),
-                        ),
-                      ],
+                    child: DemoQr(
+                      data: '${widget.vehicle.plate}-$includeClosed-$includePhotos-$expiry',
+                      size: 190,
                     ),
                   ),
                 ),
@@ -264,37 +206,19 @@ class _EvidencePassportScreenState extends State<EvidencePassportScreen> {
                 const SizedBox(height: 6),
                 Text('Link expires in', style: AppText.label),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    for (final e in const [(0, '1 hour'), (1, '24 hours'), (2, '7 days')])
-                      ChoiceChip(
-                        label: Text(e.$2),
-                        selected: expiry == e.$1,
-                        onSelected: (_) => setSheet(() => expiry = e.$1),
-                      ),
-                  ],
+                FxChipTabs(
+                  labels: const ['1 hour', '24 hours', '7 days'],
+                  index: expiry,
+                  onChanged: (i) => setSheet(() => expiry = i),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  height: 50,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Passport shared. You can stop sharing anytime.'),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.check_rounded),
-                    label: const Text('Done'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    ),
-                  ),
+                PrimaryButton(
+                  label: 'Done',
+                  icon: Icons.check_rounded,
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    showFxSnack(context, 'Passport shared. You can stop sharing anytime.');
+                  },
                 ),
               ],
             ),
@@ -312,13 +236,9 @@ class _EntryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = passportColor(entry.status);
-    return Container(
+    return FxCard(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceSolid,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.border),
-      ),
+      shadow: false,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -337,18 +257,7 @@ class _EntryCard extends StatelessWidget {
                   children: [
                     Expanded(child: Text(entry.title, style: AppText.h3.copyWith(fontSize: 14.5))),
                     const SizedBox(width: 8),
-                    // Confirmed · Ruled Out · Unresolved statuses
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: color.o(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        passportLabel(entry.status),
-                        style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 11.5),
-                      ),
-                    ),
+                    StatusPill(passportLabel(entry.status), color: color),
                   ],
                 ),
                 const SizedBox(height: 4),
