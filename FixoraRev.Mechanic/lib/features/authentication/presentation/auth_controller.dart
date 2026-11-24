@@ -14,6 +14,15 @@ class AuthController extends ChangeNotifier {
   MechanicUser? get user => _user;
   bool get isLoggedIn => _user != null;
 
+  bool _onDuty = true;
+  bool get onDuty => _onDuty;
+
+  void setOnDuty(bool value) {
+    if (_onDuty == value) return;
+    _onDuty = value;
+    notifyListeners();
+  }
+
   Future<void> restore() async {
     _user = await _repo.loadUser();
     notifyListeners();

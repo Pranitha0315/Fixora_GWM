@@ -1,5 +1,8 @@
 import '../../features/authentication/presentation/auth_controller.dart';
+import '../../features/jobs/presentation/job_controller.dart';
+import '../../features/notifications/presentation/notifications_controller.dart';
 import '../../features/quick_login/data/quick_login_store.dart';
+import '../../features/sos/presentation/sos_controller.dart';
 import '../backend/api_client.dart';
 import '../backend/mechanic_backend.dart';
 
@@ -9,6 +12,10 @@ class AppServices {
 
   static final AuthController auth = AuthController();
   static final QuickLoginStore quickLogin = QuickLoginStore();
+  static final JobController jobs = JobController();
+  static final NotificationsController notifications =
+      NotificationsController();
+  static final SosController sos = SosController();
 
   static ApiClient get api => MechanicBackend.instance.api;
 
@@ -16,6 +23,7 @@ class AppServices {
     await MechanicBackend.instance.bootstrap();
     await auth.restore();
     await quickLogin.load();
+    sos.seedDemo();
 
     if (api.signedIn && !auth.isLoggedIn) {
       final session = api.session;
