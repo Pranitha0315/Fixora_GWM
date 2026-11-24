@@ -1,11 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/navigation/nav.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
-import '../../data/models/models.dart';
-import '../../data/repositories/app_state.dart';
-import '../../data/repositories/job_store.dart';
+import '../../core/core.dart';
 import '../bookings/book_service_screen.dart';
 import '../bookings/live_queue_screen.dart';
 import '../job/screens/invoice_screen.dart';
@@ -76,10 +71,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationKind.booking:
         NavController.goToTab(context, 1);
       case NotificationKind.serviceDue:
-        context.push(BookServiceScreen(
-          vehicleId: AppState.instance.selectedVehicle.id,
-          service: 'General Service',
-        ));
+        context.push(const BookServiceScreen(vehicleId: 'v1', service: 'General Service'));
       case NotificationKind.reminder:
         context.push(VehicleDetailScreen(vehicleId: AppState.instance.selectedVehicle.id));
       case NotificationKind.offer:
@@ -87,7 +79,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationKind.subscription:
         context.push(const OffersPlansScreen(initialTab: 1));
       case NotificationKind.sos:
-        break; // no push yet
+        break;
     }
   }
 
@@ -97,16 +89,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (d.inMinutes < 1) return 'Just now';
     if (d.inMinutes < 60) return '${d.inMinutes} min ago';
     final today = DateTime(now.year, now.month, now.day);
-    if (!t.isBefore(today)) {
-      final h = t.hour % 12 == 0 ? 12 : t.hour % 12;
-      final m = t.minute.toString().padLeft(2, '0');
-      final ap = t.hour >= 12 ? 'PM' : 'AM';
-      return 'Today, $h:$m $ap';
-    }
+    if (!t.isBefore(today)) return 'Today, ${time12(t)}';
     if (!t.isBefore(today.subtract(const Duration(days: 1)))) return 'Yesterday';
     final days = today.difference(DateTime(t.year, t.month, t.day)).inDays;
     if (days < 7) return '$days days ago';
-    return '${t.day}/${t.month}/${t.year}';
+    return dayMonthYear(t);
   }
 
   @override
@@ -123,108 +110,84 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           _ => all,
         };
         final unread = store.unreadCount;
-        return Scaffold(
-          backgroundColor: AppColors.bg,
-          appBar: AppBar(
-            title: const Text('Notifications'),
-            backgroundColor: AppColors.bg,
-            foregroundColor: AppColors.navy,
-            elevation: 0,
-            actions: [
-              if (unread > 0)
-                TextButton(
-                  onPressed: store.markAllRead,
-                  child: const Text('Mark all read'),
+        return FxPage(
+          title: 'Notifications',
+          subtitle: 'Stay updated with your vehicle and service alerts',
+          headerIcon: Icons.notifications_none_rounded,
+          headerBadge: unread > 0,
+          showBack: false,
+          children: [
+            FxPillTabs(
+              labels: const ['All', 'Unread', 'Service', 'Offer'],
+              index: _tab,
+              onChanged: (i) => setState(() => _tab = i),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: unread == 0
+                    ? null
+                    : () {
+                        store.markAllRead();
+                        showFxSnack(context, 'All notifications marked as read', icon: Icons.done_all_rounded);
+                      },
+                icon: const Icon(Icons.done_all_rounded, size: 19),
+                label: const Text('Mark all as read', style: TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+            if (list.isEmpty)
+              EmptyState(
+                icon: _tab == 1 ? Icons.mark_email_read_outlined : Icons.notifications_off_outlined,
+                title: _tab == 1 ? 'You are all caught up' : 'No notifications here',
+                message: _tab == 3 ? 'New offers will appear here.' : 'Service updates will appear here.',
+              ),
+            for (var i = 0; i < list.length; i++)
+              FadeSlide(
+                index: i,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Dismissible(
+                    key: ValueKey(list[i].id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 22),
+                      decoration: BoxDecoration(
+                        color: AppColors.dangerSoft,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                    ),
+                    onDismissed: (_) {
+                      final removed = list[i];
+                      store.remove(removed.id);
+                      ScaffoldMessenger.of(context)
+                        ..hideCurrentSnackBar()
+                        ..showSnackBar(SnackBar(
+                          behavior: SnackBarBehavior.floating,
+                          content: const Text('Notification deleted'),
+                          action: SnackBarAction(
+                            label: 'UNDO',
+                            onPressed: () => store.push(removed),
+                          ),
+                        ));
+                    },
+                    child: _NotificationCard(
+                      n: list[i],
+                      icon: iconFor(list[i].kind),
+                      time: _ago(list[i].time),
+                      onTap: () => _open(context, list[i]),
+                    ),
+                  ),
                 ),
-            ],
-          ),
-          body: Column(
-            children: [
+              ),
+            if (list.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text(
-                  'Stay updated with your vehicle and service alerts',
-                  style: AppText.muted,
-                ),
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('Swipe left to delete a notification',
+                    textAlign: TextAlign.center, style: AppText.small.copyWith(color: AppColors.textFaint)),
               ),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    for (final e in const [
-                      (0, 'All'),
-                      (1, 'Unread'),
-                      (2, 'Service'),
-                      (3, 'Offer'),
-                    ])
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(e.$2),
-                          selected: _tab == e.$1,
-                          onSelected: (_) => setState(() => _tab = e.$1),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              Expanded(
-                child: list.isEmpty
-                    ? Center(
-                        child: Text(
-                          _tab == 1 ? 'You are all caught up' : 'No notifications here',
-                          style: AppText.muted,
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                        itemCount: list.length,
-                        itemBuilder: (context, i) {
-                          final n = list[i];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Dismissible(
-                              key: ValueKey(n.id),
-                              direction: DismissDirection.endToStart,
-                              background: Container(
-                                alignment: Alignment.centerRight,
-                                padding: const EdgeInsets.only(right: 22),
-                                decoration: BoxDecoration(
-                                  color: AppColors.dangerSoft,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
-                              ),
-                              onDismissed: (_) {
-                                store.remove(n.id);
-                                ScaffoldMessenger.of(context)
-                                  ..hideCurrentSnackBar()
-                                  ..showSnackBar(
-                                    SnackBar(
-                                      behavior: SnackBarBehavior.floating,
-                                      content: const Text('Notification deleted'),
-                                      action: SnackBarAction(
-                                        label: 'UNDO',
-                                        onPressed: () => store.push(n),
-                                      ),
-                                    ),
-                                  );
-                              },
-                              child: _NotificationCard(
-                                n: n,
-                                icon: iconFor(n.kind),
-                                time: _ago(n.time),
-                                onTap: () => _open(context, n),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
+          ],
         );
       },
     );
@@ -236,88 +199,67 @@ class _NotificationCard extends StatelessWidget {
   final IconData icon;
   final String time;
   final VoidCallback onTap;
-  const _NotificationCard({
-    required this.n,
-    required this.icon,
-    required this.time,
-    required this.onTap,
-  });
+  const _NotificationCard({required this.n, required this.icon, required this.time, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final green = n.kind == NotificationKind.completed;
-    return Material(
-      color: AppColors.surfaceSolid,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
-            boxShadow: n.unread ? AppColors.float : null,
+    return FxCard(
+      padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+      radius: 20,
+      onTap: onTap,
+      shadow: n.unread,
+      child: Row(
+        children: [
+          SizedBox(
+            width: 12,
+            child: n.unread
+                ? Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                  )
+                : null,
           ),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 12,
-                child: n.unread
-                    ? Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-                      )
-                    : null,
-              ),
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: green ? AppColors.successSoft : AppColors.primarySoft,
-                ),
-                child: Icon(icon, color: green ? AppColors.success : AppColors.primary, size: 26),
-              ),
-              Container(
-                width: 1.2,
-                height: 42,
-                margin: const EdgeInsets.symmetric(horizontal: 10),
-                color: AppColors.border,
-              ),
-              Expanded(
-                child: Column(
+          Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: green ? AppColors.successSoft : AppColors.primarySoft,
+            ),
+            child: Icon(icon, color: green ? AppColors.success : AppColors.primary, size: 26),
+          ),
+          Container(width: 1.2, height: 42, margin: const EdgeInsets.symmetric(horizontal: 10), color: AppColors.border),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            n.title,
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: n.unread ? FontWeight.w800 : FontWeight.w700,
-                              color: AppColors.navy,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(time, style: AppText.small.copyWith(fontSize: 11)),
-                      ],
+                    Expanded(
+                      child: Text(n.title,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: n.unread ? FontWeight.w800 : FontWeight.w700,
+                            color: AppColors.navy,
+                          )),
                     ),
-                    const SizedBox(height: 3),
-                    Text(n.body, style: AppText.muted.copyWith(fontSize: 13, color: AppColors.text)),
+                    const SizedBox(width: 6),
+                    Text(time, style: AppText.small.copyWith(fontSize: 11)),
                   ],
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right_rounded, color: AppColors.navy),
-            ],
+                const SizedBox(height: 3),
+                Text(n.body, style: AppText.muted.copyWith(fontSize: 13, color: AppColors.text)),
+              ],
+            ),
           ),
-        ),
+          const SizedBox(width: 4),
+          Icon(Icons.chevron_right_rounded, color: AppColors.navy),
+        ],
       ),
     );
   }
 }
+
