@@ -10,7 +10,7 @@
   min-height: 64px;
   padding: 12px 24px;
   box-sizing: border-box;
-  background: #ffffff;
+  background: var(--fx-color-surface);
 }
 
 .workspace {
@@ -21,13 +21,13 @@
 }
 
 .workspace-title {
-  color: #104e56;
+  color: var(--fx-color-primary);
   font-size: 17px;
   font-weight: 700;
 }
 
 .workspace-subtitle {
-  color: #64748b;
+  color: var(--fx-color-text-muted);
   font-size: 12px;
 }
 
@@ -44,24 +44,24 @@
   width: 40px;
   height: 40px;
   border-radius: 10px;
-  color: #104e56;
-  background: #edf6f6;
+  color: var(--fx-color-primary);
+  background: var(--fx-color-primary-light);
   text-decoration: none;
 }
 
 .notification-link:hover {
-  background: #d8eeee;
+  background: var(--fx-color-primary-light);
 }
 
 .notification-link:focus-visible {
-  outline: 2px solid #104e56;
+  outline: 2px solid var(--fx-color-focus);
   outline-offset: 3px;
 }
 
 .account-divider {
   width: 1px;
   height: 36px;
-  background: #e2e8f0;
+  background: var(--fx-color-border);
 }
 
 .account {
@@ -77,8 +77,8 @@
   height: 40px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #104e56;
-  color: #ffffff;
+  background: var(--fx-color-primary);
+  color: var(--fx-color-text-inverse);
   font-size: 15px;
   font-weight: 600;
 }
@@ -90,13 +90,13 @@
 }
 
 .account-name {
-  color: #104e56;
+  color: var(--fx-color-primary);
   font-size: 13px;
   font-weight: 600;
 }
 
 .account-role {
-  color: #64748b;
+  color: var(--fx-color-text-muted);
   font-size: 11px;
 }
 
@@ -122,4 +122,77 @@
   .account-divider {
     display: none;
   }
+}
+
+/* FIXORA Topbar Light/Dark Theme Toggle */
+.theme-toggle {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--fx-color-border);
+  border-radius: 10px;
+  background: var(--fx-color-primary-light);
+  color: var(--fx-color-primary);
+  cursor: pointer;
+  transition:
+    background-color var(--fx-transition-fast),
+    border-color var(--fx-transition-fast),
+    color var(--fx-transition-fast);
+}
+
+.theme-toggle:hover {
+  border-color: var(--fx-color-secondary);
+  background: var(--fx-color-primary-light);
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--fx-color-focus);
+  outline-offset: 3px;
+}
+
+.theme-toggle svg {
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle {
+    transition: none;
+  }
+}
+/* FIXORA Authentication Logout */
+.logout-button {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid var(--fx-color-border);
+  border-radius: 10px;
+  background: var(--fx-color-surface);
+  color: var(--fx-color-primary);
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background: var(--fx-color-primary-light);
+}
+
+.logout-button:focus-visible {
+  outline: 2px solid var(--fx-color-focus);
+  outline-offset: 3px;
+}
+
+.logout-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.logout-feedback {
+  margin: 8px 24px;
+  font-size: 12px;
+  color: var(--fx-color-text-muted);
 }

@@ -1,1 +1,317 @@
-<p>login works!</p>
+<main class="login-page" [class.dark-theme]="isDarkMode()">
+
+    <!-- LIGHT / DARK THEME SWITCH -->
+    <div class="theme-switch" role="group" aria-label="Appearance theme">
+        <button type="button"
+                class="theme-option"
+                [class.active]="!isDarkMode()"
+                [attr.aria-pressed]="!isDarkMode()"
+                aria-label="Light theme"
+                (click)="setTheme(false)">
+            <svg viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="4"/>
+                <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"/>
+            </svg>
+        </button>
+
+        <button type="button"
+                class="theme-option"
+                [class.active]="isDarkMode()"
+                [attr.aria-pressed]="isDarkMode()"
+                aria-label="Dark theme"
+                (click)="setTheme(true)">
+            <svg viewBox="0 0 24 24" fill="currentColor"
+                 aria-hidden="true">
+                <path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5 8.5 8.5 0 1 0 20.5 14.2Z"/>
+            </svg>
+        </button>
+    </div>
+    <div class="login-shell">
+
+        <!-- FIXORA HEADER -->
+        <header class="login-header">
+            <div class="brand">
+                <div class="brand-icon" aria-hidden="true">F</div>
+
+                <div class="brand-text">
+                    <strong>FIXORA</strong>
+                    <small>Smart Garage Management</small>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <div class="login-content">
+
+            <!-- WORKSHOP HERO -->
+            <section class="workshop-hero" aria-labelledby="hero-title">
+                <div class="hero-content">
+
+                    <p class="hero-eyebrow">SMART GARAGE MANAGEMENT</p>
+
+                    <h1 id="hero-title">
+                        Drive with
+                        <span>Confidence</span>
+                    </h1>
+
+                    <p class="hero-description">
+                        Manage your garage with smart tools,
+                        better insights and total control.
+                    </p>
+
+                    <!-- DESIGN A: FEATURE PILLS -->
+                    <div class="feature-grid" aria-label="FIXORA workshop features">
+
+                        <!-- Easy Bookings -->
+                        <div class="feature-card">
+                            <span class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="5" width="18" height="16" rx="2" />
+                                    <path d="M7 3v4M17 3v4M3 10h18M8 15l2.5 2.5L16 13" />
+                                </svg>
+                            </span>
+                            <span>Easy Bookings</span>
+                        </div>
+
+                        <!-- Repair Tracking -->
+                        <div class="feature-card">
+                            <span class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M14.7 6.3a5 5 0 0 0-6.4 6.4L3 11.6a2 2 0 0 0 2.8 2.8l5.3-5.3a5 5 0 0 0 6.4-6.4l-3 3-3-1 1-3z" />
+                                </svg>
+                            </span>
+                            <span>Repair Tracking</span>
+                        </div>
+
+                        <!-- Smart Analytics -->
+                        <div class="feature-card">
+                            <span class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 20V12M10 20V8M16 20V14M22 20V4" />
+                                    <path d="M3 5l6 3 5-4 7 2" />
+                                </svg>
+                            </span>
+                            <span>Smart Analytics</span>
+                        </div>
+
+                        <!-- Operations -->
+                        <div class="feature-card">
+                            <span class="feature-icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="3" />
+                                    <path
+                                        d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2 2-.06-.06A1.7 1.7 0 0 0 15.9 18.5a1.7 1.7 0 0 0-1.2 1.6V21h-5.4v-.9a1.7 1.7 0 0 0-1.2-1.6 1.7 1.7 0 0 0-1.84.38l-.06.06-2-2 .06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.6-1.2H2v-3.6h1a1.7 1.7 0 0 0 1.6-1.2 1.7 1.7 0 0 0-.34-1.88L4.2 7.06l2-2 .06.06A1.7 1.7 0 0 0 8.1 5.5a1.7 1.7 0 0 0 1.2-1.6V3h5.4v.9a1.7 1.7 0 0 0 1.2 1.6 1.7 1.7 0 0 0 1.84-.38l.06-.06 2 2-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.6 1.2h1v3.6h-1a1.7 1.7 0 0 0-1.6 1.2z" />
+                                </svg>
+                            </span>
+                            <span>Operations</span>
+                        </div>
+
+                    </div>
+                    <!-- END FEATURE PILLS -->
+
+                </div>
+            </section>
+            <!-- END WORKSHOP HERO -->
+
+            <!-- LOGIN PANEL -->
+            <section class="login-panel" aria-labelledby="login-title">
+                <div class="login-card">
+
+                    <div class="login-card-brand">
+                        <div class="login-card-logo garage-shield-logo" aria-hidden="true">
+    <svg viewBox="0 0 64 64" fill="none"
+         xmlns="http://www.w3.org/2000/svg">
+        <path d="M32 4L55 12V30C55 45 45 54 32 60C19 54 9 45 9 30V12L32 4Z"
+              fill="#E5FAFD" stroke="#007E91" stroke-width="3"/>
+        <path d="M18 34L22 24H42L46 34"
+              stroke="#006E80" stroke-width="3"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18 34H46V43H18V34Z"
+              fill="#00B9C9" stroke="#006E80" stroke-width="2"/>
+        <circle cx="24" cy="43" r="3" fill="#063B4C"/>
+        <circle cx="40" cy="43" r="3" fill="#063B4C"/>
+        <path d="M25 24L28 19H36L39 24"
+              stroke="#006E80" stroke-width="2"/>
+        <circle cx="32" cy="34" r="5"
+                fill="#FFFFFF" stroke="#006E80" stroke-width="2"/>
+        <path d="M32 27V41M25 34H39"
+              stroke="#006E80" stroke-width="1.5"/>
+    </svg>
+</div>
+                        <strong>FIXORA</strong>
+                        <span>MANAGER PORTAL</span>
+                    </div>
+
+                    <h2 id="login-title">Welcome Back!</h2>
+
+                    <p class="login-subtitle">
+                        Sign in to continue to your dashboard.
+                    </p>
+
+                    <!-- LOGIN FORM -->
+                    <form class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
+
+                        <!-- EMAIL -->
+                        <div class="form-field">
+                            <label for="email">Email address</label>
+
+                            <div class="input-with-icon">
+                                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.8" aria-hidden="true">
+                                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                                    <path d="m3 7 9 6 9-6" />
+                                </svg>
+
+                                <input id="email" type="email" formControlName="email"
+                                    placeholder="Enter your email address" autocomplete="username" [attr.aria-invalid]="loginForm.controls.email.invalid &&
+                    (loginForm.controls.email.touched || submitted())" />
+                            </div>
+
+                            @if (
+                            loginForm.controls.email.invalid &&
+                            (loginForm.controls.email.touched || submitted())
+                            ) {
+                            <small class="field-error">
+                                Enter a valid email address.
+                            </small>
+                            }
+                        </div>
+
+                        <!-- PASSWORD -->
+                        <div class="form-field">
+                            <label for="password">Password</label>
+
+                            <div class="input-with-icon">
+                                <svg class="field-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.8" aria-hidden="true">
+                                    <rect x="5" y="10" width="14" height="11" rx="2" />
+                                    <path d="M8 10V7a4 4 0 0 1 8 0v3" />
+                                </svg>
+
+                                <input id="password" [type]="showPassword() ? 'text' : 'password'"
+                                    formControlName="password" placeholder="Enter your password"
+                                    autocomplete="current-password" [attr.aria-invalid]="loginForm.controls.password.invalid &&
+                    (loginForm.controls.password.touched || submitted())" />
+
+                                <button class="password-toggle" type="button" (click)="togglePassword()"
+                                    [attr.aria-label]="showPassword()
+                    ? 'Hide password'
+                    : 'Show password'" [attr.aria-pressed]="showPassword()">
+                                    @if (showPassword()) {
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                        aria-hidden="true">
+                                        <path d="M3 3l18 18" />
+                                        <path d="M10.6 5.2A10.8 10.8 0 0 1 12 5c5 0 9 7 9 7a16 16 0 0 1-3 3.6" />
+                                        <path d="M6.4 6.4C3.9 8 3 12 3 12s4 7 9 7c1.3 0 2.6-.4 3.7-1" />
+                                    </svg>
+                                    } @else {
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                        aria-hidden="true">
+                                        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
+                                    }
+                                </button>
+                            </div>
+
+                            @if (
+                            loginForm.controls.password.invalid &&
+                            (loginForm.controls.password.touched || submitted())
+                            ) {
+                            <small class="field-error">
+                                Password is required.
+                            </small>
+                            }
+                        </div>
+
+                        <!-- REMEMBER ME + PASSWORD RECOVERY -->
+                        <div class="login-options">
+                            <label class="remember-me">
+                                <input type="checkbox" formControlName="rememberMe" />
+                                <span title="Persistent sessions are not yet supported">Remember Me</span>
+                            </label>
+                            <span class="forgot-password">Forgot Password?</span>
+                        </div>
+
+                        <!-- SIGN IN -->
+                        <button class="login-button" type="submit" [disabled]="loginForm.invalid || isLoading()" [attr.aria-busy]="isLoading()">
+                            <span>{{ isLoading() ? 'Signing in...' : 'Sign In' }}</span>
+                            <span class="signin-arrow" aria-hidden="true">➜</span>
+                        </button>
+
+                        @if (loginMessage()) {
+                        <p class="login-feedback" role="status">
+                            {{ loginMessage() }}
+                        </p>
+                        }
+
+                    </form>
+
+                    <!-- ALTERNATIVE SIGN IN -->
+                    <div class="login-divider"><span>or</span></div>
+
+                    <button class="google-login-button" type="button" disabled
+                        title="Google sign-in integration is pending">
+                        <svg class="google-g" width="20" height="20"
+     viewBox="0 0 48 48" aria-hidden="true"
+     xmlns="http://www.w3.org/2000/svg">
+    <path fill="#EA4335"
+          d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+    <path fill="#4285F4"
+          d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.27 5.48-4.8 7.18l7.73 6C44.38 38.03 46.98 31.87 46.98 24.55z"/>
+    <path fill="#FBBC05"
+          d="M10.53 28.59A14.41 14.41 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.2A23.9 23.9 0 0 0 0 24c0 3.87.93 7.51 2.56 10.78l7.97-6.19z"/>
+    <path fill="#34A853"
+          d="M24 48c6.48 0 11.93-2.13 15.91-5.8l-7.73-6c-2.15 1.45-4.92 2.3-8.18 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.97 6.19C6.51 42.62 14.62 48 24 48z"/>
+</svg>
+                        <span>Continue with Google</span>
+                    </button>
+                    <!-- SECURITY NOTE -->
+                    <div class="security-note">
+                        <svg viewBox="0 0 24 24"
+    width="20" height="20"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.8"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/>
+    <path d="m9 12 2 2 4-4"/>
+</svg>
+                        Secure access for authorized owners and managers.
+                    </div>
+
+                </div>
+            </section>
+            <!-- END LOGIN PANEL -->
+
+        </div>
+        <!-- END MAIN CONTENT -->
+
+        <!-- FIXORA AUTOMOTIVE TECH FOOTER -->
+<footer class="login-footer fixora-tech-footer">
+    <div class="tech-footer-brand">
+        <strong>FIXORA</strong>
+        <span>Your Trusted Garage Management Partner</span>
+    </div>
+
+    <div class="tech-footer-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z"/>
+            <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06A1.7 1.7 0 0 0 16 18.4a1.7 1.7 0 0 0-1 1.56V21h-3v-1.04A1.7 1.7 0 0 0 10.5 18.4a1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.1 15a1.7 1.7 0 0 0-1.56-1H4.5v-3h1.04A1.7 1.7 0 0 0 7.1 9.5a1.7 1.7 0 0 0-.34-1.88L6.7 7.56l1.9-1.9.06.06A1.7 1.7 0 0 0 10.5 6.1 1.7 1.7 0 0 0 12 4.54V3.5h3v1.04A1.7 1.7 0 0 0 16.5 6.1a1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06A1.7 1.7 0 0 0 19.9 9.5a1.7 1.7 0 0 0 1.56 1H22.5v3h-1.04A1.7 1.7 0 0 0 19.4 15Z"/>
+        </svg>
+    </div>
+</footer>
+
+    </div>
+</main>
