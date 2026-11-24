@@ -63,18 +63,14 @@ class Session {
 /// JSON client for /api/v1. Short-lived JWT + rotating refresh token, refreshed once on 401.
 /// Tokens are kept in shared_preferences for the demo; use flutter_secure_storage for release builds.
 class ApiClient {
-  ApiClient._();
-  static final ApiClient instance = ApiClient._();
+  ApiClient(this._storageKey);
 
-  static const _sessionKey = 'fixora.session';
-
+  final String _storageKey;
   final http.Client _http = http.Client();
   Session? session;
+  Future<String?>? _refreshing;
 
   bool get signedIn => session != null;
-
-  /// Dedupes concurrent refresh calls so only one POST /auth/refresh is in flight.
-  Future<String?>? _refreshInFlight;
 
   static final Random _rnd = Random.secure();
 
@@ -84,223 +80,138 @@ class ApiClient {
     return '${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}';
   }
 
-  Uri _uri(String path) {
-    final base = FixoraConfig.apiV1;
-    final cleaned = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$base$cleaned');
-  }
-
   Future<void> restore() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_sessionKey);
-    if (raw == null || raw.isEmpty) {
-      session = null;
-      return;
-    }
+    final raw = prefs.getString(_storageKey);
+    if (raw == null) return;
     try {
       session = Session.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       session = null;
-      await prefs.remove(_sessionKey);
     }
   }
 
   Future<void> saveSession(Map<String, dynamic> tokens) async {
     session = Session.fromJson(tokens);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_sessionKey, jsonEncode(session!.toJson()));
+    await prefs.setString(_storageKey, jsonEncode(session!.toJson()));
   }
 
   Future<void> clear() async {
     session = null;
-    _refreshInFlight = null;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_sessionKey);
+    await prefs.remove(_storageKey);
   }
 
-  /// Returns a usable access token, refreshing if it expires within 60 seconds.
+  /// A token that is valid for at least another minute (refreshing first when needed).
   Future<String?> freshToken() async {
     final s = session;
     if (s == null) return null;
-    final remaining = s.accessTokenExpiresAt.difference(DateTime.now());
-    if (remaining > const Duration(seconds: 60)) return s.accessToken;
+    if (s.accessTokenExpiresAt.difference(DateTime.now().toUtc()).inSeconds > 60) return s.accessToken;
     return refresh();
   }
 
-  /// POST /auth/refresh with the current refresh token (single in-flight).
   Future<String?> refresh() {
-    final existing = _refreshInFlight;
-    if (existing != null) return existing;
-
-    final future = _doRefresh();
-    _refreshInFlight = future.whenComplete(() => _refreshInFlight = null);
-    return _refreshInFlight!;
+    final s = session;
+    if (s == null) return Future<String?>.value(null);
+    return _refreshing ??= _doRefresh(s.refreshToken);
   }
 
-  Future<String?> _doRefresh() async {
-    final s = session;
-    if (s == null) return null;
+  Future<String?> _doRefresh(String refreshToken) async {
     try {
-      final res = await _http
-          .post(
-            _uri('/auth/refresh'),
-            headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
-            body: jsonEncode({'refreshToken': s.refreshToken}),
-          )
-          .timeout(const Duration(seconds: 20));
-
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        await clear();
-        return null;
-      }
-      final body = jsonDecode(res.body);
-      if (body is! Map<String, dynamic>) {
-        await clear();
-        return null;
-      }
-      await saveSession(body);
-      return session?.accessToken;
+      final j = await _send('POST', '/auth/refresh', body: {'refreshToken': refreshToken}, retry: false, auth: false);
+      await saveSession(j as Map<String, dynamic>);
+      return session!.accessToken;
     } catch (_) {
       await clear();
       return null;
+    } finally {
+      _refreshing = null;
     }
   }
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, String>? query}) async {
-    final r = await _send('GET', path, query: query);
-    if (r is Map<String, dynamic>) return r;
-    return <String, dynamic>{};
-  }
-
-  Future<List<dynamic>> getList(String path, {Map<String, String>? query}) async {
-    final r = await _send('GET', path, query: query);
-    if (r is List) return r;
-    if (r is Map<String, dynamic>) {
-      return (r['items'] as List<dynamic>?) ??
-          (r['services'] as List<dynamic>?) ??
-          const [];
+  Future<void> logout() async {
+    final s = session;
+    if (s != null) {
+      try {
+        await _send('POST', '/auth/logout', body: {'refreshToken': s.refreshToken}, retry: false, auth: false);
+      } catch (_) {}
     }
-    return const [];
+    await clear();
   }
 
-  Future<Map<String, dynamic>> post(
-    String path, {
-    Object? body,
-    Map<String, String>? headers,
-  }) async {
-    final r = await _send('POST', path, body: body, extraHeaders: headers);
-    if (r is Map<String, dynamic>) return r;
-    return <String, dynamic>{};
+  Future<dynamic> get(String path, {Map<String, String?>? query}) => _send('GET', path, query: query);
+
+  Future<dynamic> post(String path, {Object? body, Map<String, String>? headers}) =>
+      _send('POST', path, body: body ?? const <String, dynamic>{}, headers: headers);
+
+  Future<dynamic> put(String path, {Object? body}) => _send('PUT', path, body: body ?? const <String, dynamic>{});
+
+  Future<dynamic> delete(String path) => _send('DELETE', path);
+
+  Uri _uri(String path, Map<String, String?>? query) {
+    final uri = Uri.parse('${FixoraConfig.apiBase}/api/v1$path');
+    if (query == null) return uri;
+    final q = <String, String>{};
+    query.forEach((k, v) {
+      if (v != null && v.isNotEmpty) q[k] = v;
+    });
+    return q.isEmpty ? uri : uri.replace(queryParameters: q);
   }
 
-  Future<Map<String, dynamic>> put(String path, {Object? body}) async {
-    final r = await _send('PUT', path, body: body);
-    if (r is Map<String, dynamic>) return r;
-    return <String, dynamic>{};
-  }
-
-  Future<Map<String, dynamic>> patch(String path, {Object? body}) async {
-    final r = await _send('PATCH', path, body: body);
-    if (r is Map<String, dynamic>) return r;
-    return <String, dynamic>{};
-  }
-
-  Future<Map<String, dynamic>> delete(String path) async {
-    final r = await _send('DELETE', path);
-    if (r is Map<String, dynamic>) return r;
-    return <String, dynamic>{};
-  }
-
-  Future<Object> _send(
+  Future<dynamic> _send(
     String method,
     String path, {
     Object? body,
-    Map<String, String>? query,
-    Map<String, String>? extraHeaders,
-    bool retried = false,
+    Map<String, String?>? query,
+    Map<String, String>? headers,
+    bool retry = true,
+    bool auth = true,
   }) async {
-    final token = await freshToken();
-    var uri = _uri(path);
-    if (query != null && query.isNotEmpty) {
-      uri = uri.replace(queryParameters: {...uri.queryParameters, ...query});
+    final req = http.Request(method, _uri(path, query));
+    req.headers['Accept'] = 'application/json';
+    final token = session?.accessToken;
+    if (auth && token != null) req.headers['Authorization'] = 'Bearer $token';
+    if (headers != null) req.headers.addAll(headers);
+    if (body != null) {
+      req.headers['Content-Type'] = 'application/json; charset=utf-8';
+      req.body = jsonEncode(body);
     }
 
-    final headers = <String, String>{
-      'Accept': 'application/json',
-      if (body != null) 'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-      if (extraHeaders != null) ...extraHeaders,
-    };
-
-    late http.Response res;
+    http.Response res;
     try {
-      final encoded = body == null ? null : jsonEncode(body);
-      switch (method) {
-        case 'GET':
-          res = await _http.get(uri, headers: headers).timeout(const Duration(seconds: 20));
-        case 'POST':
-          res = await _http
-              .post(uri, headers: headers, body: encoded)
-              .timeout(const Duration(seconds: 20));
-        case 'PUT':
-          res = await _http
-              .put(uri, headers: headers, body: encoded)
-              .timeout(const Duration(seconds: 20));
-        case 'PATCH':
-          res = await _http
-              .patch(uri, headers: headers, body: encoded)
-              .timeout(const Duration(seconds: 20));
-        case 'DELETE':
-          res = await _http.delete(uri, headers: headers).timeout(const Duration(seconds: 20));
-        default:
-          throw ApiException(0, 'METHOD', 'Unsupported method $method');
-      }
+      final streamed = await _http.send(req).timeout(const Duration(seconds: 15));
+      res = await http.Response.fromStream(streamed);
     } on TimeoutException {
-      throw ApiException(0, 'TIMEOUT', 'Request timed out. Check your connection.');
-    } on http.ClientException catch (e) {
-      throw ApiException(0, 'NETWORK', e.message);
-    } catch (e) {
-      if (e is ApiException) rethrow;
-      throw ApiException(0, 'NETWORK', e.toString());
+      throw ApiException(0, 'timeout', 'The garage server did not answer in time. Check your connection.');
+    } catch (_) {
+      throw ApiException(0, 'network', 'Cannot reach the Fixora server. Check your connection.');
     }
 
-    // On 401 → refresh once, then retry the request.
-    if (res.statusCode == 401 && !retried) {
-      final refreshed = await refresh();
-      if (refreshed != null) {
-        return _send(
-          method,
-          path,
-          body: body,
-          query: query,
-          extraHeaders: extraHeaders,
-          retried: true,
-        );
+    if (res.statusCode == 401 && retry && auth && session != null) {
+      final fresh = await refresh();
+      if (fresh != null) {
+        return _send(method, path, body: body, query: query, headers: headers, retry: false);
       }
     }
 
-    return _decode(res);
-  }
-
-  Object _decode(http.Response res) {
-    Object? decoded;
-    Map<String, dynamic>? asMap;
-    if (res.body.isNotEmpty) {
+    if (res.statusCode >= 400) {
+      var code = 'error';
+      var message = 'Something went wrong (${res.statusCode}).';
       try {
-        decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic>) asMap = decoded;
-      } catch (_) {
-        decoded = null;
-      }
+        final j = jsonDecode(utf8.decode(res.bodyBytes));
+        if (j is Map) {
+          code = (j['code'] ?? code).toString();
+          message = (j['message'] ?? message).toString();
+          final errors = j['errors'];
+          if (errors is Map && errors.isNotEmpty) {
+            message = errors.values.expand((v) => v is List ? v : [v]).map((e) => e.toString()).join(' ');
+          }
+        }
+      } catch (_) {}
+      throw ApiException(res.statusCode, code, message);
     }
-
-    if (res.statusCode >= 200 && res.statusCode < 300) {
-      return decoded ?? <String, dynamic>{};
-    }
-
-    final code = (asMap?['code'] as String?) ?? 'HTTP_${res.statusCode}';
-    final message = (asMap?['message'] as String?) ??
-        (res.body.isNotEmpty ? res.body : 'Request failed (${res.statusCode})');
-    throw ApiException(res.statusCode, code, message);
+    if (res.bodyBytes.isEmpty) return null;
+    return jsonDecode(utf8.decode(res.bodyBytes));
   }
 }

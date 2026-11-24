@@ -6,38 +6,42 @@ import 'package:geolocator/geolocator.dart';
 import '../../core/backend/api_client.dart';
 import '../../core/backend/fixora_config.dart';
 import '../../core/backend/fixora_hub.dart';
+import '../mock/mock_data.dart';
 import '../models/models.dart';
-import '../models/vehicle.dart';
 import '../repositories/app_state.dart';
 import '../repositories/job_store.dart';
 import '../repositories/loyalty_store.dart';
 
-/// Customer auth + session bridge to the garage `/api/v1` backend.
+/// Connects the customer app to Fixora.Customer.Api (/api/v1/customer/*) and the realtime hub.
 ///
-/// When [enabled] is false the UI uses in-memory [AppState] demo accounts.
+/// The screens keep listening to [AppState] and [JobStore]; this class fills those stores from
+/// the backend and keeps them current over SignalR. Every hand-off with the garage goes through
+/// the service manager: an approval decision goes to the manager (who releases the work to the
+/// mechanic), and a change request goes to the manager (who forwards it to the mechanic).
+///
+/// When the backend cannot be reached at login the app falls back to its bundled demo data.
 class CustomerBackend extends ChangeNotifier {
   CustomerBackend._();
   static final CustomerBackend instance = CustomerBackend._();
 
-  final ApiClient api = ApiClient.instance;
+  final ApiClient api = ApiClient('fixora.customer.session');
   late final FixoraHub hub = FixoraHub(api.freshToken);
 
   /// true once signed in against the real backend; false in demo mode.
   bool live = false;
-
-  /// Garage service catalog from `/customer/garage/services` (used to resolve serviceId).
+  String garagePhone = '';
+  String garageName = MockData.garageName;
   final List<Map<String, dynamic>> services = [];
 
-  /// The proposal the customer is asked to decide on, if any.
+  /// The proposal the customer is asked to decide on (ProposalDto), if any.
   Map<String, dynamic>? pendingProposal;
 
-  /// Latest SOS payload from the hub, if any.
+  /// Latest SOS from the server (SosDto); the SOS screen listens to this.
   final ValueNotifier<Map<String, dynamic>?> sos = ValueNotifier(null);
 
-  /// `--dart-define=FIXORA_DEMO=true` forces offline demo mode.
-  bool get enabled =>
-      const String.fromEnvironment('FIXORA_DEMO', defaultValue: '') != 'true' &&
-      FixoraConfig.apiBase.isNotEmpty;
+  bool get enabled => !FixoraConfig.demoOnly;
+
+  // ------------------------------------------------------------------ session
 
   /// Called once at start-up: a saved session goes straight to live mode.
   Future<bool> restore() async {
@@ -49,80 +53,97 @@ class CustomerBackend extends ChangeNotifier {
       return true;
     } on ApiException catch (e) {
       if (e.status == 401) await api.clear();
+      live = false;
       return false;
     }
   }
 
-  /// Email + password login. Returns an error message, or null on success.
+  /// null on success; otherwise the server's message. Throws [ApiException] when the server is unreachable.
   Future<String?> login(String email, String password) async {
     try {
-      final tokens = await api.post('/customer/auth/login', body: {
-        'email': email.trim(),
-        'password': password,
-      });
-      await api.saveSession(tokens);
-      await _afterLogin();
-      return null;
+      final tokens = await api.post('/customer/auth/login', body: {'email': email, 'password': password});
+      await api.saveSession(tokens as Map<String, dynamic>);
     } on ApiException catch (e) {
+      if (e.isNetwork) rethrow;
       return e.message;
     }
+    await _afterLogin();
+    return null;
   }
 
-  /// Starts registration. On success returns optional [devCode] (demo OTP), else throws.
-  Future<String?> register({
-    required String fullName,
-    required String email,
-    required String phone,
-    required String password,
-  }) async {
-    final r = await api.post('/customer/auth/register', body: {
-      'fullName': fullName.trim(),
-      'email': email.trim(),
-      'phone': phone,
-      'password': password,
-    });
-    return r['devCode'] as String?;
+  /// Starts registration: the server emails a one-time code. Returns the demo code when the server exposes it.
+  Future<String?> register({required String name, required String email, required String phone, required String password}) async {
+    final r = await api.post('/customer/auth/register', body: {'name': name, 'email': email, 'phone': phone, 'password': password});
+    return (r as Map<String, dynamic>)['devCode'] as String?;
   }
 
-  /// Verifies the email OTP from register, stores tokens, then syncs [AppState].
   Future<void> verifyOtp(String email, String code) async {
-    final tokens = await api.post('/customer/auth/verify-otp', body: {
-      'email': email.trim(),
-      'code': code.trim(),
-    });
-    await api.saveSession(tokens);
+    final tokens = await api.post('/customer/auth/verify-otp', body: {'email': email, 'code': code});
+    await api.saveSession(tokens as Map<String, dynamic>);
     await _afterLogin();
   }
 
   Future<void> logout() async {
     await hub.stop();
     hub.clearHandlers();
-    try {
-      await api.post('/customer/auth/logout');
-    } on ApiException {
-      // Still clear local session if the server is unreachable.
-    }
-    await api.clear();
+    await api.logout();
     live = false;
     pendingProposal = null;
-    sos.value = null;
     LoyaltyStore.instance.resetDemo();
     notifyListeners();
   }
 
-  /// GET /customer/loyalty + /customer/garage → applyRemote / applyGarage.
+  Future<void> _afterLogin() async {
+    live = true;
+    final profile = await api.get('/customer/profile') as Map<String, dynamic>;
+    AppState.instance.updateProfile(
+      name: profile['name'] as String?,
+      email: profile['email'] as String?,
+      phone: profile['phone'] as String?,
+    );
+    await Future.wait([_loadGarage(), _loadVehicles(), refreshJob(), refreshNotifications(), refreshLoyalty(), refreshBookings()]);
+    _wireRealtime();
+    await hub.start();
+    notifyListeners();
+  }
+
+  Future<void> _loadGarage() async {
+    final g = await api.get('/customer/garage') as Map<String, dynamic>;
+    garagePhone = (g['phone'] as String?) ?? '';
+    garageName = (g['name'] as String?) ?? garageName;
+    LoyaltyStore.instance.applyGarage(g);
+    final list = await api.get('/customer/garage/services') as List<dynamic>;
+    services
+      ..clear()
+      ..addAll(list.cast<Map<String, dynamic>>());
+  }
+
+  // ------------------------------------------------------------------ loyalty
+
+  /// Points balance and ledger (LoyaltyDto). Also re-reads the garage's discount rules,
+  /// since the owner can change them in Workshop settings at any time.
   Future<void> refreshLoyalty() async {
     if (!live) return;
-    final results = await Future.wait([
-      api.get('/customer/loyalty'),
-      api.get('/customer/garage'),
-    ]);
+    final results = await Future.wait([api.get('/customer/loyalty'), api.get('/customer/garage')]);
     LoyaltyStore.instance
       ..applyGarage(results[1] as Map<String, dynamic>)
       ..applyRemote(results[0] as Map<String, dynamic>);
   }
 
-  /// Saves a vehicle on the server (POST, or PUT when [id] is a server GUID).
+  // ------------------------------------------------------------------ vehicles
+
+  Future<void> _loadVehicles() async {
+    final list = (await api.get('/customer/vehicles') as List<dynamic>).cast<Map<String, dynamic>>();
+    final app = AppState.instance;
+    // The server's list is the truth, also when it is empty (a new customer): never keep demo cars,
+    // because a booking for a demo car id cannot reach the garage.
+    app.vehicles
+      ..clear()
+      ..addAll(list.map(_vehicle));
+    if (app.vehicles.isNotEmpty) app.selectVehicle(app.vehicles.first.id);
+  }
+
+  /// Saves a vehicle on the server (POST, or PUT when [id] is a server id) and returns it as the app model.
   Future<Vehicle> saveVehicle({
     String? id,
     required String plate,
@@ -151,7 +172,7 @@ class CustomerBackend extends ChangeNotifier {
     final r = id != null && id.length == 36
         ? await api.put('/customer/vehicles/$id', body: body)
         : await api.post('/customer/vehicles', body: body);
-    return _vehicle(r);
+    return _vehicle(r as Map<String, dynamic>);
   }
 
   static Vehicle _vehicle(Map<String, dynamic> v) {
@@ -160,173 +181,107 @@ class CustomerBackend extends ChangeNotifier {
       'ThreeWheeler' => VehicleType.threeWheeler,
       _ => VehicleType.fourWheeler,
     };
+    final make = (v['make'] as String?) ?? '';
+    final image = switch (make.toLowerCase()) {
+      'toyota' => Img.corollaThumb,
+      'honda' => type == VehicleType.twoWheeler ? Img.bikeDio : Img.vezel,
+      'nissan' => Img.xtrail,
+      'yamaha' => Img.bikeFz,
+      _ => type == VehicleType.fourWheeler ? Img.carThumb : null,
+    };
     return Vehicle(
       id: v['id'] as String,
-      make: (v['make'] as String?) ?? '',
+      make: make,
       model: (v['model'] as String?) ?? '',
       year: (v['year'] as num?)?.toInt() ?? DateTime.now().year,
       plate: (v['registrationNo'] as String?) ?? '',
-      type: type,
+      image: image,
       mileageKm: (v['mileageKm'] as num?)?.toInt() ?? 0,
       fuel: (v['fuel'] as String?) ?? 'Petrol',
+      transmission: 'Manual',
       color: (v['color'] as String?) ?? 'White',
-      active: true,
-      nextServiceNote: v['driveSenseOptIn'] == true
-          ? 'DriveSense is watching wear on rough roads'
-          : 'Turn on DriveSense for early-wear alerts',
+      bodyType: type == VehicleType.fourWheeler ? (v['type'] == 'VanSuv' ? 'SUV' : 'Hatchback') : type.label,
+      type: type,
+      nextServiceNote: v['driveSenseOptIn'] == true ? 'DriveSense is watching wear on rough roads' : 'Turn on DriveSense for early-wear alerts',
+      healthScore: 0.8,
     );
   }
 
-  /// Loads garage services so [book] can resolve a real [serviceId].
-  Future<void> ensureServices() async {
-    if (services.isNotEmpty) return;
-    final list = await api.getList('/customer/garage/services');
-    services
-      ..clear()
-      ..addAll(list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)));
-  }
-
-  /// Requests a booking against real bay capacity. 409 means the slot was just taken.
-  ///
-  /// POST /customer/appointments
-  /// vehicleId, serviceId, slotStart, notes + Idempotency-Key
-  Future<Map<String, dynamic>> book({
-    required String vehicleId,
-    required String serviceName,
-    required DateTime slotStart,
-    String? notes,
-  }) async {
-    await ensureServices();
-    final svc = services.where((s) => _sameService('${s['name'] ?? ''}', serviceName)).firstOrNull ??
-        services.firstOrNull;
-    if (svc == null) {
-      throw ApiException(404, 'no_services', 'The garage has no services to book yet.');
-    }
-    final r = await api.post(
-      '/customer/appointments',
-      body: {
-        'vehicleId': vehicleId,
-        'serviceId': svc['id'],
-        'slotStart': slotStart.toUtc().toIso8601String(),
-        'notes': notes,
-        'promoCode': null,
-        'suggestionId': null, // always null — no suggestion book API call
-      },
-      headers: {'Idempotency-Key': ApiClient.newIdempotencyKey()},
-    );
-    return r;
-  }
-
-  static bool _sameService(String a, String b) {
-    String n(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
-    final x = n(a), y = n(b);
-    return x == y ||
-        x.contains(y) ||
-        y.contains(x) ||
-        (x.contains('brake') && y.contains('brake')) ||
-        (x.contains('oil') && y.contains('oil'));
-  }
-
-  Future<void> refreshBookings() async {
-    final list = (await api.getList('/customer/appointments'))
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    AppState.instance.applyRemoteBookings(list);
-  }
-
-  /// Per-item decision (BR-FP-07). Goes to the service manager, who releases approved work to the mechanic.
-  ///
-  /// POST /customer/approvals/{id}/decisions + Idempotency-Key.
-  /// Stale item version → 409; the same key is reused on network retry.
-  Future<void> decide(Map<String, bool> approveByItemId, {String? note}) async {
-    final p = pendingProposal;
-    if (p == null) {
-      throw ApiException(409, 'nothing_pending', 'There is nothing waiting for your approval.');
-    }
-    final items = (p['items'] as List<dynamic>?)?.cast<Map<String, dynamic>>() ?? const [];
-    final decisions = [
-      for (final it in items)
-        if (it['status'] == 'AwaitingCustomer')
-          {
-            'itemId': it['id'],
-            'approve': approveByItemId[it['id']] ?? true,
-            'version': it['version'],
-          },
-    ];
-    final key = ApiClient.newIdempotencyKey();
-    try {
-      await api.post(
-        '/customer/approvals/${p['id']}/decisions',
-        body: {
-          'decisions': decisions,
-          'note': (note == null || note.isEmpty) ? null : note,
-        },
-        headers: {'Idempotency-Key': key},
-      );
-    } on ApiException catch (e) {
-      // Stale version / business conflict → refresh then rethrow (409).
-      if (!e.isNetwork) {
-        await refreshJob();
-        rethrow;
-      }
-      await Future<void>.delayed(const Duration(seconds: 2));
-      await api.post(
-        '/customer/approvals/${p['id']}/decisions',
-        body: {'decisions': decisions, 'note': note},
-        headers: {'Idempotency-Key': key},
-      );
-    }
-    await refreshJob();
-  }
+  // ------------------------------------------------------------------ job + approvals
 
   /// Re-reads the active job, its FixProof report and any proposal waiting for the customer.
   Future<void> refreshJob() async {
-    final jobs = (await api.getList('/customer/jobs', query: {'activeOnly': 'true'}))
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-    final pending = (await api.getList('/customer/approvals/pending'))
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final jobs = (await api.get('/customer/jobs', query: {'activeOnly': 'true'}) as List<dynamic>).cast<Map<String, dynamic>>();
+    final pending = (await api.get('/customer/approvals/pending') as List<dynamic>).cast<Map<String, dynamic>>();
     if (jobs.isEmpty) {
       pendingProposal = null;
       JobStore.instance.clearRemote();
       return;
     }
     final summary = jobs.first;
-    final detail = await api.get('/customer/jobs/${summary['id']}');
+    final detail = await api.get('/customer/jobs/${summary['id']}') as Map<String, dynamic>;
     pendingProposal = pending.where((p) => p['jobCardId'] == summary['id']).firstOrNull;
     JobStore.instance.applyRemote(detail, pendingProposal);
     notifyListeners();
   }
 
+  /// Per-item decision (BR-FP-07). Goes to the service manager, who releases approved work to the mechanic.
+  /// The same idempotency key is reused on a retry, so a double tap never records two decisions.
+  Future<void> decide(Map<String, bool> approveByItemId, {String? note}) async {
+    final p = pendingProposal;
+    if (p == null) throw ApiException(409, 'nothing_pending', 'There is nothing waiting for your approval.');
+    final items = (p['items'] as List<dynamic>).cast<Map<String, dynamic>>();
+    final decisions = [
+      for (final it in items)
+        if (it['status'] == 'AwaitingCustomer')
+          {'itemId': it['id'], 'approve': approveByItemId[it['id']] ?? true, 'version': it['version']},
+    ];
+    final key = ApiClient.newIdempotencyKey();
+    try {
+      await api.post('/customer/approvals/${p['id']}/decisions',
+          body: {'decisions': decisions, 'note': (note == null || note.isEmpty) ? null : note},
+          headers: {'Idempotency-Key': key});
+    } on ApiException catch (e) {
+      if (!e.isNetwork) {
+        await refreshJob();
+        rethrow;
+      }
+      // One retry with the SAME key: if the first call landed, the server returns the same answer.
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await api.post('/customer/approvals/${p['id']}/decisions',
+          body: {'decisions': decisions, 'note': note}, headers: {'Idempotency-Key': key});
+    }
+    await refreshJob();
+  }
+
+  /// Customer → manager. The mechanic only sees it if the manager forwards it.
+  Future<ChangeRequest> requestChanges(List<String> changes, String details) async {
+    final jobId = JobStore.instance.remoteJobId;
+    if (jobId == null) throw ApiException(404, 'no_job', 'You have no active job at the garage.');
+    final r = await api.post('/customer/jobs/$jobId/change-requests', body: {'changes': changes, 'details': details}) as Map<String, dynamic>;
+    await refreshJob();
+    return JobStore.changeRequestFrom(r);
+  }
+
+  // ------------------------------------------------------------------ notifications
+
   Future<void> refreshNotifications() async {
-    final list = (await api.getList('/notifications', query: {'take': '60'}))
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
+    final list = (await api.get('/notifications', query: {'take': '60'}) as List<dynamic>).cast<Map<String, dynamic>>();
     JobStore.instance.replaceNotifications(list.map(notificationFrom).toList());
   }
 
   void markRead(String id) {
-    if (live && id.length == 36) {
-      unawaited(api.post('/notifications/$id/read').catchError((Object _) => <String, dynamic>{}));
-    }
+    if (live && id.length == 36) unawaited(api.post('/notifications/$id/read').catchError((Object _) => null));
   }
 
   void markAllRead() {
-    if (live) {
-      unawaited(api.post('/notifications/read-all').catchError((Object _) => <String, dynamic>{}));
-    }
+    if (live) unawaited(api.post('/notifications/read-all').catchError((Object _) => null));
   }
 
   static AppNotification notificationFrom(Map<String, dynamic> n) {
     final type = (n['type'] as String?) ?? '';
     final kind = switch (type.split('.').first) {
-      'approval' || 'proposal' || 'change' =>
-        type == 'approval.confirmed' ? NotificationKind.progress : NotificationKind.estimate,
+      'approval' || 'proposal' || 'change' => type == 'approval.confirmed' ? NotificationKind.progress : NotificationKind.estimate,
       'booking' => NotificationKind.booking,
       'job' => type == 'job.completed' ? NotificationKind.completed : NotificationKind.progress,
       'queue' => NotificationKind.queue,
@@ -354,15 +309,14 @@ class CustomerBackend extends ChangeNotifier {
       final n = Map<String, dynamic>.from(payload);
       JobStore.instance.push(notificationFrom(n));
       final type = (n['type'] as String?) ?? '';
-      // queue / booking / job events...
-      if (type.startsWith('approval') ||
-          type.startsWith('change') ||
-          type.startsWith('job') ||
-          type.startsWith('queue') ||
-          type.startsWith('invoice')) {
+      if (type.startsWith('approval') || type.startsWith('change') || type.startsWith('job') || type.startsWith('queue') || type.startsWith('invoice')) {
         unawaited(refreshJob().catchError((Object _) {}));
       }
+      if (type.startsWith('sos') && n['entityId'] is String) {
+        unawaited(refreshSos(n['entityId'] as String).catchError((Object _) {}));
+      }
       if (type.startsWith('booking')) unawaited(refreshBookings().catchError((Object _) {}));
+      // Paying an invoice earns points, billing uses them, a good DriveSense week adds them.
       if (type.startsWith('invoice') || type.startsWith('drivesense') || type.startsWith('loyalty')) {
         unawaited(refreshLoyalty().catchError((Object _) {}));
       }
@@ -379,34 +333,34 @@ class CustomerBackend extends ChangeNotifier {
     });
   }
 
-  /// Copy session profile fields into the in-memory app store after auth.
-  Future<void> _afterLogin() async {
-    live = true;
-    final s = api.session;
-    if (s == null) {
-      notifyListeners();
-      return;
-    }
-    final app = AppState.instance;
-    final name = s.name.trim();
-    if (name.isNotEmpty) {
-      app.firstName = name.split(RegExp(r'\s+')).first;
-    }
-    try {
-      await Future.wait([
-        ensureServices(),
-        refreshBookings(),
-        refreshJob(),
-        refreshNotifications(),
-        refreshLoyalty(),
-      ]);
-    } on ApiException {
-      // Profile sync still succeeds even if catalog/bookings are temporarily down.
-    }
-    _wireRealtime();
-    unawaited(hub.start());
-    app.notifyListeners();
-    notifyListeners();
+  // ------------------------------------------------------------------ bookings (USP 5)
+
+  /// Requests a booking against real bay capacity. 409 means the slot was just taken.
+  Future<Map<String, dynamic>> book({required String vehicleId, required String serviceName, required DateTime slotStart, String? notes}) async {
+    final svc = services.where((s) => _sameService(s['name'] as String, serviceName)).firstOrNull ?? services.firstOrNull;
+    if (svc == null) throw ApiException(404, 'no_services', 'The garage has no services to book yet.');
+    final r = await api.post('/customer/appointments',
+        body: {
+          'vehicleId': vehicleId,
+          'serviceId': svc['id'],
+          'slotStart': slotStart.toUtc().toIso8601String(),
+          'notes': notes,
+          'promoCode': null,
+          'suggestionId': null,
+        },
+        headers: {'Idempotency-Key': ApiClient.newIdempotencyKey()});
+    return r as Map<String, dynamic>;
+  }
+
+  Future<void> refreshBookings() async {
+    final list = (await api.get('/customer/appointments') as List<dynamic>).cast<Map<String, dynamic>>();
+    AppState.instance.applyRemoteBookings(list);
+  }
+
+  static bool _sameService(String a, String b) {
+    String n(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z]'), '');
+    final x = n(a), y = n(b);
+    return x == y || x.contains(y) || y.contains(x) || (x.contains('brake') && y.contains('brake')) || (x.contains('oil') && y.contains('oil'));
   }
 
   // ------------------------------------------------------------------ SOS (USP 4)
@@ -420,33 +374,22 @@ class CustomerBackend extends ChangeNotifier {
     'Accident': 'Accident',
   };
 
-  /// Sends the SOS and returns the server receipt (SosReceipt).
-  /// "Delivered" may only be shown after this returns.
-  /// Retries with the same idempotency key never create a second request.
-  Future<Map<String, dynamic>> raiseSos({
-    required String problem,
-    String? note,
-    String? idempotencyKey,
-  }) async {
+  /// Sends the SOS and returns the server receipt (SosReceipt). "Delivered" may only be shown after this returns.
+  /// Retries with the same idempotency key, so a retry never creates a second request.
+  Future<Map<String, dynamic>> raiseSos({required String problem, String? note, String? idempotencyKey}) async {
     final pos = await _position();
     final key = idempotencyKey ?? ApiClient.newIdempotencyKey();
     final vehicleId = AppState.instance.selectedVehicle.id;
-    final r = await api.post(
-      '/customer/sos/requests',
-      body: {
-        'lat': pos.$1,
-        'lng': pos.$2,
-        'category': sosCategories[problem] ?? 'Other',
-        'vehicleId': vehicleId.length == 36 ? vehicleId : null,
-        'note': [
-          problem,
-          if (!pos.$3) 'GPS unavailable: location is approximate',
-          if (note != null && note.isNotEmpty) note,
-        ].join(' · '),
-        'locationConsent': true, // SOS body
-      },
-      headers: {'Idempotency-Key': key},
-    ) as Map<String, dynamic>;
+    final r = await api.post('/customer/sos/requests',
+        body: {
+          'lat': pos.$1,
+          'lng': pos.$2,
+          'category': sosCategories[problem] ?? 'Other',
+          'vehicleId': vehicleId.length == 36 ? vehicleId : null,
+          'note': [problem, if (!pos.$3) 'GPS unavailable: location is approximate', if (note != null && note.isNotEmpty) note].join(' · '),
+          'locationConsent': true,
+        },
+        headers: {'Idempotency-Key': key}) as Map<String, dynamic>;
     await refreshSos(r['receiptId'] as String);
     return r;
   }
@@ -461,23 +404,14 @@ class CustomerBackend extends ChangeNotifier {
     sos.value = await api.post('/customer/sos/requests/$id/cancel') as Map<String, dynamic>;
   }
 
-  /// (lat, lng, fromGps). Denied / unavailable → fallback town coords.
+  /// (lat, lng, fromGps). Falls back to the garage's town when GPS is off or refused.
   Future<(double, double, bool)> _position() async {
     try {
       var perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      // denied → fallback town coords
-      if (perm == LocationPermission.denied ||
-          perm == LocationPermission.deniedForever) {
-        throw StateError('no permission');
-      }
+      if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
+      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) throw StateError('no permission');
       final p = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
-        ),
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
       );
       return (p.latitude, p.longitude, true);
     } catch (_) {
@@ -485,3 +419,4 @@ class CustomerBackend extends ChangeNotifier {
     }
   }
 }
+

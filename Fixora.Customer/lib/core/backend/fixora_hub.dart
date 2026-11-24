@@ -11,8 +11,9 @@ enum HubState { offline, connecting, live, reconnecting }
 
 /// Minimal SignalR client (JSON hub protocol over WebSockets) for /hubs/fixora.
 ///
-/// A realtime event never proves completion: listeners re-fetch authoritative
-/// state from the API.
+/// The server puts every connection in its user group and role group, so the app only
+/// listens. Event names match Fixora.Shared.Contracts.RealtimeEvents. A realtime event never
+/// proves completion: listeners re-fetch authoritative state from the API.
 class FixoraHub {
   FixoraHub(this._token);
 
@@ -78,19 +79,14 @@ class FixoraHub {
         return;
       }
       final negotiate = await http
-          .post(
-            Uri.parse('${FixoraConfig.hubUrl}/negotiate?negotiateVersion=1'),
-            headers: {'Authorization': 'Bearer $token'},
-          )
+          .post(Uri.parse('${FixoraConfig.hubUrl}/negotiate?negotiateVersion=1'), headers: {'Authorization': 'Bearer $token'})
           .timeout(const Duration(seconds: 10));
       if (negotiate.statusCode != 200) throw StateError('negotiate ${negotiate.statusCode}');
       final connectionToken = (jsonDecode(negotiate.body) as Map<String, dynamic>)['connectionToken'] as String;
 
       final wsBase = FixoraConfig.hubUrl.replaceFirst(RegExp(r'^http'), 'ws');
-      final uri = Uri.parse(
-        '$wsBase?id=${Uri.encodeQueryComponent(connectionToken)}'
-        '&access_token=${Uri.encodeQueryComponent(token)}',
-      );
+      final uri = Uri.parse('$wsBase?id=${Uri.encodeQueryComponent(connectionToken)}'
+          '&access_token=${Uri.encodeQueryComponent(token)}');
       final channel = WebSocketChannel.connect(uri);
       await channel.ready.timeout(const Duration(seconds: 10));
 
@@ -98,6 +94,7 @@ class FixoraHub {
       _buffer = '';
       _sub = channel.stream.listen(_onData, onDone: _onClosed, onError: (Object _) => _onClosed());
       channel.sink.add('${jsonEncode({'protocol': 'json', 'version': 1})}$_rs');
+      // The server drops clients that stay silent for 30 s; ping every 15 s.
       _ping = Timer.periodic(const Duration(seconds: 15), (_) => _write({'type': 6}));
 
       _attempt = 0;
@@ -127,7 +124,7 @@ class FixoraHub {
       final msg = jsonDecode(frame);
       if (msg is! Map) continue;
       switch (msg['type']) {
-        case 1:
+        case 1: // invocation from the server
           final target = msg['target'] as String?;
           final args = msg['arguments'];
           final payload = args is List && args.isNotEmpty ? args.first : null;
@@ -139,9 +136,9 @@ class FixoraHub {
             }
           }
           break;
-        case 6:
+        case 6: // ping
           break;
-        case 7:
+        case 7: // close
           _onClosed();
           break;
       }

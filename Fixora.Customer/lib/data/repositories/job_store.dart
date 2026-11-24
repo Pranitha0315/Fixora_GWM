@@ -1,117 +1,47 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../mock/mock_data.dart';
 import '../models/models.dart';
-import '../models/vehicle.dart';
 import '../remote/customer_backend.dart';
 import 'app_state.dart';
 
-/// In-memory job + notification store (demo). Screens listen to this.
+/// In-memory app state for the demo.
+///
+/// Swap the bodies of these methods for HTTP / SignalR calls to the Fixora
+/// .NET backend later; the screens only listen to this store.
 class JobStore extends ChangeNotifier {
   JobStore._();
   static final JobStore instance = JobStore._();
 
-  final List<AppNotification> notifications = [
-    AppNotification(
-      id: 'n1',
-      title: 'You are #2 in the queue',
-      body: 'Bay 2 is finishing up. Estimated start in about 10 minutes.',
-      time: DateTime.now().subtract(const Duration(minutes: 4)),
-      kind: NotificationKind.queue,
-      unread: true,
-    ),
-    AppNotification(
-      id: 'n2',
-      title: 'Booking confirmed',
-      body: 'Your Full Service slot is confirmed. Tap to view bookings.',
-      time: DateTime.now().subtract(const Duration(hours: 2)),
-      kind: NotificationKind.booking,
-      unread: true,
-    ),
-    AppNotification(
-      id: 'n3',
-      title: 'Service reminder',
-      body: 'General Service is due soon for your vehicle.',
-      time: DateTime.now().subtract(const Duration(days: 1)),
-      kind: NotificationKind.reminder,
-      unread: false,
-    ),
-  ];
+  // ----- Job -----
+  Vehicle get vehicle => AppState.instance.vehicleById(_vehicleId ?? 'v1');
+  String jobId = MockData.jobId;
+  String? _vehicleId;
 
-  int get unreadCount => notifications.where((n) => n.unread).length;
-
-  int _nid = 100;
-  String nextNotificationId() => 'n${_nid++}';
-
-  void push(AppNotification n) {
-    notifications.insert(0, n);
-    notifyListeners();
-  }
-
-  void markRead(String id) {
-    // local unread=false + CustomerBackend.markRead(id)
-    final i = notifications.indexWhere((n) => n.id == id);
-    if (i >= 0 && notifications[i].unread) {
-      notifications[i] = notifications[i].copyWith(unread: false);
-      CustomerBackend.instance.markRead(id);
-      notifyListeners();
-    }
-  }
-
-  void markAllRead() {
-    for (var i = 0; i < notifications.length; i++) {
-      notifications[i] = notifications[i].copyWith(unread: false);
-    }
-    CustomerBackend.instance.markAllRead();
-    notifyListeners();
-  }
-
-  void remove(String id) {
-    notifications.removeWhere((n) => n.id == id);
-    notifyListeners();
-  }
-
-  void replaceNotifications(List<AppNotification> list) {
-    notifications
-      ..clear()
-      ..addAll(list);
-    notifyListeners();
-  }
-
-  /// Active remote job id from the garage API, if any.
+  // ----- Live backend binding (all null / false in demo mode) -----
+  /// Job card id on the backend.
   String? remoteJobId;
-  String? _vehicleId = 'v1';
-  String jobId = 'FX-1042';
-  String statusLabel = 'In progress';
-  String currentStepLabel = 'Diagnosis';
-  double journey = 0.2;
-  JobStatus status = JobStatus.diagnosis;
 
-  /// Index of the current step in [progressSteps].
+  /// Backend JobStatus (Open, Inspecting, AwaitingManagerReview, AwaitingCustomerApproval, AwaitingRelease, InProgress, ...).
+  String? garageStatus;
+
+  /// The customer has answered every item; the service manager still has to release the work to the mechanic.
+  bool decisionSent = false;
+
+  bool get isLive => remoteJobId != null;
+  final List<EstimateItem> items = List.of(MockData.estimateItems);
+
+  JobStatus _status = JobStatus.awaitingApproval;
+  JobStatus get status => _status;
+
+  /// Index of the current step in [MockData.progressSteps].
   int _progress = 2;
   int get progress => _progress;
 
-  static const progressSteps = [
-    'Parts Ordered',
-    'Repair Started',
-    'Parts Installed',
-    'Quality Check',
-    'Ready for Pickup',
-  ];
-
-  static final progressTimes = [
-    DateTime(2026, 8, 27, 13, 0),
-    DateTime(2026, 8, 27, 14, 0),
-    DateTime(2026, 8, 27, 14, 50),
-    DateTime(2026, 8, 27, 15, 40),
-    DateTime(2026, 8, 27, 16, 30),
-  ];
-
-  Vehicle get vehicle => AppState.instance.vehicleById(_vehicleId ?? 'v1');
-
-  bool get isLive => remoteJobId != null;
-
+  final List<MediaItem> media = List.of(MockData.initialMedia);
+  final List<ChangeRequest> changeRequests = [];
+  String? approvalRemarks;
   double? paidAmount;
   String? paymentMethod;
 
@@ -125,196 +55,212 @@ class JobStore extends ChangeNotifier {
   double loyaltyDiscount = 0;
   bool get invoiceIssued => invoiceTotal != null;
 
-  double get subtotal => invoiceSubtotal ?? items.fold(0.0, (s, i) => s + i.amount);
-  double get tax => invoiceTax ?? (isLive ? 0 : subtotal * 0.15);
+  double get partsTotal => items
+      .where((i) => i.type == ItemType.part)
+      .fold(0.0, (s, i) => s + i.amount);
+  double get labourTotal => items
+      .where((i) => i.type == ItemType.labour)
+      .fold(0.0, (s, i) => s + i.amount);
+  double get subtotal => partsTotal + labourTotal;
+  double get tax => invoiceTax ?? (isLive ? 0 : subtotal * MockData.vatRate);
   double get total => invoiceTotal ?? subtotal + tax;
 
+  bool get allPartsInStock => items.every((i) => i.inStock);
+
+  String get currentStepLabel {
+    if (_status == JobStatus.awaitingApproval ||
+        _status == JobStatus.changesRequested) {
+      return 'Estimate Approval';
+    }
+    if (_status == JobStatus.completed || _status == JobStatus.paid) {
+      return 'Ready for Pickup';
+    }
+    return _progress == 2 ? 'Parts Installation' : MockData.progressSteps[_progress];
+  }
+
+  String get statusLabel {
+    if (isLive && decisionSent) return 'Waiting for Garage';
+    if (isLive && garageStatus == 'AwaitingManagerReview') return 'Being Priced';
+    switch (_status) {
+      case JobStatus.diagnosis:
+        return 'Diagnosing';
+      case JobStatus.awaitingApproval:
+        return 'Awaiting Approval';
+      case JobStatus.changesRequested:
+        return 'Changes Requested';
+      case JobStatus.inProgress:
+        return 'Repair In Progress';
+      case JobStatus.completed:
+        return 'Ready for Pickup';
+      case JobStatus.paid:
+        return 'Paid & Delivered';
+    }
+  }
+
+  /// Overall journey 0..1 used in the home hero card.
+  double get journey {
+    switch (_status) {
+      case JobStatus.diagnosis:
+        return 0.15;
+      case JobStatus.awaitingApproval:
+      case JobStatus.changesRequested:
+        return 0.35;
+      case JobStatus.inProgress:
+        return 0.45 + (_progress / MockData.progressSteps.length) * 0.45;
+      case JobStatus.completed:
+        return 0.95;
+      case JobStatus.paid:
+        return 1;
+    }
+  }
+
+  void approve({String? remarks}) {
+    approvalRemarks = remarks;
+    _status = JobStatus.inProgress;
+    _progress = 2;
+    notifications.insert(0, AppNotification(
+      id: nextNotificationId(),
+      title: 'Estimate approved',
+      body: 'Thanks! Work on $jobId has started.',
+      time: DateTime.now(),
+      kind: NotificationKind.estimate,
+      unread: true,
+    ));
+    notifyListeners();
+  }
+
+  void reject() {
+    _status = JobStatus.changesRequested;
+    notifyListeners();
+  }
+
+  ChangeRequest requestChanges(List<String> changes, String details) {
+    final cr = ChangeRequest(
+      id: 'CR-2026-${(47 + changeRequests.length).toString().padLeft(4, '0')}',
+      changes: changes,
+      details: details,
+      createdAt: DateTime.now(),
+    );
+    changeRequests.insert(0, cr);
+    _status = JobStatus.changesRequested;
+    notifyListeners();
+    return cr;
+  }
+
+  void addMedia(List<MediaItem> list) {
+    media.insertAll(0, list);
+    notifyListeners();
+  }
+
   void advance() {
-    if (status == JobStatus.awaitingApproval || status == JobStatus.changesRequested) {
+    if (_status == JobStatus.awaitingApproval ||
+        _status == JobStatus.changesRequested) {
       approve();
       return;
     }
-    if (status == JobStatus.inProgress) {
-      if (_progress < progressSteps.length - 1) {
+    if (_status == JobStatus.inProgress) {
+      if (_progress < MockData.progressSteps.length - 1) {
         _progress++;
-        currentStepLabel = progressSteps[_progress];
-        journey = 0.45 + (_progress / progressSteps.length) * 0.45;
       } else {
-        status = JobStatus.completed;
-        statusLabel = 'Completed';
-        currentStepLabel = 'Ready for Pickup';
-        journey = 1;
-        notifications.insert(
-          0,
-          AppNotification(
-            id: nextNotificationId(),
-            title: 'Your vehicle is ready!',
-            body: '${vehicle.name} (${vehicle.plate}) is ready for pickup.',
-            time: DateTime.now(),
-            kind: NotificationKind.completed,
-            unread: true,
-          ),
-        );
+        _status = JobStatus.completed;
+        notifications.insert(0, AppNotification(
+          id: nextNotificationId(),
+          title: 'Your vehicle is ready!',
+          body: '${vehicle.name} (${vehicle.plate}) is ready for pickup.',
+          time: DateTime.now(),
+          kind: NotificationKind.completed,
+          unread: true,
+        ));
       }
-    } else if (status == JobStatus.completed) {
-      status = JobStatus.paid;
-      statusLabel = 'Paid';
+    } else if (_status == JobStatus.completed) {
+      _status = JobStatus.paid;
       paidAmount = total;
     }
+    notifyListeners();
+  }
+
+  void setStatus(JobStatus s) {
+    _status = s;
+    if (s == JobStatus.inProgress) _progress = 2;
+    if (s == JobStatus.completed || s == JobStatus.paid) {
+      _progress = MockData.progressSteps.length - 1;
+    }
+    if (s == JobStatus.paid) paidAmount = total;
     notifyListeners();
   }
 
   void recordCashPayment(double amount, {String method = 'Card at counter'}) {
     paymentMethod = method;
     paidAmount = amount;
-    status = JobStatus.paid;
-    statusLabel = 'Paid';
-    notifications.insert(
-      0,
-      AppNotification(
-        id: nextNotificationId(),
-        title: 'Payment received',
-        body: 'Payment for $jobId received by $method. Thank you!',
-        time: DateTime.now(),
-        kind: NotificationKind.payment,
-        unread: true,
-      ),
-    );
+    _status = JobStatus.paid;
+    notifications.insert(0, AppNotification(
+      id: nextNotificationId(),
+      title: 'Payment received',
+      body: 'Payment for $jobId received by $method. Thank you!',
+      time: DateTime.now(),
+      kind: NotificationKind.payment,
+      unread: true,
+    ));
     notifyListeners();
   }
 
-  final List<EstimateItem> items = [
-    EstimateItem(
-      id: 'demo-1',
-      status: 'AwaitingCustomer',
-      name: 'Thermostat assembly',
-      subtitle: 'Part',
-      qty: 1,
-      unitPrice: 8500,
-      type: ItemType.part,
-      icon: Icons.settings_input_component_rounded,
-      color: const Color(0xFFB7791F),
-    ),
-    EstimateItem(
-      id: 'demo-2',
-      status: 'AwaitingCustomer',
-      name: 'Coolant flush labour',
-      subtitle: 'Labour',
-      qty: 1,
-      unitPrice: 4500,
-      type: ItemType.labour,
-      icon: Icons.handyman_outlined,
-      color: AppColors.primary,
-    ),
-  ];
+  // ----- Notifications -----
+  final List<AppNotification> notifications = MockData.buildNotifications();
+  int get unreadCount => notifications.where((n) => n.unread).length;
 
-  String? approvalRemarks;
-
-  void approve({String? remarks}) {
-    approvalRemarks = remarks;
-    status = JobStatus.inProgress;
-    statusLabel = 'In progress';
-    _progress = 2;
-    currentStepLabel = progressSteps[_progress];
-    journey = 0.45;
-    notifications.insert(
-      0,
-      AppNotification(
-        id: nextNotificationId(),
-        title: 'Estimate approved',
-        body: 'Thanks! Work on $jobId has started.',
-        time: DateTime.now(),
-        kind: NotificationKind.estimate,
-        unread: true,
-      ),
-    );
+  void markAllRead() {
+    for (var i = 0; i < notifications.length; i++) {
+      notifications[i] = notifications[i].copyWith(unread: false);
+    }
+    CustomerBackend.instance.markAllRead();
     notifyListeners();
   }
 
-  final List<MediaItem> media = [
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.photo,
-      stage: MediaStage.before,
-      caption: 'Front bumper scratch at check-in',
-    ),
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.photo,
-      stage: MediaStage.during,
-      caption: 'Brake disc inspection',
-    ),
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.photo,
-      stage: MediaStage.during,
-      caption: 'Old vs new brake pads',
-    ),
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.photo,
-      stage: MediaStage.during,
-      caption: 'Wheel alignment in progress',
-    ),
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.photo,
-      stage: MediaStage.after,
-      caption: 'Bumper after polishing',
-    ),
-    const MediaItem(
-      asset: '',
-      kind: MediaKind.video,
-      stage: MediaStage.during,
-      caption: 'Brake pad replacement',
-      duration: '02:36',
-    ),
-  ];
-
-  void clearRemote() {
-    remoteJobId = null;
-    statusLabel = 'In progress';
-    journey = 0;
+  void replaceNotifications(List<AppNotification> list) {
+    notifications
+      ..clear()
+      ..addAll(list);
     notifyListeners();
   }
 
-  /// Applies JobDetailDto (+ optional pending proposal) from the backend.
+  // ----- Backend → store -----
+
+  /// Fills the job from JobDetailDto and the proposal waiting for the customer (ProposalDto), if any.
   void applyRemote(Map<String, dynamic> detail, Map<String, dynamic>? pending) {
-    final job = detail['job'] as Map<String, dynamic>?;
-    remoteJobId = job?['id'] as String?;
-    final garageStatus = (job?['status'] as String?) ?? '';
-    statusLabel = switch (garageStatus) {
-      'AwaitingCustomerApproval' => 'Awaiting your approval',
-      'InProgress' || 'Paused' => 'In progress',
-      'Completed' => 'Completed',
-      'Closed' => 'Closed',
-      _ => garageStatus.isEmpty ? 'In progress' : garageStatus,
-    };
-    status = switch (garageStatus) {
-      'AwaitingCustomerApproval' => JobStatus.awaitingApproval,
+    final job = detail['job'] as Map<String, dynamic>;
+    remoteJobId = job['id'] as String;
+    jobId = (job['number'] as String?) ?? jobId;
+    _vehicleId = job['vehicleId'] as String?;
+    garageStatus = job['status'] as String?;
+
+    final proposals = ((detail['proposals'] as List?) ?? const []).cast<Map<String, dynamic>>().toList()
+      ..sort((a, b) => ((a['submittedAt'] as String?) ?? '').compareTo((b['submittedAt'] as String?) ?? ''));
+    final shown = pending ?? (proposals.isEmpty ? null : proposals.last);
+    if (shown != null) {
+      items
+        ..clear()
+        ..addAll(((shown['items'] as List?) ?? const []).cast<Map<String, dynamic>>().map(_itemFrom));
+    }
+    decisionSent = shown != null && shown['status'] == 'CustomerResponded';
+
+    final changes = ((detail['changeRequests'] as List?) ?? const []).cast<Map<String, dynamic>>();
+    changeRequests
+      ..clear()
+      ..addAll(changes.map(changeRequestFrom));
+    final changePending = changes.any((c) => c['status'] == 'PendingManagerReview');
+
+    _status = switch (garageStatus) {
+      'AwaitingCustomerApproval' => changePending ? JobStatus.changesRequested : JobStatus.awaitingApproval,
+      'AwaitingRelease' => JobStatus.awaitingApproval,
       'InProgress' || 'Paused' => JobStatus.inProgress,
       'Completed' => JobStatus.completed,
       'Closed' => JobStatus.paid,
       _ => JobStatus.diagnosis,
     };
     final timeline = ((detail['timeline'] as List?) ?? const []).cast<Map<String, dynamic>>();
-    final pct = timeline.fold<int>(
-      0,
-      (m, t) => ((t['percent'] as num?)?.toInt() ?? 0) > m ? (t['percent'] as num).toInt() : m,
-    );
-    final last = progressSteps.length - 1;
+    final pct = timeline.fold<int>(0, (m, t) => ((t['percent'] as num?)?.toInt() ?? 0) > m ? (t['percent'] as num).toInt() : m);
+    final last = MockData.progressSteps.length - 1;
     _progress = ((pct / 100) * last).round().clamp(0, last).toInt();
-    journey = (pct / 100).clamp(0.0, 1.0);
-    if (_progress >= 0 && _progress < progressSteps.length) {
-      currentStepLabel = progressSteps[_progress];
-    }
-    if (pending != null) {
-      statusLabel = 'Approval needed';
-      status = JobStatus.awaitingApproval;
-      items
-        ..clear()
-        ..addAll(((pending['items'] as List?) ?? const []).cast<Map<String, dynamic>>().map(_itemFrom));
-    }
 
     final invoice = detail['invoice'];
     if (invoice is Map) {
@@ -333,9 +279,21 @@ class JobStore extends ChangeNotifier {
     if (invoice is Map && invoice['status'] == 'Paid') {
       paidAmount = (invoice['total'] as num?)?.toDouble();
       paymentMethod = invoice['paymentMethod'] as String?;
-      status = JobStatus.paid;
-      statusLabel = 'Paid';
     }
+    notifyListeners();
+  }
+
+  /// The customer has no active job at the garage any more.
+  void clearRemote() {
+    if (remoteJobId == null) return;
+    remoteJobId = null;
+    garageStatus = null;
+    decisionSent = false;
+    invoiceNumber = null;
+    invoiceSubtotal = null;
+    invoiceTax = null;
+    invoiceTotal = null;
+    loyaltyDiscount = 0;
     notifyListeners();
   }
 
@@ -359,5 +317,42 @@ class JobStore extends ChangeNotifier {
       icon: labour ? Icons.handyman_outlined : Icons.settings_input_component_rounded,
       color: labour ? AppColors.primary : const Color(0xFFB7791F),
     );
+  }
+
+  static ChangeRequest changeRequestFrom(Map<String, dynamic> c) => ChangeRequest(
+        id: (c['number'] as String?) ?? '',
+        changes: ((c['changes'] as List?) ?? const []).cast<String>(),
+        details: (c['details'] as String?) ?? '',
+        createdAt: DateTime.tryParse((c['createdAt'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
+        status: switch (c['status']) {
+          'PendingManagerReview' => 'With service manager',
+          'ForwardedToMechanic' => 'Sent to your mechanic',
+          'Declined' => 'Declined: ${(c['managerNote'] as String?) ?? ''}',
+          'Acknowledged' => 'Mechanic is on it',
+          _ => 'Under Review',
+        },
+      );
+
+  int _nid = 100;
+  String nextNotificationId() => 'n${_nid++}';
+
+  /// Adds a notification at the top and refreshes listeners.
+  void push(AppNotification n) {
+    notifications.insert(0, n);
+    notifyListeners();
+  }
+
+  void markRead(String id) {
+    final i = notifications.indexWhere((n) => n.id == id);
+    if (i >= 0 && notifications[i].unread) {
+      notifications[i] = notifications[i].copyWith(unread: false);
+      CustomerBackend.instance.markRead(id);
+      notifyListeners();
+    }
+  }
+
+  void remove(String id) {
+    notifications.removeWhere((n) => n.id == id);
+    notifyListeners();
   }
 }
