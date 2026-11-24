@@ -11,6 +11,7 @@ export 'widgets/forms.dart';
 export 'widgets/glass.dart';
 export 'widgets/fx_page.dart';
 export 'widgets/media.dart';
+export 'widgets/osm_map.dart';
 export 'widgets/progress.dart';
 export '../data/mock/mock_data.dart';
 export '../data/models/models.dart';
