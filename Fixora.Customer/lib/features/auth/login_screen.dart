@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/core.dart';
-import '../../data/repositories/app_state.dart';
 import 'auth_widgets.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
@@ -49,17 +48,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String? get _emailError {
     if (!_submitted || _tab != 0) return null;
-    return validateEmail(_email.text);
+    final v = _email.text.trim();
+    if (v.isEmpty) return 'Enter your email';
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]{2,}$').hasMatch(v)) return 'Enter a valid email address';
+    return null;
   }
 
   String? get _passwordError {
     if (!_submitted || _tab != 0) return null;
-    return validatePassword(_password.text) ?? _authError;
+    if (_password.text.isEmpty) return 'Enter your password';
+    return _authError;
   }
 
   String? get _phoneError {
     if (!_submitted || _tab != 1) return null;
-    return validateMobile(_phone.text) ?? _authError;
+    final d = AppState.digitsOf(_phone.text);
+    if (d.length != 9) return 'Enter a valid mobile number';
+    return _authError;
   }
 
   /// Explicit choice to continue offline on the bundled demo account.
