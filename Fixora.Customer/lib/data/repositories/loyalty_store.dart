@@ -1,0 +1,181 @@
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart';
+
+/// Where a ledger line came from (the server's `source` prefix).
+enum PointsKind { drive, spend, redeem, other }
+
+/// One line of the garage loyalty ledger (LoyaltyEntryDto).
+class PointsEntry {
+  final int points;
+  final String description;
+  final String source;
+  final DateTime createdAt;
+  final DateTime? expiresAt;
+
+  const PointsEntry({
+    required this.points,
+    required this.description,
+    required this.source,
+    required this.createdAt,
+    this.expiresAt,
+  });
+
+  PointsKind get kind => switch (source.split(':').first) {
+        'drivescore' => PointsKind.drive,
+        'spend' => PointsKind.spend,
+        'redeem' => PointsKind.redeem,
+        _ => PointsKind.other,
+      };
+
+  bool get earned => points > 0;
+  bool get expired => earned && expiresAt != null && !expiresAt!.isAfter(DateTime.now());
+
+  factory PointsEntry.fromJson(Map<String, dynamic> j) => PointsEntry(
+        points: (j['points'] as num?)?.toInt() ?? 0,
+        description: (j['description'] as String?) ?? '',
+        source: (j['source'] as String?) ?? '',
+        createdAt: DateTime.tryParse((j['createdAt'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
+        expiresAt: DateTime.tryParse((j['expiresAt'] as String?) ?? '')?.toLocal(),
+      );
+}
+
+/// Garage loyalty points for the signed-in customer.
+///
+/// Rules (same as the backend, Customer + Manager billing):
+/// * 1 point per LKR 100 paid on an invoice (lasts 12 months).
+/// * DriveSense week with score 80+ over 20 km: 100 points, 200 at score 90+ (lasts 6 months).
+/// * At billing the points turn into a discount line automatically: at most the owner's
+///   percent of the subtotal and at most the owner's rupee cap per invoice.
+///
+/// [CustomerBackend] fills this store from `/customer/loyalty` and `/customer/garage`;
+/// without a backend it shows the same demo ledger the server seeds for Kavitha.
+class LoyaltyStore extends ChangeNotifier {
+  LoyaltyStore._() {
+    resetDemo();
+  }
+  static final LoyaltyStore instance = LoyaltyStore._();
+
+  int balance = 0;
+  final List<PointsEntry> history = [];
+  double rupeesPerPoint = 1;
+
+  /// Garage settings (Workshop settings page in the manager website).
+  bool enabled = true;
+  double percent = 2;
+  double cap = 1500;
+
+  /// true when the numbers came from the server.
+  bool live = false;
+  DateTime? updatedAt;
+
+  // ------------------------------------------------------------------ derived
+
+  /// What the balance is worth in rupees.
+  double get balanceValue => balance * rupeesPerPoint;
+
+  /// Discount the garage will apply to a bill with this subtotal (mirrors RedeemForInvoiceAsync).
+  double discountFor(double subtotal) {
+    if (!enabled || balance <= 0 || percent <= 0 || subtotal <= 0) return 0;
+    final maxDiscount = math.min(cap, (subtotal * percent / 100).roundToDouble());
+    final points = math.min(balance.toDouble(), (maxDiscount / rupeesPerPoint).floorToDouble());
+    return points <= 0 ? 0 : points * rupeesPerPoint;
+  }
+
+  /// Points used for that discount.
+  int pointsFor(double subtotal) => (discountFor(subtotal) / rupeesPerPoint).round();
+
+  /// Smallest bill on which the whole balance (up to the cap) can be used.
+  double get billForFullUse {
+    if (percent <= 0) return 0;
+    final usable = math.min(balanceValue, cap);
+    return (usable * 100 / percent).ceilToDouble();
+  }
+
+  /// Earned lines that are still valid, soonest expiry first.
+  List<PointsEntry> get activeEarned => history
+      .where((e) => e.earned && !e.expired && e.expiresAt != null)
+      .toList()
+    ..sort((a, b) => a.expiresAt!.compareTo(b.expiresAt!));
+
+  /// The next batch of points to expire, if any.
+  PointsEntry? get nextExpiry => activeEarned.isEmpty ? null : activeEarned.first;
+
+  /// Expires within 30 days.
+  bool get expirySoon {
+    final n = nextExpiry;
+    return n != null && n.expiresAt!.difference(DateTime.now()).inDays <= 30;
+  }
+
+  int get totalEarned => history.where((e) => e.earned).fold(0, (s, e) => s + e.points);
+  int get totalUsed => history.where((e) => !e.earned).fold(0, (s, e) => s - e.points);
+  int get totalExpired => history.where((e) => e.expired).fold(0, (s, e) => s + e.points);
+
+  // ------------------------------------------------------------------ updates
+
+  /// LoyaltyDto from `/customer/loyalty`.
+  void applyRemote(Map<String, dynamic> dto) {
+    balance = (dto['balance'] as num?)?.toInt() ?? 0;
+    rupeesPerPoint = (dto['rupeesPerPoint'] as num?)?.toDouble() ?? 1;
+    history
+      ..clear()
+      ..addAll(((dto['history'] as List?) ?? const []).cast<Map<String, dynamic>>().map(PointsEntry.fromJson));
+    live = true;
+    updatedAt = DateTime.now();
+    notifyListeners();
+  }
+
+  /// Loyalty fields of GarageDto from `/customer/garage`.
+  void applyGarage(Map<String, dynamic> garage) {
+    enabled = garage['loyaltyEnabled'] as bool? ?? enabled;
+    percent = (garage['loyaltyPercent'] as num?)?.toDouble() ?? percent;
+    cap = (garage['loyaltyCapRupees'] as num?)?.toDouble() ?? cap;
+    notifyListeners();
+  }
+
+  /// Demo ledger, identical to the backend seed for the demo customer.
+  void resetDemo() {
+    final now = DateTime.now();
+    live = false;
+    enabled = true;
+    percent = 2;
+    cap = 1500;
+    rupeesPerPoint = 1;
+    history
+      ..clear()
+      ..addAll([
+        PointsEntry(
+            points: 100,
+            description: 'Gentle driving week · score 80',
+            source: 'drivescore:seed2',
+            createdAt: now.subtract(const Duration(days: 21)),
+            expiresAt: DateTime(now.year, now.month + 5, now.day)),
+        PointsEntry(
+            points: 200,
+            description: 'Gentle driving week · score 84',
+            source: 'drivescore:seed1',
+            createdAt: now.subtract(const Duration(days: 28)),
+            expiresAt: DateTime(now.year, now.month + 5, now.day)),
+        PointsEntry(
+            points: 45,
+            description: 'Spend on INV-DEMO-0007',
+            source: 'spend:INV-DEMO-0007',
+            createdAt: DateTime(now.year, now.month - 11, now.day),
+            expiresAt: now.add(const Duration(days: 24))),
+        PointsEntry(
+            points: -60,
+            description: 'Discount on INV-DEMO-0007',
+            source: 'redeem:INV-DEMO-0007',
+            createdAt: DateTime(now.year, now.month - 11, now.day)),
+        PointsEntry(
+            points: 120,
+            description: 'Gentle driving week · score 86',
+            source: 'drivescore:seed0',
+            createdAt: DateTime(now.year, now.month - 13, now.day),
+            expiresAt: DateTime(now.year, now.month - 7, now.day)),
+      ]);
+    balance = history.where((e) => !e.expired).fold(0, (s, e) => s + e.points);
+    updatedAt = null;
+    notifyListeners();
+  }
+}
