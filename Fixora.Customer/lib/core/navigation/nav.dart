@@ -18,8 +18,8 @@ Route<T> fxRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
     transitionDuration: const Duration(milliseconds: 380),
     reverseTransitionDuration: const Duration(milliseconds: 280),
-    pageBuilder: (_, _, _) => page,
-    transitionsBuilder: (_, animation, _, child) {
+    pageBuilder: (_, __, ___) => page,
+    transitionsBuilder: (_, animation, __, child) {
       final curved = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
@@ -38,6 +38,7 @@ Route<T> fxRoute<T>(Widget page) {
     },
   );
 }
+
 extension NavX on BuildContext {
   Future<T?> push<T>(Widget page) => Navigator.of(this).push<T>(fxRoute<T>(page));
 
@@ -46,3 +47,4 @@ extension NavX on BuildContext {
 
   void pop<T>([T? result]) => Navigator.of(this).pop<T>(result);
 }
+
