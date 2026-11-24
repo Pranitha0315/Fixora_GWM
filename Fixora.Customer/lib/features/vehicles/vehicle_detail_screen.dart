@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/navigation/nav.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
-import '../../data/models/vehicle.dart';
-import '../../data/repositories/app_state.dart';
+import '../../core/core.dart';
 import '../bookings/book_service_screen.dart';
 import 'add_vehicle_screen.dart';
 import 'evidence_passport_screen.dart';
@@ -22,45 +18,24 @@ class VehicleDetailScreen extends StatelessWidget {
       listenable: app,
       builder: (context, _) {
         final v = app.vehicleById(vehicleId);
-        return Scaffold(
-          backgroundColor: AppColors.bg,
-          appBar: AppBar(
-            title: const Text('Vehicle Details'),
-            backgroundColor: AppColors.bg,
-            foregroundColor: AppColors.navy,
-            elevation: 0,
-            actions: [_menu(context, v)],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-            children: [
-              Text('Your vehicle overview', style: AppText.muted),
-              const SizedBox(height: 14),
-              Container(
+        final passport = app.passportFor(v.id);
+        final open = passport
+            .where((e) => e.status == PassportStatus.unresolved || e.status == PassportStatus.stillUnresolved)
+            .length;
+        return FxPage(
+          title: 'Vehicle Details',
+          subtitle: 'Your vehicle overview',
+          compactHeader: true,
+          trailing: _menu(context, v),
+          children: [
+            FadeSlide(
+              child: FxCard(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  gradient: LinearGradient(
-                    colors: [AppColors.surface, AppColors.adapt(const Color(0xFFECFDFC))],
-                  ),
-                ),
+                gradient: LinearGradient(colors: [AppColors.surface, AppColors.adapt(Color(0xFFECFDFC))]),
                 child: Row(
                   children: [
-                    Container(
-                      width: 112,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: AppColors.primarySoft,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(v.type.icon, size: 40, color: AppColors.link),
-                    ),
-                    Container(
-                      width: 1.4,
-                      height: 80,
-                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                      color: AppColors.border,
-                    ),
+                    SizedBox(width: 138, height: 96, child: VehicleImage(v, radius: 14)),
+                    Container(width: 1.4, height: 80, margin: const EdgeInsets.symmetric(horizontal: 12), color: AppColors.border),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,14 +50,8 @@ class VehicleDetailScreen extends StatelessWidget {
                               color: v.active ? AppColors.success : AppColors.textMuted,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text(
-                              v.active ? 'Active' : 'Inactive',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12.5,
-                              ),
-                            ),
+                            child: Text(v.active ? 'Active' : 'Inactive',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5)),
                           ),
                         ],
                       ),
@@ -90,13 +59,12 @@ class VehicleDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              Container(
+            ),
+            const SizedBox(height: 14),
+            FadeSlide(
+              index: 1,
+              child: FxCard(
                 padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(20),
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -108,82 +76,77 @@ class VehicleDetailScreen extends StatelessWidget {
                       _InfoCell(Icons.local_gas_station_outlined, 'Fuel Type', v.fuel),
                       _InfoCell(Icons.settings_outlined, 'Transmission', v.transmission),
                       _InfoCell(v.type.icon, 'Body Type', v.bodyType),
-                      _InfoCell(Icons.miscellaneous_services_outlined, 'Engine Capacity', '${v.engineCc} cc'),
-                      _InfoCell(Icons.speed_rounded, 'Mileage', '${v.mileageKm} km'),
-                      _InfoCell(
-                        Icons.favorite_border_rounded,
-                        'Health',
-                        '${(v.healthScore * 100).round()}%',
-                      ),
+                      _InfoCell(Icons.miscellaneous_services_outlined, 'Engine Capacity', '${groupDigits(v.engineCc)} cc'),
+                      _InfoCell(Icons.speed_rounded, 'Mileage', app.distance(v.mileageKm)),
+                      _InfoCell(Icons.favorite_border_rounded, 'Health', '${(v.healthScore * 100).round()}%'),
                     ]),
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(ServiceHistoryScreen(vehicleId: v.id)),
-                  icon: const Icon(Icons.history_rounded),
-                  label: const Text('View Service History'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navy,
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
+            ),
+            const SizedBox(height: 14),
+            FadeSlide(
+              index: 2,
+              child: OutlineButton2(
+                label: 'View Service History',
+                icon: Icons.history_rounded,
+                onPressed: () => context.push(ServiceHistoryScreen(vehicleId: v.id)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            FadeSlide(
+              index: 3,
+              child: FxCard(
+                onTap: () => context.push(EvidencePassportScreen(vehicle: v)),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7B5CFF), Color(0xFF4F3BD6)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderColor: Colors.transparent,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(color: Colors.white.o(0.18), borderRadius: BorderRadius.circular(14)),
+                      child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 28),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Evidence Passport',
+                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 2),
+                          Text(
+                            passport.isEmpty
+                                ? 'No suspected causes recorded'
+                                : '$open open suspected cause${open == 1 ? '' : 's'} · ${passport.length} total',
+                            style: TextStyle(color: Colors.white.o(0.85), fontSize: 12.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right_rounded, color: Colors.white),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(EvidencePassportScreen(vehicle: v)),
-                  icon: const Icon(Icons.shield_outlined),
-                  label: const Text('Evidence Passport'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navy,
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
+            ),
+            const SizedBox(height: 12),
+            FadeSlide(
+              index: 4,
+              child: PrimaryButton(
+                label: 'Book a Service',
+                icon: Icons.event_available_rounded,
+                onPressed: v.active
+                    ? () => context.push(BookServiceScreen(vehicleId: v.id))
+                    : () => showFxSnack(context, 'Set this vehicle to Active to book a service',
+                        icon: Icons.info_outline_rounded),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(AddVehicleScreen(editId: v.id)),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit details'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navy,
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 54,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    if (!v.active) {
-                      _snack(context, 'Set this vehicle to Active to book a service',
-                          icon: Icons.info_outline_rounded);
-                      return;
-                    }
-                    context.push(BookServiceScreen(vehicleId: v.id));
-                  },
-                  icon: const Icon(Icons.event_available_rounded),
-                  label: const Text('Book a Service'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -218,13 +181,10 @@ class VehicleDetailScreen extends StatelessWidget {
             context.push(AddVehicleScreen(editId: v.id));
           case 'status':
             app.updateVehicle(v.copyWith(active: !v.active));
-            _snack(
-              context,
-              v.active ? '${v.name} set to Inactive' : '${v.name} is Active again',
-            );
+            showFxSnack(context, v.active ? '${v.name} set to Inactive' : '${v.name} is Active again');
           case 'default':
             app.selectVehicle(v.id);
-            _snack(context, '${v.name} will show on Home');
+            showFxSnack(context, '${v.name} will show on Home');
           case 'remove':
             final ok = await showDialog<bool>(
               context: context,
@@ -244,7 +204,7 @@ class VehicleDetailScreen extends StatelessWidget {
             if (ok == true && context.mounted) {
               Navigator.of(context).pop();
               app.removeVehicle(v.id);
-              _snack(context, '${v.name} removed');
+              showFxSnack(context, '${v.name} removed');
             }
         }
       },
@@ -257,21 +217,6 @@ class VehicleDetailScreen extends StatelessWidget {
           child: Text('Remove vehicle', style: TextStyle(color: AppColors.dangerText)),
         ),
       ],
-    );
-  }
-
-  void _snack(BuildContext context, String msg, {IconData icon = Icons.check_circle_outline_rounded}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            Icon(icon, color: Colors.white, size: 18),
-            const SizedBox(width: 10),
-            Expanded(child: Text(msg)),
-          ],
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
     );
   }
 }
@@ -293,24 +238,17 @@ class _InfoCell extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: AppColors.link, size: 22),
-          Container(
-            width: 1,
-            height: 30,
-            margin: const EdgeInsets.symmetric(horizontal: 9),
-            color: AppColors.border,
-          ),
+          Container(width: 1, height: 30, margin: const EdgeInsets.symmetric(horizontal: 9), color: AppColors.border),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.small.copyWith(fontSize: 11.5)),
                 const SizedBox(height: 2),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.navy),
-                ),
+                Text(value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.navy)),
               ],
             ),
           ),
