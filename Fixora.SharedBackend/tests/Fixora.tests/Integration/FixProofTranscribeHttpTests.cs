@@ -40,10 +40,11 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
 
     private async Task<HttpClient> CustomerAsync() => await _factory.Customer();
 
-    private static MultipartFormDataContent BuildAudioForm(string language)
+    private static MultipartFormDataContent BuildAudioForm(string language, byte[]? audioBytes = null)
     {
-        // Minimal bytes labeled as audio/wav — NullSpeechToText ignores content and returns null.
-        var audio = new ByteArrayContent(new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00 });
+        // Default: minimal bytes labeled as audio/wav — NullSpeechToText ignores content and returns null.
+        var bytes = audioBytes ?? new byte[] { 0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00 };
+        var audio = new ByteArrayContent(bytes);
         audio.Headers.ContentType = new MediaTypeHeaderValue("audio/wav");
 
         var form = new MultipartFormDataContent
@@ -124,6 +125,40 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             form);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Assigned_mechanic_empty_audio_returns_validation_failed()
+    {
+        var ravi = await RaviAsync();
+        using var form = BuildAudioForm("ta", Array.Empty<byte>());
+
+        var response = await ravi.PostAsync(
+            $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
+            form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<ApiErrorResponse>())!;
+        Assert.Equal("validation_failed", error.Code);
+        Assert.Contains("empty", error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Assigned_mechanic_audio_over_15mb_returns_validation_failed()
+    {
+        // App Guard is 15 MB; RequestSizeLimit is 16 MB — 15 MB + 1 hits validation_failed, not 413.
+        var ravi = await RaviAsync();
+        using var form = BuildAudioForm("ta", new byte[15 * 1024 * 1024 + 1]);
+
+        var response = await ravi.PostAsync(
+            $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
+            form);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var error = (await response.Content.ReadFromJsonAsync<ApiErrorResponse>())!;
+        Assert.Equal("validation_failed", error.Code);
+        Assert.Contains("too long", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("15 MB", error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
