@@ -1,5 +1,13 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
   <ItemGroup>
-    <ProjectReference Include="../Fixora.SharedKernel/Fixora.SharedKernel.csproj" />
+    <ProjectReference Include="..\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
   </ItemGroup>
+
 </Project>

@@ -43,11 +43,6 @@ builder.Services.AddFixoraShared(config);
 builder.Services.AddCustomerModule(config);
 builder.Services.AddMechanicModule(config);
 builder.Services.AddManagerModule(config);
-// Manager + Mechanic schemas share one SQL database; acceptance must commit both or neither.
-builder.Services.AddScoped<IFixoraTransaction>(sp =>
-    new CrossContextTransaction<ManagerDbContext, MechanicDbContext>(
-        sp.GetRequiredService<ManagerDbContext>(),
-        sp.GetRequiredService<MechanicDbContext>()));
 
 builder.Services.AddControllers()
     .AddApplicationPart(typeof(CustomerControllerBase).Assembly)
@@ -70,8 +65,8 @@ builder.Services.AddCors(o => o.AddPolicy("apps", p =>
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseSerilogRequestLogging();
 app.UseMiddleware<ErrorHandlingMiddleware>();
+app.UseSerilogRequestLogging();
 app.UseCors("apps");
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -102,12 +97,13 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
     var cfg = sp.GetRequiredService<IConfiguration>();
     var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Database");
 
-    // One SQL Server, one schema per owner (shared / customer / mechanic / workshop).
-    await sp.GetRequiredService<SharedDbContext>().EnsureSchemaAsync(SharedDbContext.Schema);
-    await sp.GetRequiredService<CustomerDbContext>().EnsureSchemaAsync(CustomerDbContext.Schema);
-    await sp.GetRequiredService<MechanicDbContext>().EnsureSchemaAsync(MechanicDbContext.Schema);
-    await sp.GetRequiredService<ManagerDbContext>().EnsureSchemaAsync(ManagerDbContext.Schema);
-    await sp.GetRequiredService<ControlDbContext>().EnsureSchemaAsync(ControlDbContext.Schema);   // Manager / Auto mode
+    // One SQL Server, one schema per owner. Each context applies its own EF Core migrations
+    // (SQL Server) or just creates its tables (in-memory demo / tests).
+    await sp.GetRequiredService<SharedDbContext>().MigrateOrCreateAsync();
+    await sp.GetRequiredService<CustomerDbContext>().MigrateOrCreateAsync();
+    await sp.GetRequiredService<MechanicDbContext>().MigrateOrCreateAsync();
+    await sp.GetRequiredService<ManagerDbContext>().MigrateOrCreateAsync();
+    await sp.GetRequiredService<ControlDbContext>().MigrateOrCreateAsync();   // Manager / Auto mode
 
     if (cfg.GetValue("Database:Seed", true))
     {

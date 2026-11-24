@@ -112,7 +112,8 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
         var notifier = new StubNotifier();
         var queue = new QueueService(db, notifier, read, clock);
         var billing = new BillingService(db, new StubCustomers(), notifier, clock);
-        return new JobService(db, read, notifier, queue, billing, mechanics, clock);
+        // Shared JobService ctor: (db, read, notifier, queue, billing, clock) — no IMechanicDirectory.
+        return new JobService(db, read, notifier, queue, billing, clock);
     }
 
     private static JobCard SeedAssignedJob(
@@ -253,8 +254,9 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
     }
 
     [Fact]
-    public async Task Assignee_pause_and_resume_preserve_saved_progress_percent()
+    public async Task Assignee_pause_and_resume_use_Shared_LastPercent_constants()
     {
+        // Shared JobService.LastPercent: Paused → 50, otherwise → 60 (ignores prior ProgressUpdate %).
         await using var db = CreateDb();
         var assignee = Guid.NewGuid();
         var job = SeedAssignedJob(db, assignee, JobStatus.InProgress);
@@ -284,7 +286,7 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
             .Where(p => p.JobCardId == job.Id && p.Stage == "Paused")
             .OrderByDescending(p => p.At)
             .FirstAsync();
-        Assert.Equal(42, pauseUpdate.Percent);
+        Assert.Equal(50, pauseUpdate.Percent);
 
         clock.UtcNow = Now.AddMinutes(10);
         var resumed = await service.ApplyMechanicActionAsync(
@@ -298,7 +300,7 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
             .Where(p => p.JobCardId == job.Id && p.Stage == "Repair")
             .OrderByDescending(p => p.At)
             .FirstAsync();
-        Assert.Equal(42, resumeUpdate.Percent);
+        Assert.Equal(60, resumeUpdate.Percent);
         Assert.Equal("Work resumed.", resumeUpdate.Message);
     }
 }

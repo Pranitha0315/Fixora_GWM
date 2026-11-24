@@ -4,11 +4,14 @@ using Xunit;
 
 namespace Fixora.Tests.Integration;
 
+/// <summary>
+/// Characterizes Shared invitation list DTO: ListAsync maps via ToDto which includes token and link.
+/// </summary>
 [Collection("api")]
 public sealed class InvitationListingTests(FixoraFactory factory)
 {
     [Fact]
-    public async Task Listing_excludes_token_and_link_but_creation_returns_them()
+    public async Task Listing_includes_token_and_link_like_creation()
     {
         using var manager = await factory.Manager();
 
@@ -23,11 +26,11 @@ public sealed class InvitationListingTests(FixoraFactory factory)
 
         var invitation = createdJson.RootElement;
         var id = invitation.GetProperty("id").GetGuid();
+        var createdToken = invitation.GetProperty("token").GetString();
+        var createdLink = invitation.GetProperty("link").GetString();
 
-        Assert.False(string.IsNullOrWhiteSpace(
-            invitation.GetProperty("token").GetString()));
-        Assert.False(string.IsNullOrWhiteSpace(
-            invitation.GetProperty("link").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(createdToken));
+        Assert.False(string.IsNullOrWhiteSpace(createdLink));
 
         using var response = await manager.GetAsync(
             "/api/v1/manager/mechanics/invitations");
@@ -39,13 +42,10 @@ public sealed class InvitationListingTests(FixoraFactory factory)
 
         var entries = listJson.RootElement.EnumerateArray().ToArray();
 
-        Assert.Contains(entries, item =>
+        var listed = Assert.Single(entries, item =>
             item.GetProperty("id").GetGuid() == id);
 
-        Assert.All(entries, item =>
-        {
-            Assert.False(item.TryGetProperty("token", out _));
-            Assert.False(item.TryGetProperty("link", out _));
-        });
+        Assert.Equal(createdToken, listed.GetProperty("token").GetString());
+        Assert.Equal(createdLink, listed.GetProperty("link").GetString());
     }
 }

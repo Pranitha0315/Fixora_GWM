@@ -31,14 +31,26 @@ public static class CustomerSeeder
             var week = thisWeek.AddDays(-7 * w);
             db.WearProfiles.Add(new VehicleWearProfile
             {
-                VehicleId = DemoIds.VehicleWagonR, WeekStart = week, DistanceKm = 160 + 10 * w, RoughRoadPct = 52 + (4 - w) * 3.4,
-                PotholeHits = 18 + (4 - w) * 4, DriveScore = scores[4 - w], HarshBrakesPer100Km = 4 + (4 - w), HarshAccelsPer100Km = 3, UpdatedAt = week.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(6),
+                VehicleId = DemoIds.VehicleWagonR,
+                WeekStart = week,
+                DistanceKm = 160 + 10 * w,
+                RoughRoadPct = 52 + (4 - w) * 3.4,
+                PotholeHits = 18 + (4 - w) * 4,
+                DriveScore = scores[4 - w],
+                HarshBrakesPer100Km = 4 + (4 - w),
+                HarshAccelsPer100Km = 3,
+                UpdatedAt = week.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc).AddDays(6),
             });
         }
         db.Suggestions.Add(new MaintenanceSuggestion
         {
-            CustomerId = DemoIds.CustomerKavitha, VehicleId = DemoIds.VehicleWagonR, Component = "Suspension", WearFactor = 1.4, SuggestedServiceId = DemoIds.ServiceSuspension,
-            Reason = "Suspension check recommended — 62% of your driving was on rough roads", CreatedAt = now.AddDays(-3),
+            CustomerId = DemoIds.CustomerKavitha,
+            VehicleId = DemoIds.VehicleWagonR,
+            Component = "Suspension",
+            WearFactor = 1.4,
+            SuggestedServiceId = DemoIds.ServiceSuspension,
+            Reason = "Suspension check recommended — 62% of your driving was on rough roads",
+            CreatedAt = now.AddDays(-3),
         });
         db.Loyalty.AddRange(
             new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 200, Source = "drivescore:seed1", Description = "Gentle driving week · score 84", CreatedAt = now.AddDays(-28), ExpiresAt = now.AddMonths(5) },

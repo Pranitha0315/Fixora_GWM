@@ -39,7 +39,8 @@ public sealed class MechanicInvitationHttpTests
         Assert.False(string.IsNullOrWhiteSpace(invite.Token));
         Assert.Contains(invite.Token, invite.Link);
 
-        var list = (await manager.GetFromJsonAsync<List<InvitationListDto>>(
+        // Shared ListAsync returns InvitationDto (includes Token/Link), not InvitationListDto.
+        var list = (await manager.GetFromJsonAsync<List<InvitationDto>>(
             "/api/v1/manager/mechanics/invitations"))!;
         Assert.Contains(list, i => i.Id == invite.Id && i.Status == "Pending");
 
@@ -47,7 +48,7 @@ public sealed class MechanicInvitationHttpTests
             $"/api/v1/manager/mechanics/invitations/{invite.Id}");
         Assert.Equal(HttpStatusCode.NoContent, revoke.StatusCode);
 
-        var after = (await manager.GetFromJsonAsync<List<InvitationListDto>>(
+        var after = (await manager.GetFromJsonAsync<List<InvitationDto>>(
             "/api/v1/manager/mechanics/invitations"))!;
         Assert.Contains(after, i => i.Id == invite.Id && i.Status == "Revoked");
     }

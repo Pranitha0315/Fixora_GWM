@@ -39,7 +39,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddSingleton<IPushSender, LoggingPushSender>();
         services.AddSingleton<IMediaStorage, LocalMediaStorage>();
-        services.AddFixoraDbContext<SharedDbContext>(config);
+        services.AddFixoraDbContext<SharedDbContext>(config, SharedDbContext.Schema);
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(o =>

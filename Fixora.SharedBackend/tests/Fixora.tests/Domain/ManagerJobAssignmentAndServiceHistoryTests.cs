@@ -191,7 +191,8 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         var queue = new QueueService(db, notifier, read, clock);
         var billing = new BillingService(db, customers, notifier, clock);
         var inventory = new InventoryService(db, notifier, clock);
-        var jobs = new JobService(db, read, notifier, queue, billing, mechanics, clock);
+        // Shared JobService ctor: (db, read, notifier, queue, billing, clock) — no IMechanicDirectory.
+        var jobs = new JobService(db, read, notifier, queue, billing, clock);
         var bookings = new BookingService(db, read, notifier, queue, customers, clock);
         var approvals = new ApprovalWorkflowService(db, read, notifier, queue, inventory, clock);
         var changes = new ChangeRequestService(db, notifier, clock);
@@ -535,59 +536,67 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         Assert.Empty(otherHistory);
     }
 
-    // ---- Mechanic account validation on assign ----
+    // ---- Shared AssignAsync: no mechanic-directory / bay validation (sets ids + notifies) ----
 
     [Fact]
-    public async Task Unknown_mechanic_is_rejected_without_mutating_job_or_notifying()
+    public async Task Unknown_mechanic_is_still_assigned_and_notified_on_Shared()
     {
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var existingMechanic = Guid.NewGuid();
         var existingBay = Guid.NewGuid();
         var unknownMechanic = Guid.NewGuid();
+        var newBay = Guid.NewGuid();
         var job = SeedOpenJob(db, customerId, existingMechanic, existingBay);
         var harness = CreateHarness(db, existingMechanic);
 
-        var ex = await Assert.ThrowsAsync<NotFoundException>(
-            () => harness.Jobs.AssignAsync(
-                Guid.NewGuid(),
-                job.Id,
-                new AssignJobRequest(unknownMechanic, Guid.NewGuid())));
+        var summary = await harness.Jobs.AssignAsync(
+            Guid.NewGuid(),
+            job.Id,
+            new AssignJobRequest(unknownMechanic, newBay));
 
-        Assert.Equal("not_found", ex.Code);
+        Assert.Equal(unknownMechanic, summary.MechanicId);
+        Assert.Equal(newBay, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
-        Assert.Equal(existingMechanic, reloaded.MechanicId);
-        Assert.Equal(existingBay, reloaded.BayId);
-        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+        Assert.Equal(unknownMechanic, reloaded.MechanicId);
+        Assert.Equal(newBay, reloaded.BayId);
+
+        var assigned = Assert.Single(
+            JobAssignedNotifications(harness.Notifier),
+            n => n.Message.Title == "Job assigned to you");
+        Assert.Contains(
+            assigned.Recipients,
+            r => r.Role == Roles.Mechanic && r.UserId == unknownMechanic);
     }
 
     [Fact]
-    public async Task Inactive_mechanic_is_rejected_without_mutating_job_or_notifying()
+    public async Task Inactive_mechanic_is_still_assigned_on_Shared()
     {
+        // Shared AssignAsync does not consult IMechanicDirectory / Active.
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var existingMechanic = Guid.NewGuid();
         var existingBay = Guid.NewGuid();
         var inactiveMechanic = Guid.NewGuid();
+        var newBay = Guid.NewGuid();
         var job = SeedOpenJob(db, customerId, existingMechanic, existingBay);
         var directory = new AssignableMechanicDirectory()
             .WithActive(existingMechanic)
             .WithInactive(inactiveMechanic);
         var harness = CreateHarness(db, directory);
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(
-            () => harness.Jobs.AssignAsync(
-                Guid.NewGuid(),
-                job.Id,
-                new AssignJobRequest(inactiveMechanic, Guid.NewGuid())));
+        var summary = await harness.Jobs.AssignAsync(
+            Guid.NewGuid(),
+            job.Id,
+            new AssignJobRequest(inactiveMechanic, newBay));
 
-        Assert.Equal("mechanic_inactive", ex.Code);
+        Assert.Equal(inactiveMechanic, summary.MechanicId);
+        Assert.Equal(newBay, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
-        Assert.Equal(existingMechanic, reloaded.MechanicId);
-        Assert.Equal(existingBay, reloaded.BayId);
-        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+        Assert.Equal(inactiveMechanic, reloaded.MechanicId);
+        Assert.Equal(newBay, reloaded.BayId);
     }
 
     [Fact]
@@ -620,35 +629,34 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
             r => r.Role == Roles.Mechanic && r.UserId == mechanicId);
     }
 
-    // ---- Bay validation on assign ----
+    // ---- Shared AssignAsync: bay id written without Active/existence checks ----
 
     [Fact]
-    public async Task Unknown_bay_is_rejected_without_mutating_job_or_notifying()
+    public async Task Unknown_bay_is_still_assigned_on_Shared()
     {
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
         var mechanicId = Guid.NewGuid();
         var existingBay = SeedBay(db, name: "Existing Bay");
+        var unknownBay = Guid.NewGuid();
         var job = SeedOpenJob(db, customerId, mechanicId, existingBay.Id);
         var harness = CreateHarness(db, mechanicId);
 
-        var ex = await Assert.ThrowsAsync<ValidationException>(
-            () => harness.Jobs.AssignAsync(
-                Guid.NewGuid(),
-                job.Id,
-                new AssignJobRequest(mechanicId, Guid.NewGuid())));
+        var summary = await harness.Jobs.AssignAsync(
+            Guid.NewGuid(),
+            job.Id,
+            new AssignJobRequest(mechanicId, unknownBay));
 
-        Assert.Equal("validation_failed", ex.Code);
-        Assert.Equal("Pick an active bay.", ex.Message);
+        Assert.Equal(mechanicId, summary.MechanicId);
+        Assert.Equal(unknownBay, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
         Assert.Equal(mechanicId, reloaded.MechanicId);
-        Assert.Equal(existingBay.Id, reloaded.BayId);
-        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+        Assert.Equal(unknownBay, reloaded.BayId);
     }
 
     [Fact]
-    public async Task Inactive_bay_is_rejected_without_mutating_job_or_notifying()
+    public async Task Inactive_bay_is_still_assigned_on_Shared()
     {
         await using var db = CreateDb();
         var customerId = Guid.NewGuid();
@@ -658,18 +666,16 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         var job = SeedOpenJob(db, customerId, mechanicId, existingBay.Id);
         var harness = CreateHarness(db, mechanicId);
 
-        var ex = await Assert.ThrowsAsync<ValidationException>(
-            () => harness.Jobs.AssignAsync(
-                Guid.NewGuid(),
-                job.Id,
-                new AssignJobRequest(mechanicId, inactiveBay.Id)));
+        var summary = await harness.Jobs.AssignAsync(
+            Guid.NewGuid(),
+            job.Id,
+            new AssignJobRequest(mechanicId, inactiveBay.Id));
 
-        Assert.Equal("validation_failed", ex.Code);
-        Assert.Equal("Pick an active bay.", ex.Message);
+        Assert.Equal(mechanicId, summary.MechanicId);
+        Assert.Equal(inactiveBay.Id, summary.BayId);
 
         var reloaded = await db.JobCards.AsNoTracking().SingleAsync(j => j.Id == job.Id);
         Assert.Equal(mechanicId, reloaded.MechanicId);
-        Assert.Equal(existingBay.Id, reloaded.BayId);
-        Assert.Empty(JobAssignedNotifications(harness.Notifier));
+        Assert.Equal(inactiveBay.Id, reloaded.BayId);
     }
 }

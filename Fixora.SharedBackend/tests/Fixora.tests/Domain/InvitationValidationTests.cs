@@ -1,13 +1,15 @@
 ﻿using Fixora.Manager.Application.Staff;
-using Fixora.Manager.Domain;
 using Fixora.Manager.Infrastructure.Persistence;
 using Fixora.SharedKernel;
-using Fixora.Tests.Support;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 
 namespace Fixora.Tests.Domain;
 
+/// <summary>
+/// Characterizes Shared invitation create / FindValidAsync / revoke validity rules.
+/// Shared InvitationService ctor is (IManagerDb, IClock) only.
+/// </summary>
 public sealed class InvitationValidationTests
 {
     private static readonly DateTime Now =
@@ -27,8 +29,8 @@ public sealed class InvitationValidationTests
         return new ManagerDbContext(options);
     }
 
-    private static InvitationService CreateService(ManagerDbContext db, IClock clock, params Guid[] mechanicIds)
-        => new(db, clock, new TestMechanicDirectory(mechanicIds));
+    private static InvitationService CreateService(ManagerDbContext db, IClock clock)
+        => new(db, clock);
 
     [Fact]
     public async Task Created_invitation_expires_after_exactly_seven_days()
@@ -111,7 +113,7 @@ public sealed class InvitationValidationTests
         await using var db = CreateDb();
         var clock = new TestClock();
         var mechanicId = Guid.NewGuid();
-        var service = CreateService(db, clock, mechanicId);
+        var service = CreateService(db, clock);
 
         var result = await service.CreateAsync(
             Guid.NewGuid(),

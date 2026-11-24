@@ -135,8 +135,12 @@ public sealed class DriveSenseService(
                 if (!await db.Loyalty.AnyAsync(l => l.Source == source, ct))
                     db.Loyalty.Add(new LoyaltyEntry
                     {
-                        CustomerId = v.CustomerId, Points = profile.DriveScore >= 90 ? o.LoyaltyPointsPerScoreWeek * 2 : o.LoyaltyPointsPerScoreWeek,
-                        Source = source, Description = $"Gentle driving week · score {profile.DriveScore}", CreatedAt = clock.UtcNow, ExpiresAt = clock.UtcNow.AddMonths(6),
+                        CustomerId = v.CustomerId,
+                        Points = profile.DriveScore >= 90 ? o.LoyaltyPointsPerScoreWeek * 2 : o.LoyaltyPointsPerScoreWeek,
+                        Source = source,
+                        Description = $"Gentle driving week · score {profile.DriveScore}",
+                        CreatedAt = clock.UtcNow,
+                        ExpiresAt = clock.UtcNow.AddMonths(6),
                     });
             }
         }
@@ -151,9 +155,18 @@ public sealed class DriveSenseService(
         Guard.Against(t.DistanceKm is <= 0 or > 2000, "Trip distance is not valid.");
         var trip = new Trip
         {
-            CustomerId = customerId, VehicleId = vehicle.Id, StartedAt = t.StartedAt, DistanceKm = t.DistanceKm, RoughKm = Math.Min(t.RoughKm, t.DistanceKm),
-            PotholeCount = t.PotholeCount, HarshBrakes = t.HarshBrakes, HarshAccels = t.HarshAccels, SharpCorners = t.SharpCorners,
-            Confidence = Math.Clamp(t.Confidence, 0, 1), IsDemoReplay = demo, UploadedAt = clock.UtcNow,
+            CustomerId = customerId,
+            VehicleId = vehicle.Id,
+            StartedAt = t.StartedAt,
+            DistanceKm = t.DistanceKm,
+            RoughKm = Math.Min(t.RoughKm, t.DistanceKm),
+            PotholeCount = t.PotholeCount,
+            HarshBrakes = t.HarshBrakes,
+            HarshAccels = t.HarshAccels,
+            SharpCorners = t.SharpCorners,
+            Confidence = Math.Clamp(t.Confidence, 0, 1),
+            IsDemoReplay = demo,
+            UploadedAt = clock.UtcNow,
             SegmentGeohashesCsv = string.Join(',', (t.SegmentGeohashes ?? Array.Empty<string>()).Select(g => g.Length > 5 ? g[..5] : g)), // coarse cells only
             Score = DriveSenseRules.TripScore(t.DistanceKm, t.HarshBrakes, t.HarshAccels, t.SharpCorners, t.PotholeCount),
         };
@@ -210,8 +223,13 @@ public sealed class DriveSenseService(
             if (open) continue;
             var s = new MaintenanceSuggestion
             {
-                CustomerId = vehicle.CustomerId, VehicleId = vehicle.Id, Component = rule.Component, Reason = rule.Explanation,
-                WearFactor = rule.Factor, SuggestedServiceId = rule.ServiceId, CreatedAt = clock.UtcNow,
+                CustomerId = vehicle.CustomerId,
+                VehicleId = vehicle.Id,
+                Component = rule.Component,
+                Reason = rule.Explanation,
+                WearFactor = rule.Factor,
+                SuggestedServiceId = rule.ServiceId,
+                CreatedAt = clock.UtcNow,
             };
             db.Suggestions.Add(s);
             created.Add(s);

@@ -203,7 +203,12 @@ public sealed class ApprovalWorkflowService(
         Audit(p, auto ? AutoPilot.ActorRole : Roles.Manager, staffId, auto ? "Released to mechanic (Auto mode)" : "Released to mechanic", $"{released.Count} item(s) · Rs {released.Sum(i => i.Amount):N0}");
         db.ProgressUpdates.Add(new ProgressUpdate
         {
-            JobCardId = job.Id, Stage = "Approved work", Percent = 40, ActorRole = auto ? AutoPilot.ActorRole : Roles.Manager, ActorId = staffId, At = now,
+            JobCardId = job.Id,
+            Stage = "Approved work",
+            Percent = 40,
+            ActorRole = auto ? AutoPilot.ActorRole : Roles.Manager,
+            ActorId = staffId,
+            At = now,
             Message = released.Count > 0 ? $"Approved: {Names(released)}" : "No extra repairs approved; continuing the booked service.",
         });
         await db.SaveChangesAsync(ct);
@@ -285,7 +290,13 @@ public sealed class ApprovalWorkflowService(
     private void Audit(RepairProposal p, string role, Guid actor, string action, string? detail)
         => db.ApprovalAudit.Add(new ApprovalAuditEntry
         {
-            ProposalId = p.Id, JobCardId = p.JobCardId, ActorRole = role, ActorId = actor, Action = action, Detail = detail, At = clock.UtcNow,
+            ProposalId = p.Id,
+            JobCardId = p.JobCardId,
+            ActorRole = role,
+            ActorId = actor,
+            Action = action,
+            Detail = detail,
+            At = clock.UtcNow,
         });
 
     private static string Names(IEnumerable<RepairItem> items)

@@ -103,23 +103,26 @@ public sealed class ManagerJobAssignAndServiceHistoryHttpTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Unknown_mechanic_assign_returns_not_found()
+    public async Task Unknown_mechanic_assign_succeeds_on_Shared()
     {
+        // Shared AssignAsync does not look up mechanic accounts.
         var manager = await _factory.Manager();
+        var unknownMechanic = Guid.NewGuid();
 
         var response = await manager.PostAsJsonAsync(
             $"/api/v1/manager/jobs/{DemoIds.JobArunToday}/assign",
-            new { mechanicId = Guid.NewGuid(), bayId = DemoIds.Bay1 });
+            new { mechanicId = unknownMechanic, bayId = DemoIds.Bay1 });
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
-        var error = await ReadErrorAsync(response);
-        Assert.Equal(404, error.Status);
-        Assert.Equal("not_found", error.Code);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var summary = (await response.Content.ReadFromJsonAsync<JobSummaryDto>())!;
+        Assert.Equal(unknownMechanic, summary.MechanicId);
+        Assert.Equal(DemoIds.Bay1, summary.BayId);
     }
 
     [Fact]
-    public async Task Inactive_mechanic_assign_returns_mechanic_inactive()
+    public async Task Inactive_mechanic_assign_succeeds_on_Shared()
     {
+        // Shared AssignAsync does not check mechanic Active.
         var manager = await _factory.Manager();
         await SetMechanicActiveAsync(DemoIds.MechanicSenthil, active: false);
         try
@@ -128,10 +131,10 @@ public sealed class ManagerJobAssignAndServiceHistoryHttpTests : IAsyncLifetime
                 $"/api/v1/manager/jobs/{DemoIds.JobArunToday}/assign",
                 new { mechanicId = DemoIds.MechanicSenthil, bayId = DemoIds.Bay1 });
 
-            Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-            var error = await ReadErrorAsync(response);
-            Assert.Equal(409, error.Status);
-            Assert.Equal("mechanic_inactive", error.Code);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var summary = (await response.Content.ReadFromJsonAsync<JobSummaryDto>())!;
+            Assert.Equal(DemoIds.MechanicSenthil, summary.MechanicId);
+            Assert.Equal(DemoIds.Bay1, summary.BayId);
         }
         finally
         {
@@ -140,23 +143,24 @@ public sealed class ManagerJobAssignAndServiceHistoryHttpTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Unknown_bay_assign_returns_validation_failed()
+    public async Task Unknown_bay_assign_succeeds_on_Shared()
     {
+        // Shared AssignAsync writes BayId without existence/active checks.
         var manager = await _factory.Manager();
+        var unknownBay = Guid.NewGuid();
 
         var response = await manager.PostAsJsonAsync(
             $"/api/v1/manager/jobs/{DemoIds.JobArunToday}/assign",
-            new { mechanicId = DemoIds.MechanicKumar, bayId = Guid.NewGuid() });
+            new { mechanicId = DemoIds.MechanicKumar, bayId = unknownBay });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        var error = await ReadErrorAsync(response);
-        Assert.Equal(400, error.Status);
-        Assert.Equal("validation_failed", error.Code);
-        Assert.Equal("Pick an active bay.", error.Message);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var summary = (await response.Content.ReadFromJsonAsync<JobSummaryDto>())!;
+        Assert.Equal(DemoIds.MechanicKumar, summary.MechanicId);
+        Assert.Equal(unknownBay, summary.BayId);
     }
 
     [Fact]
-    public async Task Inactive_bay_assign_returns_validation_failed()
+    public async Task Inactive_bay_assign_succeeds_on_Shared()
     {
         var manager = await _factory.Manager();
         await SetBayActiveAsync(DemoIds.Bay2, active: false);
@@ -166,11 +170,10 @@ public sealed class ManagerJobAssignAndServiceHistoryHttpTests : IAsyncLifetime
                 $"/api/v1/manager/jobs/{DemoIds.JobArunToday}/assign",
                 new { mechanicId = DemoIds.MechanicKumar, bayId = DemoIds.Bay2 });
 
-            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-            var error = await ReadErrorAsync(response);
-            Assert.Equal(400, error.Status);
-            Assert.Equal("validation_failed", error.Code);
-            Assert.Equal("Pick an active bay.", error.Message);
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var summary = (await response.Content.ReadFromJsonAsync<JobSummaryDto>())!;
+            Assert.Equal(DemoIds.MechanicKumar, summary.MechanicId);
+            Assert.Equal(DemoIds.Bay2, summary.BayId);
         }
         finally
         {

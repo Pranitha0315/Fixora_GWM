@@ -14,7 +14,7 @@ public static class DependencyInjection
     public static IServiceCollection AddCustomerModule(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<CustomerOptions>(config.GetSection("Customer"));
-        services.AddFixoraDbContext<CustomerDbContext>(config);
+        services.AddFixoraDbContext<CustomerDbContext>(config, CustomerDbContext.Schema);
         services.AddScoped<ICustomerDb>(sp => sp.GetRequiredService<CustomerDbContext>());
         services.AddSingleton<IEmailSender, LoggingEmailSender>();
         services.AddCustomerApplication();

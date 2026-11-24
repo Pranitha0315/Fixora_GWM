@@ -20,9 +20,8 @@ namespace Fixora.Tests.Integration;
 public sealed class FixProofTranscribeHttpCollection;
 
 /// <summary>
-/// FX13-D06-NID-1: FixProof transcribe HTTP contract under NullSpeechToText, auth gates,
-/// and vendor-agnostic STT provider failure fallback (BR-FP-13). Does not claim real STT,
-/// language validation, or job-assignment gating.
+/// FixProof transcribe HTTP contract under NullSpeechToText and auth gates.
+/// Shared STT path has no provider-failure fallback (exceptions → 500).
 /// </summary>
 [Collection("fixproof-transcribe-http")]
 public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
@@ -122,8 +121,9 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Assigned_mechanic_transcribe_when_stt_throws_returns_unavailable_fallback()
+    public async Task Assigned_mechanic_transcribe_when_stt_throws_returns_server_error_on_Shared()
     {
+        // Shared FixProofCaptureService.TranscribeAsync forwards to ISpeechToText with no fallback catch.
         await using var factory = new ThrowingSttFixoraFactory(() =>
             throw new InvalidOperationException("STT provider unavailable"));
         var ravi = await factory.Mechanic();
@@ -133,13 +133,13 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        await AssertNullSttContractAsync(response);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     [Fact]
-    public async Task Assigned_mechanic_transcribe_when_stt_times_out_returns_unavailable_fallback()
+    public async Task Assigned_mechanic_transcribe_when_stt_times_out_returns_server_error_on_Shared()
     {
-        // Provider timeout surfaces as TaskCanceledException without the request token being cancelled.
+        // Shared has no timeout→null fallback; TaskCanceledException propagates as 500.
         await using var factory = new ThrowingSttFixoraFactory(() =>
             throw new TaskCanceledException("STT timed out"));
         var ravi = await factory.Mechanic();
@@ -149,7 +149,7 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        await AssertNullSttContractAsync(response);
+        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
     }
 
     /// <summary>Isolated host that replaces <see cref="ISpeechToText"/> with a throwing double.</summary>

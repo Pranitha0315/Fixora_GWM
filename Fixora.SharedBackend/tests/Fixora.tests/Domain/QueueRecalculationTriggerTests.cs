@@ -144,7 +144,8 @@ public sealed class QueueRecalculationTriggerTests
         var read = new WorkshopReadModel(db, mechanics, new StubMedia(), clock);
         var queue = new QueueService(db, notifier, read, clock);
         var billing = new BillingService(db, customers, notifier, clock);
-        var jobs = new JobService(db, read, notifier, queue, billing, mechanics, clock);
+        // Shared JobService ctor: (db, read, notifier, queue, billing, clock) — no IMechanicDirectory.
+        var jobs = new JobService(db, read, notifier, queue, billing, clock);
         var bookings = new BookingService(db, read, notifier, queue, customers, clock);
         return new Harness
         {

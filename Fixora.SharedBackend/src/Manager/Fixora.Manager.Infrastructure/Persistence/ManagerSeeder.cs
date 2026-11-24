@@ -23,8 +23,13 @@ public static class ManagerSeeder
 
         var ws = new Workshop
         {
-            Id = DemoIds.Workshop, Name = "Fixora Garage · Jaffna", Phone = "+94 21 222 3344", EmergencyPhone = "+94 77 555 0101",
-            Address = "No. 42, Point Pedro Road, Jaffna", Lat = 9.6847, Lng = 80.0255,
+            Id = DemoIds.Workshop,
+            Name = "Fixora Garage · Jaffna",
+            Phone = "+94 21 222 3344",
+            EmergencyPhone = "+94 77 555 0101",
+            Address = "No. 42, Point Pedro Road, Jaffna",
+            Lat = 9.6847,
+            Lng = 80.0255,
         };
         db.Workshops.Add(ws);
         db.Bays.AddRange(new Bay { Id = DemoIds.Bay1, Name = "Bay 1", SortOrder = 1 }, new Bay { Id = DemoIds.Bay2, Name = "Bay 2", SortOrder = 2 });
@@ -117,9 +122,19 @@ public static class ManagerSeeder
     {
         var appt = new Appointment
         {
-            CustomerId = customerId, CustomerName = customerName, VehicleId = vehicleId, VehicleLabel = vehicleLabel, ServiceId = svc.Id, ServiceName = svc.Name,
-            SlotStart = start, SlotEnd = start + length, Status = noShow ? AppointmentStatus.NoShow : AppointmentStatus.Completed,
-            BayId = jobNo % 2 == 0 ? DemoIds.Bay1 : DemoIds.Bay2, MechanicId = mechanicId, CreatedAt = start.AddDays(-2), DecidedAt = start.AddDays(-2),
+            CustomerId = customerId,
+            CustomerName = customerName,
+            VehicleId = vehicleId,
+            VehicleLabel = vehicleLabel,
+            ServiceId = svc.Id,
+            ServiceName = svc.Name,
+            SlotStart = start,
+            SlotEnd = start + length,
+            Status = noShow ? AppointmentStatus.NoShow : AppointmentStatus.Completed,
+            BayId = jobNo % 2 == 0 ? DemoIds.Bay1 : DemoIds.Bay2,
+            MechanicId = mechanicId,
+            CreatedAt = start.AddDays(-2),
+            DecidedAt = start.AddDays(-2),
         };
         db.Appointments.Add(appt);
         if (noShow) return null;
@@ -127,9 +142,21 @@ public static class ManagerSeeder
         jobNo++;
         var job = new JobCard
         {
-            Number = $"JC-{start:yyyy}-H{jobNo:0000}", AppointmentId = appt.Id, CustomerId = customerId, CustomerName = customerName, VehicleId = vehicleId,
-            VehicleLabel = vehicleLabel, MechanicId = mechanicId, BayId = appt.BayId, Status = JobStatus.Closed, Complaint = svc.Name,
-            EstimatedMinutes = svc.StandardMinutes, CreatedAt = start, StartedAt = start, WorkedMinutes = length.TotalMinutes, CompletedAt = start + length,
+            Number = $"JC-{start:yyyy}-H{jobNo:0000}",
+            AppointmentId = appt.Id,
+            CustomerId = customerId,
+            CustomerName = customerName,
+            VehicleId = vehicleId,
+            VehicleLabel = vehicleLabel,
+            MechanicId = mechanicId,
+            BayId = appt.BayId,
+            Status = JobStatus.Closed,
+            Complaint = svc.Name,
+            EstimatedMinutes = svc.StandardMinutes,
+            CreatedAt = start,
+            StartedAt = start,
+            WorkedMinutes = length.TotalMinutes,
+            CompletedAt = start + length,
         };
         appt.JobCardId = job.Id;
         db.JobCards.Add(job);
@@ -137,8 +164,15 @@ public static class ManagerSeeder
         invNo++;
         var invoice = new Invoice
         {
-            JobCardId = job.Id, CustomerId = customerId, Number = $"INV-{start:yyyy}-H{invNo:0000}", Subtotal = svc.BasePrice, Total = svc.BasePrice,
-            Status = InvoiceStatus.Paid, PaymentMethod = invNo % 3 == 0 ? "BankTransfer" : "Cash", IssuedAt = start + length, PaidAt = start + length,
+            JobCardId = job.Id,
+            CustomerId = customerId,
+            Number = $"INV-{start:yyyy}-H{invNo:0000}",
+            Subtotal = svc.BasePrice,
+            Total = svc.BasePrice,
+            Status = InvoiceStatus.Paid,
+            PaymentMethod = invNo % 3 == 0 ? "BankTransfer" : "Cash",
+            IssuedAt = start + length,
+            PaidAt = start + length,
         };
         invoice.Lines.Add(new InvoiceLine { InvoiceId = invoice.Id, Description = svc.Name, Qty = 1, UnitPrice = svc.BasePrice, Amount = svc.BasePrice });
         db.Invoices.Add(invoice);
@@ -152,18 +186,42 @@ public static class ManagerSeeder
         // Kavitha's Wagon R: booked from a DriveSense brake suggestion, inspection in progress by Ravi (FixProof demo).
         var kavithaAppt = new Appointment
         {
-            CustomerId = DemoIds.CustomerKavitha, CustomerName = "Kavitha", VehicleId = DemoIds.VehicleWagonR, VehicleLabel = "Suzuki Wagon R (NP CAB-4521)",
-            ServiceId = DemoIds.ServiceBrake, ServiceName = "Brake Inspection", SlotStart = now.AddMinutes(-40), SlotEnd = now.AddMinutes(20),
-            Status = AppointmentStatus.CheckedIn, Source = BookingSource.DriveSense, BayId = DemoIds.Bay1, MechanicId = DemoIds.MechanicRavi,
-            Notes = "Brake inspection recommended by DriveSense (1.5× pad wear)", CreatedAt = now.AddDays(-2), DecidedAt = now.AddDays(-2), JobCardId = DemoIds.JobKavithaToday,
+            CustomerId = DemoIds.CustomerKavitha,
+            CustomerName = "Kavitha",
+            VehicleId = DemoIds.VehicleWagonR,
+            VehicleLabel = "Suzuki Wagon R (NP CAB-4521)",
+            ServiceId = DemoIds.ServiceBrake,
+            ServiceName = "Brake Inspection",
+            SlotStart = now.AddMinutes(-40),
+            SlotEnd = now.AddMinutes(20),
+            Status = AppointmentStatus.CheckedIn,
+            Source = BookingSource.DriveSense,
+            BayId = DemoIds.Bay1,
+            MechanicId = DemoIds.MechanicRavi,
+            Notes = "Brake inspection recommended by DriveSense (1.5× pad wear)",
+            CreatedAt = now.AddDays(-2),
+            DecidedAt = now.AddDays(-2),
+            JobCardId = DemoIds.JobKavithaToday,
         };
         db.Appointments.Add(kavithaAppt);
         db.JobCards.Add(new JobCard
         {
-            Id = DemoIds.JobKavithaToday, Number = $"JC-{now:yyyy}-0042", AppointmentId = kavithaAppt.Id, CustomerId = DemoIds.CustomerKavitha, CustomerName = "Kavitha",
-            VehicleId = DemoIds.VehicleWagonR, VehicleLabel = kavithaAppt.VehicleLabel, MechanicId = DemoIds.MechanicRavi, BayId = DemoIds.Bay1,
-            Status = JobStatus.Inspecting, Complaint = "Squeal when braking; DriveSense: harsh braking + pothole hits", EstimatedMinutes = 90,
-            CreatedAt = now.AddMinutes(-35), StartedAt = now.AddMinutes(-30), RunningSince = now.AddMinutes(-30), QueueOrder = 1,
+            Id = DemoIds.JobKavithaToday,
+            Number = $"JC-{now:yyyy}-0042",
+            AppointmentId = kavithaAppt.Id,
+            CustomerId = DemoIds.CustomerKavitha,
+            CustomerName = "Kavitha",
+            VehicleId = DemoIds.VehicleWagonR,
+            VehicleLabel = kavithaAppt.VehicleLabel,
+            MechanicId = DemoIds.MechanicRavi,
+            BayId = DemoIds.Bay1,
+            Status = JobStatus.Inspecting,
+            Complaint = "Squeal when braking; DriveSense: harsh braking + pothole hits",
+            EstimatedMinutes = 90,
+            CreatedAt = now.AddMinutes(-35),
+            StartedAt = now.AddMinutes(-30),
+            RunningSince = now.AddMinutes(-30),
+            QueueOrder = 1,
         });
         db.ProgressUpdates.AddRange(
             new ProgressUpdate { JobCardId = DemoIds.JobKavithaToday, Stage = "Checked in", Message = "Vehicle received at the workshop.", Percent = 5, ActorRole = Roles.Manager, ActorId = DemoIds.Manager, At = now.AddMinutes(-35) },
@@ -172,26 +230,55 @@ public static class ManagerSeeder
         // Arun's Axio: waiting in the queue for Kumar.
         var arunAppt = new Appointment
         {
-            CustomerId = DemoIds.CustomerArun, CustomerName = "Arun", VehicleId = DemoIds.VehicleArunAxio, VehicleLabel = "Toyota Axio (NP KX-2210)",
-            ServiceId = DemoIds.ServiceGeneral, ServiceName = "General Service", SlotStart = now.AddMinutes(-10), SlotEnd = now.AddMinutes(80),
-            Status = AppointmentStatus.CheckedIn, BayId = DemoIds.Bay2, MechanicId = DemoIds.MechanicKumar, CreatedAt = now.AddDays(-1), DecidedAt = now.AddDays(-1),
+            CustomerId = DemoIds.CustomerArun,
+            CustomerName = "Arun",
+            VehicleId = DemoIds.VehicleArunAxio,
+            VehicleLabel = "Toyota Axio (NP KX-2210)",
+            ServiceId = DemoIds.ServiceGeneral,
+            ServiceName = "General Service",
+            SlotStart = now.AddMinutes(-10),
+            SlotEnd = now.AddMinutes(80),
+            Status = AppointmentStatus.CheckedIn,
+            BayId = DemoIds.Bay2,
+            MechanicId = DemoIds.MechanicKumar,
+            CreatedAt = now.AddDays(-1),
+            DecidedAt = now.AddDays(-1),
             JobCardId = DemoIds.JobArunToday,
         };
         db.Appointments.Add(arunAppt);
         db.JobCards.Add(new JobCard
         {
-            Id = DemoIds.JobArunToday, Number = $"JC-{now:yyyy}-0043", AppointmentId = arunAppt.Id, CustomerId = DemoIds.CustomerArun, CustomerName = "Arun",
-            VehicleId = DemoIds.VehicleArunAxio, VehicleLabel = arunAppt.VehicleLabel, MechanicId = DemoIds.MechanicKumar, BayId = DemoIds.Bay2,
-            Status = JobStatus.Open, Complaint = "General Service", EstimatedMinutes = 90, CreatedAt = now.AddMinutes(-10), QueueOrder = 2,
+            Id = DemoIds.JobArunToday,
+            Number = $"JC-{now:yyyy}-0043",
+            AppointmentId = arunAppt.Id,
+            CustomerId = DemoIds.CustomerArun,
+            CustomerName = "Arun",
+            VehicleId = DemoIds.VehicleArunAxio,
+            VehicleLabel = arunAppt.VehicleLabel,
+            MechanicId = DemoIds.MechanicKumar,
+            BayId = DemoIds.Bay2,
+            Status = JobStatus.Open,
+            Complaint = "General Service",
+            EstimatedMinutes = 90,
+            CreatedAt = now.AddMinutes(-10),
+            QueueOrder = 2,
         });
 
         // A request waiting for the manager (tomorrow 10:00 local).
         var tomorrow = localToday.AddDays(localToday.DayOfWeek == DayOfWeek.Saturday ? 2 : 1).AddHours(10);
         db.Appointments.Add(new Appointment
         {
-            CustomerId = DemoIds.CustomerArun, CustomerName = "Arun", VehicleId = DemoIds.VehicleArunAxio, VehicleLabel = "Toyota Axio (NP KX-2210)",
-            ServiceId = DemoIds.ServiceAlignment, ServiceName = "Wheel Alignment", SlotStart = ws.ToUtc(tomorrow), SlotEnd = ws.ToUtc(tomorrow).AddMinutes(45),
-            Status = AppointmentStatus.Requested, Notes = "Car pulls to the left", CreatedAt = now.AddHours(-3),
+            CustomerId = DemoIds.CustomerArun,
+            CustomerName = "Arun",
+            VehicleId = DemoIds.VehicleArunAxio,
+            VehicleLabel = "Toyota Axio (NP KX-2210)",
+            ServiceId = DemoIds.ServiceAlignment,
+            ServiceName = "Wheel Alignment",
+            SlotStart = ws.ToUtc(tomorrow),
+            SlotEnd = ws.ToUtc(tomorrow).AddMinutes(45),
+            Status = AppointmentStatus.Requested,
+            Notes = "Car pulls to the left",
+            CreatedAt = now.AddHours(-3),
         });
     }
 }

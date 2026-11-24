@@ -31,9 +31,9 @@ public sealed record SosStatusBody(string Status, string? Note);
 [EnableRateLimiting("auth")]
 public sealed class MechanicAuthController(MechanicAuthService auth) : ControllerBase
 {
-    [HttpPost("pin-login")] [AllowAnonymous] public Task<AuthTokens> Login(PinLoginRequest req, CancellationToken ct) => auth.LoginAsync(req, ct);
-    [HttpGet("invitations/{token}")] [AllowAnonymous] public Task<InvitationInfo> Invitation(string token, CancellationToken ct) => auth.CheckInvitationAsync(token, ct);
-    [HttpPost("invitations/accept")] [AllowAnonymous] public Task<AuthTokens> Accept(AcceptInvitationRequest req, CancellationToken ct) => auth.AcceptInvitationAsync(req, ct);
+    [HttpPost("pin-login")][AllowAnonymous] public Task<AuthTokens> Login(PinLoginRequest req, CancellationToken ct) => auth.LoginAsync(req, ct);
+    [HttpGet("invitations/{token}")][AllowAnonymous] public Task<InvitationInfo> Invitation(string token, CancellationToken ct) => auth.CheckInvitationAsync(token, ct);
+    [HttpPost("invitations/accept")][AllowAnonymous] public Task<AuthTokens> Accept(AcceptInvitationRequest req, CancellationToken ct) => auth.AcceptInvitationAsync(req, ct);
 }
 
 [Route("api/v1/mechanic/profile")]

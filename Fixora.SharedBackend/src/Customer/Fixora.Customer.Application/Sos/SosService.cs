@@ -1,6 +1,8 @@
 using Fixora.Customer.Application.Common;
 using Fixora.Customer.Contracts;
 using Fixora.Customer.Domain;
+using Fixora.Manager.Contracts;
+using Fixora.Manager.Domain;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -36,9 +38,14 @@ public sealed class SosService(ICustomerDb db, INotificationService notifier, IC
         var now = clock.UtcNow;
         var sos = new SosRequest
         {
-            CustomerId = customerId, VehicleId = vehicle?.Id, Lat = req.Lat, Lng = req.Lng,
-            Category = Categories.Contains(req.Category) ? req.Category : "Other", Note = req.Note?.Trim(),
-            IdempotencyKey = idempotencyKey, ReceivedAt = now,
+            CustomerId = customerId,
+            VehicleId = vehicle?.Id,
+            Lat = req.Lat,
+            Lng = req.Lng,
+            Category = Categories.Contains(req.Category) ? req.Category : "Other",
+            Note = req.Note?.Trim(),
+            IdempotencyKey = idempotencyKey,
+            ReceivedAt = now,
             DriveSenseContext = vehicle is { DriveSenseOptIn: true } ? await RecentTripContextAsync(vehicle.Id, ct) : null,
         };
         sos.History.Add(new SosStatusHistory { SosRequestId = sos.Id, Status = SosStatus.Received, ActorRole = Roles.Customer, ActorId = customerId, At = now });

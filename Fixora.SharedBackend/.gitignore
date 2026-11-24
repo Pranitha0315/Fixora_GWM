@@ -6,9 +6,3 @@ obj/
 TestResults/
 App_Data/
 appsettings.*.local.json
-
-*.bak
-
-.env
-.env.*
-!.env.example

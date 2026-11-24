@@ -71,8 +71,10 @@ public sealed class MechanicProgressCompleteHttpTests
     }
 
     [Fact]
-    public async Task Progress_on_open_job_before_start_is_conflict()
+    public async Task Progress_on_open_job_before_start_succeeds_on_Shared()
     {
+        // Shared ApplyMechanicActionAsync "progress" only blocks approval-pending statuses,
+        // not Open (no EnsureCanReportProgress gate).
         await using var factory = NewFactory();
         var kumar = await factory.LoginAsync(
             "/api/v1/mechanic/auth/pin-login",
@@ -81,7 +83,7 @@ public sealed class MechanicProgressCompleteHttpTests
         var response = await kumar.PostAsJsonAsync(
             $"/api/v1/mechanic/jobs/{DemoIds.JobArunToday}/actions",
             new JobActionRequest("progress", "Inspection", "too early", 10));
-        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]

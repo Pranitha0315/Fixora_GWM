@@ -32,8 +32,14 @@ public sealed class FixProofCaptureService(
         var stored = await media.SaveAsync(content, contentType, fileName, ct);
         var record = new CaptureMedia
         {
-            JobCardId = jobId, MechanicId = mechanicId, MediaRef = stored.MediaRef, ContentType = stored.ContentType, Size = stored.Size,
-            Phase = Enum.TryParse<MediaPhase>(phase, true, out var p) ? p : MediaPhase.Before, Caption = caption, CapturedAt = clock.UtcNow,
+            JobCardId = jobId,
+            MechanicId = mechanicId,
+            MediaRef = stored.MediaRef,
+            ContentType = stored.ContentType,
+            Size = stored.Size,
+            Phase = Enum.TryParse<MediaPhase>(phase, true, out var p) ? p : MediaPhase.Before,
+            Caption = caption,
+            CapturedAt = clock.UtcNow,
         };
         db.Media.Add(record);
         await db.SaveChangesAsync(ct);
@@ -47,26 +53,9 @@ public sealed class FixProofCaptureService(
         return rows.Select(r => new MediaUploadResult(r.Id, r.MediaRef, media.GetSignedUrl(r.MediaRef, TimeSpan.FromMinutes(15)), r.Phase.ToString(), r.CapturedAt)).ToList();
     }
 
-    /// <summary>
-    /// Transcribe a voice note (server STT). Returns null when no provider is configured or the
-    /// provider fails/times out so FixProof never blocks on AI (BR-FP-13). Request cancellation is not swallowed.
-    /// </summary>
-    public async Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
-    {
-        try
-        {
-            return await stt.TranscribeAsync(audio, contentType, language, ct);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            // Provider fault or timeout (e.g. TaskCanceledException without caller cancel) → unavailable.
-            return null;
-        }
-    }
+    /// <summary>Transcribe a voice note (server STT) — returns null when no STT provider is configured.</summary>
+    public Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
+        => stt.TranscribeAsync(audio, contentType, language, ct);
 
     public async Task<DraftDto> CreateDraftAsync(Guid mechanicId, Guid jobId, CreateDraftRequest req, CancellationToken ct = default)
     {
@@ -81,9 +70,19 @@ public sealed class FixProofCaptureService(
 
         var draft = new InspectionDraft
         {
-            JobCardId = jobId, MechanicId = mechanicId, Component = req.Component.Trim(), Transcript = transcript, Language = req.Language,
-            Severity = output.Severity, FindingEn = output.FindingEn, FindingTa = output.FindingTa, RecommendationEn = output.RecommendationEn,
-            RecommendationTa = output.RecommendationTa, Source = output.Source, MediaRefsCsv = string.Join(',', req.MediaRefs ?? Array.Empty<string>()), CreatedAt = clock.UtcNow,
+            JobCardId = jobId,
+            MechanicId = mechanicId,
+            Component = req.Component.Trim(),
+            Transcript = transcript,
+            Language = req.Language,
+            Severity = output.Severity,
+            FindingEn = output.FindingEn,
+            FindingTa = output.FindingTa,
+            RecommendationEn = output.RecommendationEn,
+            RecommendationTa = output.RecommendationTa,
+            Source = output.Source,
+            MediaRefsCsv = string.Join(',', req.MediaRefs ?? Array.Empty<string>()),
+            CreatedAt = clock.UtcNow,
         };
         db.Drafts.Add(draft);
         await db.SaveChangesAsync(ct);

@@ -1,22 +1,26 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-  <PropertyGroup>
-    <RootNamespace>Fixora.Host</RootNamespace>
-    <UserSecretsId>fixora-host-dev</UserSecretsId>
-  </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
-      <PrivateAssets>all</PrivateAssets>
-    </PackageReference>
-    <PackageReference Include="Serilog.AspNetCore" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="../../Customer/Fixora.Customer.Api/Fixora.Customer.Api.csproj" />
-    <ProjectReference Include="../../Customer/Fixora.Customer.Infrastructure/Fixora.Customer.Infrastructure.csproj" />
-    <ProjectReference Include="../../Mechanic/Fixora.Mechanic.Api/Fixora.Mechanic.Api.csproj" />
-    <ProjectReference Include="../../Mechanic/Fixora.Mechanic.Infrastructure/Fixora.Mechanic.Infrastructure.csproj" />
-    <ProjectReference Include="../../Manager/Fixora.Manager.Api/Fixora.Manager.Api.csproj" />
-    <ProjectReference Include="../../Manager/Fixora.Manager.Infrastructure/Fixora.Manager.Infrastructure.csproj" />
-    <ProjectReference Include="../../Shared/Fixora.Shared.Infrastructure/Fixora.Shared.Infrastructure.csproj" />
-  </ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+		<PackageReference Include="Serilog.AspNetCore" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\..\Customer\Fixora.Customer.Api\Fixora.Customer.Api.csproj" />
+	  <ProjectReference Include="..\..\Customer\Fixora.Customer.Infrastructure\Fixora.Customer.Infrastructure.csproj" />
+	  <ProjectReference Include="..\..\Manager\Fixora.Manager.Api\Fixora.Manager.Api.csproj" />
+	  <ProjectReference Include="..\..\Manager\Fixora.Manager.Infrastructure\Fixora.Manager.Infrastructure.csproj" />
+	  <ProjectReference Include="..\..\Mechanic\Fixora.Mechanic.Api\Fixora.Mechanic.Api.csproj" />
+	  <ProjectReference Include="..\..\Mechanic\Fixora.Mechanic.Infrastructure\Fixora.Mechanic.Infrastructure.csproj" />
+	  <ProjectReference Include="..\..\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj" />
+	  <ProjectReference Include="..\..\Shared\Fixora.Shared.Infrastructure\Fixora.Shared.Infrastructure.csproj" />
+	  <ProjectReference Include="..\..\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
 </Project>

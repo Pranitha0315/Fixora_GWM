@@ -352,7 +352,13 @@ public sealed class AutoPilotService(
     {
         control.AutoActions.Add(new AutoActionLog
         {
-            At = clock.UtcNow, Kind = kind, EntityId = entityId, JobCardId = jobId, Title = title, Detail = detail, Held = held,
+            At = clock.UtcNow,
+            Kind = kind,
+            EntityId = entityId,
+            JobCardId = jobId,
+            Title = title,
+            Detail = detail,
+            Held = held,
         });
         await control.SaveChangesAsync(ct);
     }

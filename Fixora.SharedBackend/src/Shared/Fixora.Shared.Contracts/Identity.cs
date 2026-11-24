@@ -28,16 +28,6 @@ public interface IPasswordService
     bool Verify(string hash, string secret);
 }
 
-/// <summary>
-/// Runs work inside one database transaction when the provider is relational.
-/// Used when Manager and Mechanic DbContexts must commit or roll back together.
-/// </summary>
-public interface IFixoraTransaction
-{
-    Task ExecuteAsync(Func<CancellationToken, Task> operation, CancellationToken ct = default);
-    Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default);
-}
-
 public sealed record StoredMedia(string MediaRef, string ContentType, long Size);
 
 /// <summary>Private media storage. Callers only ever receive short-lived signed URLs.</summary>

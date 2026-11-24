@@ -123,9 +123,17 @@ public sealed class AdvisorService(IManagerDb db, ICustomerDirectory customers, 
         foreach (var d in drafts)
             db.Insights.Add(new AdvisorInsight
             {
-                WeekStart = metrics.WeekStart, Detector = d.Detector, Severity = d.Severity, Title = d.TitleEn,
-                Narrative = d.NarrativeEn + "\n" + d.NarrativeTa, EvidenceJson = JsonSerializer.Serialize(d.Evidence),
-                SampleSize = d.SampleSize, RupeeImpact = d.RupeeImpact, ActionType = d.ActionType, ActionLabel = d.ActionLabel, CreatedAt = now,
+                WeekStart = metrics.WeekStart,
+                Detector = d.Detector,
+                Severity = d.Severity,
+                Title = d.TitleEn,
+                Narrative = d.NarrativeEn + "\n" + d.NarrativeTa,
+                EvidenceJson = JsonSerializer.Serialize(d.Evidence),
+                SampleSize = d.SampleSize,
+                RupeeImpact = d.RupeeImpact,
+                ActionType = d.ActionType,
+                ActionLabel = d.ActionLabel,
+                CreatedAt = now,
             });
         await db.SaveChangesAsync(ct);
 
@@ -171,32 +179,37 @@ public sealed class AdvisorService(IManagerDb db, ICustomerDirectory customers, 
         switch (insight.ActionType)
         {
             case "CreatePromo":
-            {
-                var targets = (await customers.ListCustomersAsync(ct)).Count;
-                var day = evidence.GetValueOrDefault("day", "Thursday");
-                var code = string.IsNullOrWhiteSpace(req.PromoCode) ? $"{day[..3].ToUpperInvariant()}{(int)(req.DiscountPercent ?? 20)}" : req.PromoCode.Trim().ToUpperInvariant();
-                var campaign = new Campaign
                 {
-                    Name = $"{day} {req.DiscountPercent ?? 20}% off", PromoCode = code, DiscountPercent = req.DiscountPercent ?? 20, TargetCount = targets, InsightId = insight.Id, SentAt = now,
-                    Message = req.Message ?? $"{day} {evidence.GetValueOrDefault("window", "afternoon")}: {req.DiscountPercent ?? 20}% off any service. Code {code}. Book in the Fixora app.",
-                };
-                db.Campaigns.Add(campaign);
-                db.Earnings.Add(new EarningsEntry { Kind = "CampaignMessages", Amount = targets * 2m, Reference = $"Campaign {code} × {targets}", At = now });
-                action.LinkedEntityId = campaign.Id;
-                action.OutcomeMetricKey = $"promo:{code}";
-                result = $"Campaign {code} sent to {targets} customers.";
-                break;
-            }
+                    var targets = (await customers.ListCustomersAsync(ct)).Count;
+                    var day = evidence.GetValueOrDefault("day", "Thursday");
+                    var code = string.IsNullOrWhiteSpace(req.PromoCode) ? $"{day[..3].ToUpperInvariant()}{(int)(req.DiscountPercent ?? 20)}" : req.PromoCode.Trim().ToUpperInvariant();
+                    var campaign = new Campaign
+                    {
+                        Name = $"{day} {req.DiscountPercent ?? 20}% off",
+                        PromoCode = code,
+                        DiscountPercent = req.DiscountPercent ?? 20,
+                        TargetCount = targets,
+                        InsightId = insight.Id,
+                        SentAt = now,
+                        Message = req.Message ?? $"{day} {evidence.GetValueOrDefault("window", "afternoon")}: {req.DiscountPercent ?? 20}% off any service. Code {code}. Book in the Fixora app.",
+                    };
+                    db.Campaigns.Add(campaign);
+                    db.Earnings.Add(new EarningsEntry { Kind = "CampaignMessages", Amount = targets * 2m, Reference = $"Campaign {code} × {targets}", At = now });
+                    action.LinkedEntityId = campaign.Id;
+                    action.OutcomeMetricKey = $"promo:{code}";
+                    result = $"Campaign {code} sent to {targets} customers.";
+                    break;
+                }
             case "OrderParts":
-            {
-                var partId = Guid.Parse(evidence["partId"]);
-                var qty = req.Quantity ?? int.Parse(evidence.GetValueOrDefault("suggestedQty", "4"));
-                var order = await inventory.PlaceOrderAsync(new PartsOrderCreate(partId, qty, req.Dealer ?? "Jaffna Auto Parts", 0, insight.Id), ct);
-                action.LinkedEntityId = order.Id;
-                action.OutcomeMetricKey = $"order:{order.Id}";
-                result = $"Ordered {qty} × {order.PartName} from {order.Dealer}.";
-                break;
-            }
+                {
+                    var partId = Guid.Parse(evidence["partId"]);
+                    var qty = req.Quantity ?? int.Parse(evidence.GetValueOrDefault("suggestedQty", "4"));
+                    var order = await inventory.PlaceOrderAsync(new PartsOrderCreate(partId, qty, req.Dealer ?? "Jaffna Auto Parts", 0, insight.Id), ct);
+                    action.LinkedEntityId = order.Id;
+                    action.OutcomeMetricKey = $"order:{order.Id}";
+                    result = $"Ordered {qty} × {order.PartName} from {order.Dealer}.";
+                    break;
+                }
             default:
                 action.OutcomeMetricKey = insight.Detector;
                 result = insight.ActionType switch
