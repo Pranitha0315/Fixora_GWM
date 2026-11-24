@@ -1,0 +1,128 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/authentication/presentation/screens/login_screen.dart';
+import '../../features/authentication/presentation/screens/otp_args.dart';
+import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
+import '../../features/authentication/presentation/screens/register_screen.dart';
+import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
+import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
+import '../../features/fixproof/presentation/screens/report_review_screen.dart';
+import '../../features/inventory/presentation/inventory_screen.dart';
+import '../../features/job_progress/presentation/screens/progress_update_screen.dart';
+import '../../features/jobs/presentation/screens/job_detail_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/passport/presentation/passport_screen.dart';
+import '../../features/repair_proposal/presentation/screens/repair_proposal_screen.dart';
+import '../../features/shell/presentation/main_shell.dart';
+import '../../features/sos/presentation/sos_screen.dart';
+import '../../features/splash/presentation/screens/splash_screen.dart';
+import 'route_names.dart';
+
+/// GoRouter config for Fixora Rev Mechanic.
+class AppRouter {
+  AppRouter._();
+
+  static final GlobalKey<NavigatorState> rootNavigatorKey =
+      GlobalKey<NavigatorState>();
+
+  static final GoRouter router = GoRouter(
+    navigatorKey: rootNavigatorKey,
+    initialLocation: RouteNames.splash,
+    routes: [
+      GoRoute(
+        path: RouteNames.splash,
+        builder: (context, state) => const SplashScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.login,
+        builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.forgotPassword,
+        builder: (context, state) => ForgotPasswordScreen(
+          initialEmail: state.uri.queryParameters['email'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.register,
+        builder: (context, state) => const RegisterScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.otpVerification,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is OtpArgs) {
+            return OtpVerificationScreen(args: extra);
+          }
+          final email = state.uri.queryParameters['email'] ?? '';
+          return OtpVerificationScreen(args: OtpArgs(email: email));
+        },
+      ),
+      GoRoute(
+        path: RouteNames.shell,
+        builder: (context, state) => const MainShell(),
+      ),
+      GoRoute(
+        path: '${RouteNames.jobDetails}/:jobId',
+        builder: (context, state) =>
+            JobDetailScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.inspectionCapture}/:jobId',
+        builder: (context, state) => InspectionCaptureScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.reportReview}/:jobId',
+        builder: (context, state) => ReportReviewScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.repairProposal}/:jobId',
+        builder: (context, state) => RepairProposalScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.evidencePassport}/:jobId',
+        builder: (context, state) => EvidencePassportScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.progressUpdate}/:jobId',
+        builder: (context, state) => ProgressUpdateScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.sosList,
+        builder: (context, state) => const SosListScreen(),
+      ),
+      GoRoute(
+        path: '${RouteNames.sosDetail}/:requestId',
+        builder: (context, state) => SosDetailScreen(
+          requestId: state.pathParameters['requestId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: RouteNames.notifications,
+        builder: (context, state) => const NotificationsScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.passport,
+        builder: (context, state) =>
+            const PassportScreen(standalone: true),
+      ),
+      GoRoute(
+        path: RouteNames.parts,
+        builder: (context, state) =>
+            const InventoryScreen(standalone: true),
+      ),
+    ],
+  );
+}
