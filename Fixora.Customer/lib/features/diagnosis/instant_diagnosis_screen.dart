@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../core/navigation/nav.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
-import '../../data/models/vehicle.dart';
-import '../../data/repositories/app_state.dart';
+import '../../core/core.dart';
 import '../bookings/book_service_screen.dart';
 import '../sos/sos_screen.dart';
 
@@ -25,6 +21,9 @@ class _Result {
 }
 
 /// Instant Diagnosis: rule-based symptom checker (USP 1, before the visit).
+///
+/// The rules are simple weights for the demo. The real AI Diagnosis
+/// Assistant on the backend can replace [_analyse] later.
 class InstantDiagnosisScreen extends StatefulWidget {
   final String vehicleId;
   const InstantDiagnosisScreen({super.key, required this.vehicleId});
@@ -169,12 +168,7 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
 
   Future<void> _run() async {
     if (_picked.isEmpty && _pickedLights.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pick at least one symptom or warning light'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showFxSnack(context, 'Pick at least one symptom or warning light', icon: Icons.info_outline_rounded);
       return;
     }
     setState(() {
@@ -189,137 +183,66 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
     });
   }
 
-  Future<void> _pickVehicle() async {
-    final app = AppState.instance;
-    final names = {for (final x in app.vehicles) '${x.name} · ${x.plate}': x.id};
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: AppColors.surfaceSolid, borderRadius: BorderRadius.circular(24)),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text('Choose vehicle', style: AppText.h1),
-              const SizedBox(height: 12),
-              for (final e in names.entries)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(e.key, style: AppText.label),
-                  trailing: Icon(
-                    e.value == _vehicleId ? Icons.radio_button_checked : Icons.radio_button_off,
-                    color: e.value == _vehicleId ? AppColors.link : AppColors.textMuted,
-                  ),
-                  onTap: () => Navigator.of(ctx).pop(e.value),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-    if (picked != null) setState(() => _vehicleId = picked);
-  }
-
   @override
   Widget build(BuildContext context) {
     final app = AppState.instance;
     final v = app.vehicleById(_vehicleId);
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('Instant Diagnosis'),
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.navy,
-        elevation: 0,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
-          Text('Tell us what you feel. We suggest likely causes.', style: AppText.muted),
-          const SizedBox(height: 12),
-          ListTile(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            tileColor: AppColors.surface,
-            leading: Icon(v.type.icon, color: AppColors.link),
-            title: Text(v.name, style: AppText.label),
-            subtitle: Text(v.plate, style: AppText.small),
-            trailing: TextButton(onPressed: _pickVehicle, child: const Text('Change')),
-            onTap: _pickVehicle,
-          ),
-          const SizedBox(height: 16),
-          Text("What's happening?", style: AppText.h2.copyWith(fontSize: 15)),
-          const SizedBox(height: 8),
-          _chips(_symptoms, _picked),
-          const SizedBox(height: 16),
-          Text('Any warning light on?', style: AppText.h2.copyWith(fontSize: 15)),
-          const SizedBox(height: 8),
-          _chips(_lights, _pickedLights, color: AppColors.warning),
-          const SizedBox(height: 16),
-          Text('When does it happen?', style: AppText.h2.copyWith(fontSize: 15)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final w in _when)
-                ChoiceChip(
-                  label: Text(w),
-                  selected: _whenPicked == w,
-                  showCheckmark: false,
-                  selectedColor: AppColors.primary,
-                  backgroundColor: AppColors.surface,
-                  side: BorderSide(color: AppColors.border),
-                  labelStyle: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: _whenPicked == w ? Colors.white : AppColors.navy,
-                  ),
-                  onSelected: (s) => setState(() => _whenPicked = s ? w : null),
+    return FxPage(
+      title: 'Instant Diagnosis',
+      subtitle: 'Tell us what you feel. We suggest likely causes.',
+      compactHeader: true,
+      children: [
+        VehicleStrip(
+          vehicle: v,
+          compact: true,
+          onTap: () async {
+            final names = {for (final x in app.vehicles) '${x.name} · ${x.plate}': x.id};
+            final picked = await pickOption(context,
+                title: 'Choose vehicle', options: names.keys.toList(), selected: '${v.name} · ${v.plate}');
+            if (picked != null) setState(() => _vehicleId = names[picked]!);
+          },
+          trailing: const ValueChip('Change'),
+        ),
+        const SectionTitle("What's happening?", icon: Icons.help_outline_rounded),
+        _chips(_symptoms, _picked),
+        const SectionTitle('Any warning light on?', icon: Icons.warning_amber_rounded),
+        _chips(_lights, _pickedLights, color: AppColors.warning),
+        const SectionTitle('When does it happen?', icon: Icons.schedule_rounded),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final w in _when)
+              ChoiceChip(
+                label: Text(w),
+                selected: _whenPicked == w,
+                showCheckmark: false,
+                selectedColor: AppColors.primary,
+                backgroundColor: AppColors.surface,
+                side: BorderSide(color: AppColors.border),
+                labelStyle: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: _whenPicked == w ? Colors.white : AppColors.navy,
                 ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _note,
-            maxLines: 2,
-            decoration: InputDecoration(
-              hintText: 'Anything else? (e.g. started after a long drive)',
-              filled: true,
-              fillColor: AppColors.surface,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.border)),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 52,
-            child: FilledButton.icon(
-              onPressed: _analysing ? null : _run,
-              icon: _analysing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.auto_awesome_rounded),
-              label: Text(_results == null ? 'Analyse Symptoms' : 'Analyse Again'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                onSelected: (s) => setState(() => _whenPicked = s ? w : null),
               ),
-            ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 350),
-            curve: Curves.easeOutCubic,
-            child: _results == null ? const SizedBox(width: double.infinity) : _resultsView(context, v),
-          ),
-        ],
-      ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        FxTextField(controller: _note, hint: 'Anything else? (e.g. started after a long drive)', maxLines: 2),
+        const SizedBox(height: 16),
+        PrimaryButton(
+          label: _results == null ? 'Analyse Symptoms' : 'Analyse Again',
+          icon: Icons.auto_awesome_rounded,
+          loading: _analysing,
+          onPressed: _run,
+        ),
+        AnimatedSize(
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+          child: _results == null ? const SizedBox(width: double.infinity) : _resultsView(context, v),
+        ),
+      ],
     );
   }
 
@@ -331,6 +254,7 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
         for (final it in items)
           GestureDetector(
             onTap: () {
+              AppState.instance.feedback();
               setState(() => picked.contains(it.$2) ? picked.remove(it.$2) : picked.add(it.$2));
             },
             child: AnimatedContainer(
@@ -346,14 +270,12 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
                 children: [
                   Icon(it.$1, size: 17, color: picked.contains(it.$2) ? Colors.white : color),
                   const SizedBox(width: 6),
-                  Text(
-                    it.$2,
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: picked.contains(it.$2) ? Colors.white : AppColors.navy,
-                    ),
-                  ),
+                  Text(it.$2,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: picked.contains(it.$2) ? Colors.white : AppColors.navy,
+                      )),
                 ],
               ),
             ),
@@ -373,113 +295,74 @@ class _InstantDiagnosisScreenState extends State<InstantDiagnosisScreen> {
     final service = results.first.cause.service;
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceSolid,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.auto_awesome_rounded, color: AppColors.purple),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Likely causes', style: AppText.h2)),
+      child: FadeSlide(
+        child: FxCard(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.auto_awesome_rounded, color: AppColors.purple),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('Likely causes', style: AppText.h2)),
+                  StatusPill(label, color: color, icon: icon),
+                ],
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < results.length; i++)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(color: color.o(0.12), borderRadius: BorderRadius.circular(20)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: i == 0 ? AppColors.primarySofter : AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: i == 0 ? AppColors.primary.o(0.4) : AppColors.border),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(icon, size: 14, color: color),
-                      const SizedBox(width: 4),
-                      Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 11)),
+                      Row(
+                        children: [
+                          Expanded(child: Text(results[i].cause.name, style: AppText.h3.copyWith(fontSize: 14.5))),
+                          Text('${(results[i].confidence * 100).round()}%',
+                              style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.link)),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      FxProgressBar(value: results[i].confidence, height: 6),
+                      const SizedBox(height: 6),
+                      Text('Service: ${results[i].cause.service} · Est. ${results[i].cause.cost}',
+                          style: AppText.small.copyWith(fontSize: 11.5)),
                     ],
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            for (var i = 0; i < results.length; i++)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: i == 0 ? AppColors.primarySofter : AppColors.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: i == 0 ? AppColors.primary.o(0.4) : AppColors.border),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: Text(results[i].cause.name, style: AppText.h3.copyWith(fontSize: 14.5))),
-                        Text(
-                          '${(results[i].confidence * 100).round()}%',
-                          style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.link),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: results[i].confidence,
-                        minHeight: 6,
-                        backgroundColor: AppColors.border,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Service: ${results[i].cause.service} · Est. ${results[i].cause.cost}',
-                      style: AppText.small.copyWith(fontSize: 11.5),
-                    ),
-                  ],
-                ),
+              Text(
+                'This is a guide, not a final diagnosis. A mechanic confirms it with an OBD scan and inspection.',
+                style: AppText.small.copyWith(fontSize: 11.5),
               ),
-            Text(
-              'This is a guide, not a final diagnosis. A mechanic confirms it with an OBD scan and inspection.',
-              style: AppText.small.copyWith(fontSize: 11.5),
-            ),
-            const SizedBox(height: 14),
-            if (worst == 2) ...[
-              SizedBox(
-                height: 48,
-                child: FilledButton.icon(
+              const SizedBox(height: 14),
+              if (worst == 2) ...[
+                PrimaryButton(
+                  label: 'Get Roadside Help',
+                  icon: Icons.sos_rounded,
+                  gradient: AppColors.sosGradient,
                   onPressed: () => context.push(const SosScreen()),
-                  icon: const Icon(Icons.sos_rounded),
-                  label: const Text('Get Roadside Help'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.danger,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
                 ),
-              ),
-              const SizedBox(height: 10),
-            ],
-            SizedBox(
-              height: 48,
-              child: FilledButton.icon(
+                const SizedBox(height: 10),
+              ],
+              PrimaryButton(
+                label: 'Book $service',
+                icon: Icons.event_available_rounded,
                 onPressed: () => context.push(BookServiceScreen(
                   vehicleId: v.id,
                   service: service,
                   symptoms: [..._picked, ..._pickedLights.map((l) => '$l light')],
                   note: _note.text.trim(),
                 )),
-                icon: const Icon(Icons.event_available_rounded),
-                label: Text('Book $service'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
