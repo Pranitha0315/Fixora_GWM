@@ -5,9 +5,10 @@ import '../../../app/theme/app_colors.dart';
 import '../../fixproof/presentation/screens/fixproof_hub_screen.dart';
 import '../../home/presentation/screens/home_screen.dart';
 import '../../inventory/presentation/inventory_screen.dart';
-import '../../jobs/presentation/screens/queue_screen.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../queue_board/presentation/screens/queue_board_screen.dart';
+
 
 /// Current bottom-nav tab.
 class ShellTabNotifier extends Notifier<int> {
@@ -51,7 +52,7 @@ class MainShell extends ConsumerWidget {
 
     const pages = <Widget>[
       HomeScreen(),
-      QueueScreen(asTab: true),
+      QueueBoardScreen(asTab: true),
       FixproofHubScreen(),
       InventoryScreen(),
       ProfileScreen(),
