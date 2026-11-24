@@ -21,7 +21,7 @@ public sealed class FixProofTranscribeHttpCollection;
 
 /// <summary>
 /// FixProof transcribe HTTP contract under NullSpeechToText and auth gates.
-/// Shared STT path has no provider-failure fallback (exceptions → 500).
+/// FX13-D06-NID-1: STT failures return 200 with available=false + reason (typing fallback).
 /// </summary>
 [Collection("fixproof-transcribe-http")]
 public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
@@ -54,7 +54,7 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
         return form;
     }
 
-    private static async Task AssertNullSttContractAsync(HttpResponseMessage response)
+    private static async Task AssertUnavailableSttContractAsync(HttpResponseMessage response, string? reasonContains = null)
     {
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         await using var stream = await response.Content.ReadAsStreamAsync();
@@ -66,6 +66,12 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
 
         Assert.True(root.TryGetProperty("available", out var available));
         Assert.False(available.GetBoolean());
+
+        Assert.True(root.TryGetProperty("reason", out var reason));
+        Assert.Equal(JsonValueKind.String, reason.ValueKind);
+        Assert.False(string.IsNullOrWhiteSpace(reason.GetString()));
+        if (reasonContains is not null)
+            Assert.Contains(reasonContains, reason.GetString()!, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -78,7 +84,7 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        await AssertNullSttContractAsync(response);
+        await AssertUnavailableSttContractAsync(response);
     }
 
     [Fact]
@@ -91,7 +97,7 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        await AssertNullSttContractAsync(response);
+        await AssertUnavailableSttContractAsync(response);
     }
 
     [Fact]
@@ -121,9 +127,9 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Assigned_mechanic_transcribe_when_stt_throws_returns_server_error_on_Shared()
+    public async Task Assigned_mechanic_transcribe_when_stt_throws_returns_unavailable_with_reason()
     {
-        // Shared FixProofCaptureService.TranscribeAsync forwards to ISpeechToText with no fallback catch.
+        // NID Gemini pack: provider failures never 500 — typing fallback via available=false + reason.
         await using var factory = new ThrowingSttFixoraFactory(() =>
             throw new InvalidOperationException("STT provider unavailable"));
         var ravi = await factory.Mechanic();
@@ -133,13 +139,13 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        await AssertUnavailableSttContractAsync(response, "Speech-to-text is not available");
     }
 
     [Fact]
-    public async Task Assigned_mechanic_transcribe_when_stt_times_out_returns_server_error_on_Shared()
+    public async Task Assigned_mechanic_transcribe_when_stt_times_out_returns_unavailable_with_reason()
     {
-        // Shared has no timeout→null fallback; TaskCanceledException propagates as 500.
+        // TaskCanceledException from STT (request ct not cancelled) → available=false, not 500.
         await using var factory = new ThrowingSttFixoraFactory(() =>
             throw new TaskCanceledException("STT timed out"));
         var ravi = await factory.Mechanic();
@@ -149,7 +155,7 @@ public sealed class FixProofTranscribeHttpTests : IAsyncLifetime
             $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/transcribe",
             form);
 
-        Assert.Equal(HttpStatusCode.InternalServerError, response.StatusCode);
+        await AssertUnavailableSttContractAsync(response, "Speech-to-text is not available");
     }
 
     /// <summary>Isolated host that replaces <see cref="ISpeechToText"/> with a throwing double.</summary>

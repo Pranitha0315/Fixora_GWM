@@ -13,6 +13,9 @@ public sealed record UpdateDraftRequest(string Component, string FindingEn, stri
 public sealed record DraftDto(Guid Id, Guid JobCardId, string Component, string Transcript, string Language, string Severity, string FindingEn, string FindingTa,
     string RecommendationEn, string RecommendationTa, IReadOnlyList<string> MediaUrls, IReadOnlyList<string> MediaRefs, string Source, string Status, bool Verified, Guid? PublishedIssueId);
 
+/// <summary>Result of server speech-to-text: Available = false means "let the mechanic type" (Reason says why).</summary>
+public sealed record TranscriptResult(string? Transcript, bool Available, string? Reason);
+
 /// <summary>
 /// FixProof capture (USP 1) on the mechanic side: photo/video + voice → AI draft (unverified) →
 /// mechanic edits and confirms → verified issue published to the manager-owned job card.
@@ -53,9 +56,28 @@ public sealed class FixProofCaptureService(
         return rows.Select(r => new MediaUploadResult(r.Id, r.MediaRef, media.GetSignedUrl(r.MediaRef, TimeSpan.FromMinutes(15)), r.Phase.ToString(), r.CapturedAt)).ToList();
     }
 
-    /// <summary>Transcribe a voice note (server STT) — returns null when no STT provider is configured.</summary>
-    public Task<string?> TranscribeAsync(Stream audio, string contentType, string language, CancellationToken ct = default)
-        => stt.TranscribeAsync(audio, contentType, language, ct);
+    /// <summary>
+    /// Transcribe a voice note (server STT, FX13-D06-NID-1). Only for the mechanic's own assigned job.
+    /// Never throws for an STT problem: Available = false + Reason, so the app falls back to typing.
+    /// </summary>
+    public async Task<TranscriptResult> TranscribeAsync(Guid mechanicId, Guid jobId, Stream audio, string contentType, long length, string language, CancellationToken ct = default)
+    {
+        await EnsureAssignedAsync(mechanicId, jobId, ct);
+        Guard.Against(length <= 0, "The voice note is empty. Record again.");
+        Guard.Against(length > 15 * 1024 * 1024, "The voice note is too long (max 15 MB). Record a shorter note.");
+        var lang = language is "en" or "ta" ? language : "ta";
+        try
+        {
+            var text = await stt.TranscribeAsync(audio, contentType, lang, ct);
+            return string.IsNullOrWhiteSpace(text)
+                ? new TranscriptResult(null, false, "Could not understand the voice note. Type what you found, or record again.")
+                : new TranscriptResult(text.Trim(), true, null);
+        }
+        catch (Exception) when (!ct.IsCancellationRequested)
+        {
+            return new TranscriptResult(null, false, "Speech-to-text is not available right now. Type what you found.");
+        }
+    }
 
     public async Task<DraftDto> CreateDraftAsync(Guid mechanicId, Guid jobId, CreateDraftRequest req, CancellationToken ct = default)
     {
