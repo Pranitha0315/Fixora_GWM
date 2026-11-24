@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/core.dart';
 import '../../core/backend/api_client.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_theme.dart';
 import '../../data/remote/customer_backend.dart';
 
 enum _SosState { idle, searching, matched }
 
-/// Roadside SOS: pick a problem, send location + category to nearby garages.
+/// Roadside SOS (USP 2): online + offline (save & retry, Bluetooth relay).
 class SosScreen extends StatefulWidget {
   final bool showNav;
   const SosScreen({super.key, this.showNav = true});
@@ -53,14 +52,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-  void _snack(String msg, {IconData? icon}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), behavior: SnackBarBehavior.floating),
-    );
-  }
-
-  /// Live hub updates. status: Acknowledged | Dispatched | OnSite | Resolved | Cancelled
-  /// UI: searching → matched → Help is on the way / resolved.
+  /// Manager acknowledged / dispatched / resolved: follows the server state live.
   void _onSosUpdate() {
     final s = CustomerBackend.instance.sos.value;
     if (!mounted || s == null || _receipt == null || s['id'] != _receipt) return;
@@ -71,10 +63,10 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         _state = _SosState.matched;
         _accepted = 0;
       });
-      _snack(status == 'OnSite' ? 'Your mechanic is on site.' : 'A mechanic is on the way.');
+      showFxSnack(context, status == 'OnSite' ? 'Your mechanic is on site.' : 'A mechanic is on the way.');
     } else if (status == 'Acknowledged') {
       setState(() => _state = _SosState.matched);
-      _snack('The garage has your SOS and is arranging help.');
+      showFxSnack(context, 'The garage has your SOS and is arranging help.');
     } else if (status == 'Resolved' || status == 'Cancelled') {
       _timer?.cancel();
       setState(() {
@@ -82,7 +74,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         _accepted = -1;
         _receipt = null;
       });
-      _snack(status == 'Resolved' ? 'SOS resolved. Drive safe!' : 'SOS cancelled.');
+      showFxSnack(context, status == 'Resolved' ? 'SOS resolved. Drive safe!' : 'SOS cancelled.');
     }
   }
 
@@ -93,17 +85,14 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
       _escalateSecs = 15 * 60;
     });
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() => _escalateSecs = (_escalateSecs - 1).clamp(0, 15 * 60).toInt());
     });
     _sosKey ??= ApiClient.newIdempotencyKey();
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
-        final r = await CustomerBackend.instance.raiseSos(
-          problem: _problems[_problem].$2,
-          idempotencyKey: _sosKey,
-        );
+        final r = await CustomerBackend.instance.raiseSos(problem: _problems[_problem].$2, idempotencyKey: _sosKey);
         if (!mounted) return;
         final at = DateTime.tryParse((r['receivedAt'] as String?) ?? '')?.toLocal() ?? DateTime.now();
         _sosKey = null;
@@ -111,25 +100,24 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           _receipt = r['receiptId'] as String?;
           _state = _SosState.matched;
         });
-        final receiptShort = (_receipt ?? '').length >= 8
-            ? (_receipt!.substring(0, 8).toUpperCase())
-            : (_receipt ?? '').toUpperCase();
-        _snack('Delivered ${_time12(at)} · receipt $receiptShort');
+        showFxSnack(context, 'Delivered ${time12(at)} · receipt ${(_receipt ?? '').substring(0, 8).toUpperCase()}');
         return;
       } on ApiException catch (e) {
         if (!e.isNetwork) {
           if (!mounted) return;
           _cancel();
-          _snack(e.message);
+          showFxSnack(context, e.message, icon: Icons.error_outline_rounded);
           return;
         }
+        // Pending: not delivered yet. Retry with the same key so the garage never gets two.
         await Future<void>.delayed(const Duration(seconds: 4));
         if (!mounted || _state == _SosState.idle) return;
       }
     }
     if (!mounted) return;
     _cancel();
-    _snack('SOS not delivered. Call the garage.');
+    final phone = CustomerBackend.instance.garagePhone;
+    showFxSnack(context, 'SOS not delivered. Call the garage${phone.isEmpty ? '' : ' on $phone'}.', icon: Icons.error_outline_rounded);
   }
 
   void _send() {
@@ -143,11 +131,11 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
       _escalateSecs = 15 * 60;
     });
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       setState(() => _escalateSecs = (_escalateSecs - 1).clamp(0, 15 * 60).toInt());
     });
-    if (_offline) return;
+    if (_offline) return; // stays "saved, retrying" until back online
     Future<void>.delayed(const Duration(milliseconds: 2200), () {
       if (!mounted || _state != _SosState.searching) return;
       setState(() => _state = _SosState.matched);
@@ -177,96 +165,70 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     return '$m:$s';
   }
 
-  String _time12(DateTime d) {
-    final h = d.hour % 12 == 0 ? 12 : d.hour % 12;
-    final m = d.minute.toString().padLeft(2, '0');
-    final ap = d.hour >= 12 ? 'PM' : 'AM';
-    return '$h:$m $ap';
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        title: const Text('Roadside SOS'),
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.navy,
-        elevation: 0,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: GestureDetector(
-              onTap: () => setState(() => _offline = !_offline),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _offline ? AppColors.ink : AppColors.surface,
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _offline ? Icons.wifi_off_rounded : Icons.wifi_rounded,
-                      size: 16,
-                      color: _offline ? Colors.white : AppColors.success,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _offline ? 'Offline (demo)' : 'Online',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: _offline ? Colors.white : AppColors.navy,
-                      ),
-                    ),
-                  ],
+    return FxPage(
+      title: 'Roadside SOS',
+      subtitle: 'Stuck? We find a garage that can actually fix it.',
+      showNav: widget.showNav,
+      topRight: GestureDetector(
+        onTap: () => setState(() => _offline = !_offline),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: _offline ? AppColors.ink : AppColors.surface,
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(_offline ? Icons.wifi_off_rounded : Icons.wifi_rounded,
+                  size: 16, color: _offline ? Colors.white : AppColors.success),
+              const SizedBox(width: 6),
+              Text(_offline ? 'Offline (demo)' : 'Online',
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: _offline ? Colors.white : AppColors.navy)),
+            ],
+          ),
+        ),
+      ),
+      children: [
+        // Emergency call reminder
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.dangerSoft,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.danger.o(0.25)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.local_hospital_outlined, color: AppColors.danger),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  const TextSpan(children: [
+                    TextSpan(text: 'Anyone hurt? Call '),
+                    TextSpan(text: '1990', style: TextStyle(fontWeight: FontWeight.w800)),
+                    TextSpan(text: ' (Suwa Seriya) or '),
+                    TextSpan(text: '119', style: TextStyle(fontWeight: FontWeight.w800)),
+                    TextSpan(text: ' (Police) first.'),
+                  ]),
+                  style: AppText.body.copyWith(fontSize: 12.5),
                 ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-        children: [
-          Text('Stuck? We find a garage that can actually fix it.', style: AppText.muted),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.dangerSoft,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.danger.o(0.25)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.local_hospital_outlined, color: AppColors.danger),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text.rich(
-                    const TextSpan(children: [
-                      TextSpan(text: 'Anyone hurt? Call '),
-                      TextSpan(text: '1990', style: TextStyle(fontWeight: FontWeight.w800)),
-                      TextSpan(text: ' (Suwa Seriya) or '),
-                      TextSpan(text: '119', style: TextStyle(fontWeight: FontWeight.w800)),
-                      TextSpan(text: ' (Police) first.'),
-                    ]),
-                    style: AppText.body.copyWith(fontSize: 12.5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 350),
-            child: _state == _SosState.idle ? _idle() : _active(),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          child: _state == _SosState.idle ? _idle() : _active(),
+        ),
+      ],
     );
   }
 
@@ -294,27 +256,20 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
                     color: i == _problem ? AppColors.dangerSoft : AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: i == _problem ? AppColors.danger : AppColors.border,
-                      width: i == _problem ? 1.5 : 1,
-                    ),
+                        color: i == _problem ? AppColors.danger : AppColors.border,
+                        width: i == _problem ? 1.5 : 1),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        _problems[i].$1,
-                        color: i == _problem ? AppColors.danger : AppColors.navy,
-                        size: 26,
-                      ),
+                      Icon(_problems[i].$1,
+                          color: i == _problem ? AppColors.danger : AppColors.navy, size: 26),
                       const SizedBox(height: 4),
-                      Text(
-                        _problems[i].$2,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: i == _problem ? AppColors.dangerText : AppColors.navy,
-                        ),
-                      ),
+                      Text(_problems[i].$2,
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: i == _problem ? AppColors.dangerText : AppColors.navy)),
                     ],
                   ),
                 ),
@@ -322,26 +277,23 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
           ],
         ),
         const SizedBox(height: 14),
-        Container(
+        FxCard(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceSolid,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
+          shadow: false,
           child: Row(
             children: [
-              Icon(Icons.my_location_rounded, color: AppColors.link, size: 28),
+              const IconTile(icon: Icons.my_location_rounded, size: 44),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Peradeniya Rd, Kandy', style: AppText.h3),
-                    Text('GPS ±12 m · used for SOS dispatch', style: AppText.small),
+                    Text('GPS ±12 m · 7.2706° N, 80.5986° E', style: AppText.small),
                   ],
                 ),
               ),
+              Icon(Icons.edit_location_alt_outlined, color: AppColors.link),
             ],
           ),
         ),
@@ -412,25 +364,15 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
     );
   }
 
-  /// Finding capable garages... / Waiting for a garage to accept /
-  /// Help is on the way! + matched garages + auto-reassign timer + Cancel SOS
   Widget _active() {
     final searching = _state == _SosState.searching;
-    const matched = [
-      ('Fixora Garage', '2.1 km · ETA 12 min'),
-      ('Peradeniya Motors', '3.4 km · ETA 18 min'),
-      ('Kandy Auto Care', '4.0 km · ETA 22 min'),
-    ];
     return Column(
       key: const ValueKey('active'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: _accepted >= 0 ? AppColors.successGradient : AppColors.sosGradient,
-            borderRadius: BorderRadius.circular(18),
-          ),
+        FxCard(
+          gradient: _accepted >= 0 ? AppColors.successGradient : AppColors.sosGradient,
+          borderColor: Colors.transparent,
           child: Row(
             children: [
               SizedBox(
@@ -458,7 +400,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
                     const SizedBox(height: 2),
                     Text(
                       _accepted >= 0
-                          ? '${matched[0].$1} accepted · arriving soon'
+                          ? '${MockData.garages[0].name} accepted · arriving in ${MockData.garages[0].etaMin} min'
                           : '${_problems[_problem].$2} · Peradeniya Rd, Kandy',
                       style: TextStyle(color: Colors.white.o(0.88), fontSize: 12.5),
                     ),
@@ -470,13 +412,9 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
         ),
         const SizedBox(height: 12),
         if (_offline)
-          Container(
+          FxCard(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceSolid,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
-            ),
+            shadow: false,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -493,19 +431,19 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  'Looking for nearby phones with Fixora that have internet to pass your SOS on. '
-                  'We also retry by SMS every 30 seconds.',
-                  style: AppText.muted.copyWith(fontSize: 12.5),
-                ),
+                Text('Looking for nearby phones with Fixora that have internet to pass your SOS on. '
+                    'We also retry by SMS every 30 seconds.',
+                    style: AppText.muted.copyWith(fontSize: 12.5)),
                 const SizedBox(height: 10),
-                OutlinedButton.icon(
+                OutlineButton2(
+                  label: 'I am back online - send now',
+                  icon: Icons.wifi_rounded,
+                  height: 46,
+                  fontSize: 14,
                   onPressed: () {
                     setState(() => _offline = false);
                     _send();
                   },
-                  icon: const Icon(Icons.wifi_rounded),
-                  label: const Text('I am back online - send now'),
                 ),
               ],
             ),
@@ -515,24 +453,7 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
             children: [
               Expanded(child: Text('Matched garages', style: AppText.h3)),
               if (_accepted < 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.o(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.timer_outlined, size: 14, color: AppColors.warning),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Auto-reassign in $_countdown',
-                        style: TextStyle(color: AppColors.warningText, fontWeight: FontWeight.w700, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
+                StatusPill('Auto-reassign in $_countdown', color: AppColors.warning, icon: Icons.timer_outlined),
             ],
           ),
           const SizedBox(height: 10),
@@ -541,45 +462,15 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
               Container(
                 height: 76,
                 margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(18)),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                ),
                 child: const Center(child: LinearProgressIndicator(minHeight: 2)),
               )
           else
-            for (var i = 0; i < matched.length; i++)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _accepted == i ? AppColors.successSoft : AppColors.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _accepted == i ? AppColors.success : AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.garage_outlined,
-                        color: _accepted == i ? AppColors.success : AppColors.link,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(matched[i].$1, style: AppText.label),
-                            Text(
-                              _accepted == i ? 'Accepted · arriving soon' : matched[i].$2,
-                              style: AppText.small,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_accepted == i)
-                        Icon(Icons.check_circle_rounded, color: AppColors.success),
-                    ],
-                  ),
-                ),
-              ),
+            for (var i = 0; i < MockData.garages.length && i < 3; i++)
+              FadeSlide(index: i, child: _garageCard(i)),
         ],
         const SizedBox(height: 8),
         Container(
@@ -593,26 +484,108 @@ class _SosScreenState extends State<SosScreen> with SingleTickerProviderStateMix
               const Icon(Icons.alarm_rounded, color: AppColors.warning),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  'We will remind you in 5 hours to call emergency services if you are still stuck.',
-                  style: AppText.small.copyWith(fontSize: 11.5),
-                ),
+                child: Text('We will remind you in 5 hours to call emergency services if you are still stuck.',
+                    style: AppText.small.copyWith(color: AppColors.text, fontSize: 11.5)),
               ),
             ],
           ),
         ),
         const SizedBox(height: 14),
-        OutlinedButton.icon(
+        OutlineButton2(
+          label: _accepted >= 0 ? 'Done' : 'Cancel SOS',
+          icon: _accepted >= 0 ? Icons.check_rounded : Icons.close_rounded,
+          color: _accepted >= 0 ? AppColors.primary : AppColors.danger,
           onPressed: _cancel,
-          icon: Icon(_accepted >= 0 ? Icons.check_rounded : Icons.close_rounded),
-          label: Text(_accepted >= 0 ? 'Done' : 'Cancel SOS'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: _accepted >= 0 ? AppColors.primary : AppColors.danger,
-            minimumSize: const Size.fromHeight(48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-          ),
         ),
       ],
+    );
+  }
+
+  Widget _garageCard(int i) {
+    final g = MockData.garages[i];
+    final accepted = _accepted == i;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FxCard(
+        padding: const EdgeInsets.all(12),
+        shadow: false,
+        borderColor: accepted ? AppColors.success : null,
+        color: accepted ? AppColors.successSoft : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                IconTile(
+                  icon: g.towing ? Icons.local_shipping_outlined : Icons.home_repair_service_outlined,
+                  color: accepted ? AppColors.success : AppColors.primary,
+                  size: 44,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(g.name, style: AppText.h3.copyWith(fontSize: 14)),
+                      const SizedBox(height: 2),
+                      Text('${g.distanceKm} km · ~${g.etaMin} min · ★ ${g.rating}',
+                          style: AppText.small.copyWith(fontSize: 11.5)),
+                    ],
+                  ),
+                ),
+                if (accepted)
+                  const StatusPill('Accepted', color: AppColors.success, icon: Icons.check_rounded)
+                else if (i == 0 && _accepted < 0)
+                  const StatusPill('Requested', color: AppColors.warning),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final c in g.capabilities)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySofter,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(c, style: AppText.small.copyWith(color: AppColors.primaryDark, fontWeight: FontWeight.w600)),
+                  ),
+              ],
+            ),
+            if (accepted) ...[
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: PrimaryButton(
+                      label: 'Call Garage',
+                      icon: Icons.call_rounded,
+                      height: 44,
+                      fontSize: 14,
+                      gradient: AppColors.successGradient,
+                      onPressed: () => showFxSnack(context, 'Calling ${g.name}...', icon: Icons.call_rounded),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlineButton2(
+                      label: 'Share Live',
+                      icon: Icons.share_location_rounded,
+                      height: 44,
+                      fontSize: 14,
+                      color: AppColors.success,
+                      onPressed: () => showFxSnack(context, 'Live location shared with the garage'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
