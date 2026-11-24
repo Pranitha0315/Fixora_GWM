@@ -13,7 +13,7 @@ public sealed record DriveSenseHintDto(Guid VehicleId, double RoughRoadPct, int 
 public sealed record SosHistoryDto(string Status, string ActorRole, DateTime At, string? Note);
 
 public sealed record SosDto(Guid Id, Guid CustomerId, string CustomerName, string CustomerPhone, Guid? VehicleId, string? VehicleLabel,
-    double Lat, double Lng, string Category, string? Note, string Status, DateTime ReceivedAt, Guid? AssignedMechanicId,
+    double? Lat, double? Lng, string Category, string? Note, string Status, DateTime ReceivedAt, Guid? AssignedMechanicId,
     string? DriveSenseContext, IReadOnlyList<SosHistoryDto> History);
 
 public sealed record LoyaltyRedemption(decimal DiscountRupees, int PointsUsed);

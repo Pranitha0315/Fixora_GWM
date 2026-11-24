@@ -15,9 +15,9 @@ namespace Fixora.Tests.Integration;
 public sealed class SosLifecycleHttpCollection;
 
 /// <summary>
-/// FX13-D10-NID-1 (+ light D10-NID-2) tests-only: customer SOS create/cancel, manager
-/// acknowledge/dispatch, mechanic alert list + status, and consented DriveSense context.
-/// Does not edit SosService production or THA Shared_Backend paths.
+/// FX13-D10-NID-1: customer SOS create/cancel, manager acknowledge/dispatch, mechanic
+/// alert list + status, and consented DriveSense context. Location privacy (D10-NID-2)
+/// is covered in SosMechanicLocationPrivacyHttpTests.
 /// </summary>
 [Collection("sos-lifecycle-http")]
 public sealed class SosLifecycleHttpTests
