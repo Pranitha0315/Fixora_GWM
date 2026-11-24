@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../data/repositories/job_store.dart';
-import '../../bookings/booking_dialogs.dart';
+import '../../../core/core.dart';
+import '../widgets/job_widgets.dart';
 
 /// "Pay at Garage" dialog (card, mobile wallet or bank transfer).
 Future<void> showPayCashSheet(BuildContext context) {
@@ -41,17 +39,13 @@ class _PayCashDialogState extends State<_PayCashDialog> {
     (Icons.account_balance_outlined, 'Bank Transfer', 'Transfer and show the slip'),
   ];
   int _method = 0;
+  final _note = TextEditingController();
   bool _loading = false;
 
-  String _lkr(num value) {
-    final n = value.round().toString();
-    final buf = StringBuffer();
-    for (var i = 0; i < n.length; i++) {
-      final fromEnd = n.length - i;
-      if (i > 0 && fromEnd % 3 == 0) buf.write(',');
-      buf.write(n[i]);
-    }
-    return 'LKR $buf';
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
   }
 
   Future<void> _confirm() async {
@@ -62,19 +56,16 @@ class _PayCashDialogState extends State<_PayCashDialog> {
     JobStore.instance.recordCashPayment(total, method: _methods[_method].$2);
     final nav = Navigator.of(context);
     nav.pop();
-    await showSuccessDialog<void>(
+    showSuccessDialog<void>(
       nav.context,
       title: 'Payment Confirmed',
-      message: 'Thank you! ${_lkr(total)} paid by ${_methods[_method].$2}. Your receipt is in Invoices.',
+      message: 'Thank you! ${lkr(total)} paid by ${_methods[_method].$2}. Your receipt is in Invoices.',
       actions: (d) => [
         Expanded(
-          child: FilledButton(
+          child: PrimaryButton(
+            label: 'Done',
+            height: 48,
             onPressed: () => Navigator.of(d).pop(),
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text('Done'),
           ),
         ),
       ],
@@ -92,59 +83,62 @@ class _PayCashDialogState extends State<_PayCashDialog> {
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
             decoration: BoxDecoration(
-              color: AppColors.surfaceSolid,
+              color: AppColors.surface,
               borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.payments_outlined, color: AppColors.link),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Pay at Garage', style: AppText.h2),
-                          Text('Choose how you will pay at the counter.', style: AppText.small),
-                        ],
-                      ),
+                CardHeader(
+                  icon: Icons.payments_outlined,
+                  title: 'Pay at Garage',
+                  subtitle: 'Choose how you will pay at the counter. We confirm once received.',
+                  trailing: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 6),
+                      child: Icon(Icons.close_rounded, color: AppColors.navy),
                     ),
-                    IconButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(Icons.close_rounded, color: AppColors.navy),
-                    ),
-                  ],
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Text('${store.vehicle.name} · ${store.jobId}', style: AppText.muted),
+                const SizedBox(height: 14),
+                VehicleStrip(
+                  vehicle: store.vehicle,
+                  compact: true,
+                  trailing: const CurrentStepBadge(
+                    label: 'Service Type',
+                    value: 'Diagnosis & Repair',
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   decoration: BoxDecoration(
-                    color: AppColors.primarySofter,
+                    gradient: LinearGradient(colors: [AppColors.adapt(Color(0xFFECFDFC)), AppColors.adapt(Color(0xFFE0FCFA))]),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(
                     children: [
-                      Text('Total Amount to Pay', style: AppText.muted.copyWith(color: AppColors.navy)),
+                      Text('Total Amount to Pay',
+                          style: AppText.muted.copyWith(fontSize: 14, color: AppColors.navy)),
                       const SizedBox(height: 4),
-                      Text(
-                        _lkr(store.total),
-                        style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.link),
-                      ),
+                      Text(lkr(store.total, decimals: true),
+                          style: TextStyle(
+                              fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.link)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text('Payment Method', style: AppText.h2.copyWith(fontSize: 15)),
+                Text('Payment Method', style: AppText.h2),
                 const SizedBox(height: 10),
                 for (var i = 0; i < _methods.length; i++)
                   GestureDetector(
-                    onTap: () => setState(() => _method = i),
+                    onTap: () {
+                      AppState.instance.feedback();
+                      setState(() => _method = i);
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(bottom: 8),
@@ -153,16 +147,12 @@ class _PayCashDialogState extends State<_PayCashDialog> {
                         color: i == _method ? AppColors.primarySofter : AppColors.surface,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: i == _method ? AppColors.primary : AppColors.border,
-                          width: i == _method ? 1.6 : 1,
-                        ),
+                            color: i == _method ? AppColors.primary : AppColors.border, width: i == _method ? 1.6 : 1),
                       ),
                       child: Row(
                         children: [
-                          Icon(
-                            i == _method ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
-                            color: i == _method ? AppColors.primary : AppColors.textFaint,
-                          ),
+                          Icon(i == _method ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                              color: i == _method ? AppColors.primary : AppColors.textFaint),
                           const SizedBox(width: 10),
                           Icon(_methods[i].$1, color: AppColors.link),
                           const SizedBox(width: 10),
@@ -179,33 +169,32 @@ class _PayCashDialogState extends State<_PayCashDialog> {
                       ),
                     ),
                   ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 6),
+                FxTextField(
+                  controller: _note,
+                  hint: 'Add a payment note (optional)',
+                  prefix: Icon(Icons.sticky_note_2_outlined, size: 20, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
-                      child: OutlinedButton(
+                      child: OutlineButton2(
+                        label: 'Cancel',
+                        height: 50,
                         onPressed: () => Navigator.of(context).pop(),
-                        style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
-                        child: const Text('Cancel'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       flex: 2,
-                      child: FilledButton.icon(
-                        onPressed: _loading ? null : _confirm,
-                        icon: _loading
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                              )
-                            : const Icon(Icons.check_rounded),
-                        label: Text(_loading ? 'Confirming…' : 'Confirm Payment'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          minimumSize: const Size.fromHeight(50),
-                        ),
+                      child: PrimaryButton(
+                        label: 'Confirm Payment',
+                        icon: Icons.check_rounded,
+                        height: 50,
+                        fontSize: 15,
+                        loading: _loading,
+                        onPressed: _confirm,
                       ),
                     ),
                   ],
