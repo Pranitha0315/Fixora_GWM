@@ -1,5 +1,8 @@
-import 'package:flutter/foundation.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+
+import '../../../core/backend/mechanic_backend.dart';
 import '../domain/job_entities.dart';
 
 /// The mechanic's job cards and the live queue (BRD USP 5).
@@ -38,10 +41,55 @@ class JobController extends ChangeNotifier {
   }
 
   void setStatus(String jobId, JobStatus status) {
-    final i = _jobs.indexWhere((j) => j.id == jobId);
-    if (i < 0) return;
-    _jobs[i] = _jobs[i].copyWith(status: status);
+    final job = byId(jobId);
+    if (job == null) return;
+    job.status = status;
     notifyListeners();
+  }
+
+  void startDiagnosis(Job job) {
+    if (job.status == JobStatus.waiting) {
+      job.status = JobStatus.diagnosing;
+      job.startedAt ??= DateTime.now();
+      job.paused = false;
+      job.log('Diagnosis started', icon: Icons.troubleshoot_rounded);
+      notifyListeners();
+      unawaited(
+        MechanicBackend.instance.jobAction(job.id, 'start_diagnosis'),
+      );
+    }
+  }
+
+  void startRepair(Job job) {
+    job.status = JobStatus.inProgress;
+    job.startedAt = DateTime.now();
+    job.paused = false;
+    job.log(
+      'Repair started',
+      detail: job.bay != null ? 'Bay ${job.bay}' : null,
+      icon: Icons.build_circle_outlined,
+    );
+    notifyListeners();
+    unawaited(MechanicBackend.instance.jobAction(job.id, 'start_repair'));
+  }
+
+  void pauseJob(Job job) {
+    if (job.status != JobStatus.inProgress &&
+        job.status != JobStatus.diagnosing) {
+      return;
+    }
+    job.paused = true;
+    // 'Paused' stays JobStatus.inProgress (or diagnosing) with paused flag.
+    job.log('Paused', icon: Icons.pause_circle_outline);
+    notifyListeners();
+    unawaited(MechanicBackend.instance.jobAction(job.id, 'pause'));
+  }
+
+  void resumeJob(Job job) {
+    job.paused = false;
+    job.log('Resumed', icon: Icons.play_circle_outline);
+    notifyListeners();
+    unawaited(MechanicBackend.instance.jobAction(job.id, 'resume'));
   }
 
   List<Job> get queue {
@@ -59,6 +107,13 @@ class JobController extends ChangeNotifier {
   List<Job> get finished =>
       _jobs.where((j) => !j.status.isActive).toList(growable: false);
 
+  /// Jobs that have a bay assignment (for board cards).
+  List<Job> get bayJobs {
+    final list = _jobs.where((j) => j.bay != null && j.bay!.isNotEmpty).toList();
+    list.sort((a, b) => (a.bay ?? '').compareTo(b.bay ?? ''));
+    return list;
+  }
+
   int _statusGroup(JobStatus s) {
     if (s == JobStatus.diagnosing || s == JobStatus.inProgress) return 0;
     if (s == JobStatus.awaitingApproval || s == JobStatus.qualityCheck) {
@@ -68,7 +123,7 @@ class JobController extends ChangeNotifier {
   }
 }
 
-const _demoJobs = <Job>[
+final _demoJobs = <Job>[
   Job(
     id: 'job-1',
     token: 'A12',
@@ -132,6 +187,7 @@ const _demoJobs = <Job>[
     summary: 'Quality check pending',
     status: JobStatus.qualityCheck,
     priority: JobPriority.normal,
+    bay: 'Bay 2',
   ),
   Job(
     id: 'job-7',
@@ -142,5 +198,6 @@ const _demoJobs = <Job>[
     summary: 'Battery replacement done',
     status: JobStatus.completed,
     priority: JobPriority.low,
+    bay: 'Bay 1',
   ),
 ];

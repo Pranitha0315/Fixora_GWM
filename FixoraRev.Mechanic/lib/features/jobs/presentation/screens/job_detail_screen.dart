@@ -37,10 +37,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     final jobs = AppServices.jobs;
     switch (job.status) {
       case JobStatus.waiting:
-        jobs.setStatus(job.id, JobStatus.diagnosing);
-        if (mounted) {
-          context.toastish('Diagnosis started');
-        }
+        jobs.startDiagnosis(job);
+        if (mounted) context.toastish('Diagnosis started');
       case JobStatus.diagnosing:
         jobs.setStatus(job.id, JobStatus.awaitingApproval);
         if (mounted) {
@@ -55,10 +53,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           );
         }
       case JobStatus.approved:
-        jobs.setStatus(job.id, JobStatus.inProgress);
+        jobs.startRepair(job);
         if (mounted) context.push(RouteNames.repairPath(job.id));
       case JobStatus.inProgress:
-        if (mounted) context.push(RouteNames.repairPath(job.id));
+        if (job.paused) {
+          jobs.resumeJob(job);
+        } else if (mounted) {
+          context.push(RouteNames.repairPath(job.id));
+        }
       case JobStatus.qualityCheck:
         jobs.setStatus(job.id, JobStatus.completed);
         if (mounted) context.push(RouteNames.invoicePath(job.id));
@@ -69,12 +71,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
   }
 
-  String _actionLabel(JobStatus status) => switch (status) {
+  String _actionLabel(Job job) => switch (job.status) {
         JobStatus.waiting => 'Start Diagnosis',
         JobStatus.diagnosing => 'Continue Diagnosis',
         JobStatus.awaitingApproval => 'Wait for customer approve',
         JobStatus.approved => 'Start Repair',
-        JobStatus.inProgress => 'Open repair checklist',
+        JobStatus.inProgress =>
+          job.paused ? 'Resume repair' : 'Open repair checklist',
         JobStatus.qualityCheck => 'Open quality check',
         JobStatus.completed => 'View invoice',
         JobStatus.parked => 'Open Passport entry',
@@ -112,19 +115,58 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           Text(job.vehicleModel, style: TextStyle(color: AppColors.body)),
           const SizedBox(height: 16),
           _row('Customer', job.customerName),
-          _row('Status', job.status.label),
+          _row('Status', job.paused ? '${job.status.label} (paused)' : job.status.label),
           _row('Priority', job.priority.label),
           if (job.bay != null) _row('Bay', job.bay!),
+          if (job.startedAt != null)
+            _row('Started', job.startedAt!.toLocal().toString().split('.').first),
           const SizedBox(height: 12),
           Text('Summary', style: TextStyle(color: AppColors.body)),
           const SizedBox(height: 6),
           Text(job.summary, style: TextStyle(color: AppColors.ink, height: 1.4)),
+          if (job.logs.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            Text('Activity', style: TextStyle(color: AppColors.body)),
+            const SizedBox(height: 8),
+            for (final entry in job.logs.take(5))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      entry.icon ?? Icons.circle,
+                      size: 16,
+                      color: AppColors.primary,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        entry.detail == null
+                            ? entry.message
+                            : '${entry.message} — ${entry.detail}',
+                        style: TextStyle(color: AppColors.ink, fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
           const SizedBox(height: 28),
           ElevatedButton(
             style: BronzeButtons.elevated,
             onPressed: () => _runAction(job),
-            child: Text(_actionLabel(job.status)),
+            child: Text(_actionLabel(job)),
           ),
+          if (job.status == JobStatus.inProgress ||
+              job.status == JobStatus.diagnosing) ...[
+            const SizedBox(height: 10),
+            if (!job.paused)
+              OutlinedButton(
+                onPressed: () => AppServices.jobs.pauseJob(job),
+                child: const Text('Pause'),
+              ),
+          ],
           if (job.status == JobStatus.inProgress) ...[
             const SizedBox(height: 10),
             OutlinedButton(
