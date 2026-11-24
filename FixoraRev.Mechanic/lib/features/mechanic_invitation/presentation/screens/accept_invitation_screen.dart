@@ -8,6 +8,7 @@ import '../../../../app/theme/bronze_colors.dart';
 import '../../../../app/theme/bronze_inputs.dart';
 import '../../../../core/backend/api_client.dart';
 import '../../../../core/backend/mechanic_backend.dart';
+import '../../../../core/di/app_services.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../auth/presentation/widgets/auth_scaffold.dart';
 
@@ -64,6 +65,10 @@ class _AcceptInvitationScreenState extends State<AcceptInvitationScreen> {
         token: widget.token.trim(),
         name: name,
         pin: pin,
+      );
+      await AppServices.auth.signInRemote(
+        login: name,
+        profile: {'name': name, 'employee_code': name},
       );
       if (!mounted) return;
       context.go(RouteNames.shell);

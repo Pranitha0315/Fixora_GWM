@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/loading_screen.dart';
+import '../../features/authentication/presentation/screens/garage_pin_login_screen.dart';
 import '../../features/authentication/presentation/screens/login_screen.dart';
 import '../../features/authentication/presentation/screens/otp_args.dart';
 import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
@@ -9,6 +11,7 @@ import '../../features/authentication/presentation/screens/register_screen.dart'
 import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/accept_invitation_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/expired_invite_screen.dart';
+import '../../features/quick_login/presentation/screens/quick_login_screen.dart';
 import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
 import '../../features/fixproof/presentation/screens/report_review_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
@@ -39,7 +42,34 @@ class AppRouter {
       ),
       GoRoute(
         path: RouteNames.login,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          final initial = extra is LoginScreen
+              ? extra.initialEmail
+              : extra is String
+                  ? extra
+                  : state.uri.queryParameters['email'];
+          return LoginScreen(initialEmail: initial);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.garagePin,
+        builder: (context, state) => const GaragePinLoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.quickLogin,
+        builder: (context, state) => const QuickLoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.loading,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is LoadingScreen) return extra;
+          return const LoadingScreen(
+            title: 'Loading…',
+            next: MainShell(),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.forgotPassword,

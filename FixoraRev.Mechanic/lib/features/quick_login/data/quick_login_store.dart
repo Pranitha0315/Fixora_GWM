@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum PinCheck { ok, wrong, locked }
+
 /// Local quick-login prefs for the mechanic app.
 ///
 /// Non-sensitive profile flags stay in SharedPreferences.
@@ -17,6 +19,7 @@ class QuickLoginStore extends ChangeNotifier {
   static const _kName = 'fixora.mechanic.ql.name';
   static const _kFailed = 'fixora.mechanic.ql.failed';
   static const _kPin = 'fixora.mechanic.ql.pin';
+  static const int maxAttempts = 5;
 
   final FlutterSecureStorage _secure;
   SharedPreferences? _prefs;
@@ -24,6 +27,7 @@ class QuickLoginStore extends ChangeNotifier {
   bool enabled = false;
   String? email;
   String? name;
+  String? login;
   int failed = 0;
 
   Future<void> load() async {
@@ -68,18 +72,28 @@ class QuickLoginStore extends ChangeNotifier {
   }
 
   Future<bool> unlock(String pin) async {
+    final result = await verify(pin);
+    return result == PinCheck.ok;
+  }
+
+  Future<PinCheck> verify(String pin) async {
+    if (!enabled) return PinCheck.locked;
     final p = await _prefsInstance();
     final saved = await _secure.read(key: _kPin);
-    if (saved == null || saved != pin) {
-      failed += 1;
-      await p.setInt(_kFailed, failed);
+    if (saved != null && saved == pin) {
+      failed = 0;
+      await p.setInt(_kFailed, 0);
       notifyListeners();
-      return false;
+      return PinCheck.ok;
     }
-    failed = 0;
-    await p.setInt(_kFailed, 0);
+    failed += 1;
+    await p.setInt(_kFailed, failed);
+    if (failed >= maxAttempts) {
+      await clear();
+      return PinCheck.locked;
+    }
     notifyListeners();
-    return true;
+    return PinCheck.wrong;
   }
 
   Future<void> clear() async {
@@ -87,6 +101,7 @@ class QuickLoginStore extends ChangeNotifier {
     enabled = false;
     email = null;
     name = null;
+    login = null;
     failed = 0;
     await p.remove(_kEnabled);
     await p.remove(_kEmail);
@@ -96,6 +111,8 @@ class QuickLoginStore extends ChangeNotifier {
     await _secure.delete(key: _kPin);
     notifyListeners();
   }
+
+  Future<void> disable() => clear();
 
   Future<SharedPreferences> _prefsInstance() async {
     return _prefs ??= await SharedPreferences.getInstance();

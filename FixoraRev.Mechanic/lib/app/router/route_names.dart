@@ -3,6 +3,9 @@ class RouteNames {
 
   static const splash = '/';
   static const login = '/login';
+  static const garagePin = '/garage-pin';
+  static const quickLogin = '/quick-login';
+  static const loading = '/loading';
   static const forgotPassword = '/forgot-password';
   static const register = '/register';
   static const otpVerification = '/verify-otp';
