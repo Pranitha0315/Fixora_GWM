@@ -13,6 +13,9 @@ class RouteNames {
   static const expiredInvitation = '/invite/expired';
   static const shell = '/home';
   static const jobDetails = '/jobs/details';
+  static const repair = '/jobs/repair';
+  static const invoice = '/jobs/invoice';
+  static const additionalRepair = '/jobs/additional-repair';
   static const inspectionCapture = '/fixproof/capture';
   static const reportReview = '/fixproof/review';
   static const repairProposal = '/jobs/proposal';
@@ -25,6 +28,10 @@ class RouteNames {
   static const parts = '/parts';
 
   static String jobDetailsPath(String jobId) => '$jobDetails/$jobId';
+  static String repairPath(String jobId) => '$repair/$jobId';
+  static String invoicePath(String jobId) => '$invoice/$jobId';
+  static String additionalRepairPath(String jobId) =>
+      '$additionalRepair/$jobId';
   static String inspectionCapturePath(String jobId) =>
       '$inspectionCapture/$jobId';
   static String reportReviewPath(String jobId) => '$reportReview/$jobId';

@@ -16,7 +16,10 @@ import '../../features/fixproof/presentation/screens/inspection_capture_screen.d
 import '../../features/fixproof/presentation/screens/report_review_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/job_progress/presentation/screens/progress_update_screen.dart';
+import '../../features/jobs/presentation/screens/additional_repair_screen.dart';
+import '../../features/jobs/presentation/screens/invoice_screen.dart';
 import '../../features/jobs/presentation/screens/job_detail_screen.dart';
+import '../../features/jobs/presentation/screens/repair_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/passport/presentation/passport_screen.dart';
 import '../../features/repair_proposal/presentation/screens/repair_proposal_screen.dart';
@@ -116,6 +119,22 @@ class AppRouter {
         path: '${RouteNames.jobDetails}/:jobId',
         builder: (context, state) =>
             JobDetailScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.repair}/:jobId',
+        builder: (context, state) =>
+            RepairScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.invoice}/:jobId',
+        builder: (context, state) =>
+            InvoiceScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.additionalRepair}/:jobId',
+        builder: (context, state) => AdditionalRepairScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
       ),
       GoRoute(
         path: '${RouteNames.inspectionCapture}/:jobId',
