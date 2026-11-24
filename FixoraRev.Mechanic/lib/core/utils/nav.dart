@@ -8,6 +8,12 @@ import '../../features/shell/presentation/main_shell.dart';
 
 /// Navigation shortcuts used across the app.
 extension NavX on BuildContext {
+  void goRoute(String location, {Object? extra}) =>
+      go(location, extra: extra);
+
+  Future<T?> pushRoute<T extends Object?>(String location, {Object? extra}) =>
+      push<T>(location, extra: extra);
+
   Future<T?> pushPage<T>(Widget page) =>
       Navigator.of(this).push<T>(MaterialPageRoute(builder: (_) => page));
 

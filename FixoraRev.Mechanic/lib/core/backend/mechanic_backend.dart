@@ -15,4 +15,27 @@ class MechanicBackend {
   Future<void> bootstrap() async {
     await api.restore();
   }
+
+  /// Accept a manager's 7-day invitation: name + PIN → session tokens.
+  Future<void> acceptInvitation({
+    required String token,
+    required String name,
+    required String pin,
+  }) async {
+    final raw = await api.post(
+      '/mechanic/auth/accept-invitation',
+      body: {
+        'token': token,
+        'name': name,
+        'pin': pin,
+      },
+    );
+    if (raw is! Map) {
+      throw ApiException(
+        'Invalid invitation response',
+        code: 'invalid_invite_response',
+      );
+    }
+    await api.saveSession(Map<String, dynamic>.from(raw));
+  }
 }

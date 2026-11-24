@@ -7,6 +7,8 @@ import '../../features/authentication/presentation/screens/otp_args.dart';
 import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
 import '../../features/authentication/presentation/screens/register_screen.dart';
 import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
+import '../../features/mechanic_invitation/presentation/screens/accept_invitation_screen.dart';
+import '../../features/mechanic_invitation/presentation/screens/expired_invite_screen.dart';
 import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
 import '../../features/fixproof/presentation/screens/report_review_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
@@ -59,6 +61,22 @@ class AppRouter {
           final email = state.uri.queryParameters['email'] ?? '';
           return OtpVerificationScreen(args: OtpArgs(email: email));
         },
+      ),
+      GoRoute(
+        path: RouteNames.acceptInvitation,
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'] ??
+              (state.extra is String ? state.extra as String : '');
+          return AcceptInvitationScreen(token: token);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.expiredInvitation,
+        builder: (context, state) => ExpiredInviteScreen(
+          message: state.extra is String
+              ? state.extra as String
+              : 'This invitation link has expired or was already used. Ask your workshop manager to send a new 7-day invite.',
+        ),
       ),
       GoRoute(
         path: RouteNames.shell,

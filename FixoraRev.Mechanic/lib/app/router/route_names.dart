@@ -6,6 +6,8 @@ class RouteNames {
   static const forgotPassword = '/forgot-password';
   static const register = '/register';
   static const otpVerification = '/verify-otp';
+  static const acceptInvitation = '/invite/accept';
+  static const expiredInvitation = '/invite/expired';
   static const shell = '/home';
   static const jobDetails = '/jobs/details';
   static const inspectionCapture = '/fixproof/capture';
