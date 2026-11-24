@@ -1,0 +1,1323 @@
+.login-page, .login-page * { box-sizing: border-box; }
+
+.login-page {
+  min-height: 100vh;
+  padding: 16px;
+  background: #071b2b;
+}
+
+.login-shell {
+  position: relative;
+  min-height: calc(100vh - 32px);
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    linear-gradient(90deg, rgba(2, 20, 34, .85), rgba(2, 20, 34, .35)),
+    url("/images/fixora-workshop.png") center / cover no-repeat;
+}
+
+.login-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 5%;
+  color: white;
+  background: rgba(4, 30, 45, .35);
+  backdrop-filter: blur(12px);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon,
+.login-card-logo {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #00c8d5, #08758a);
+  color: white;
+  font-size: 25px;
+  font-weight: 900;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand-text strong {
+  font-size: 25px;
+}
+
+.brand-text small {
+  font-size: 11px;
+}
+
+.portal-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 30px;
+  background: rgba(255,255,255,.12);
+}
+
+.portal-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #32e6d6;
+}
+
+.login-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 460px);
+  align-items: center;
+  gap: 50px;
+  padding: 55px 5%;
+}
+
+.workshop-hero {
+  display: flex;
+  align-items: center;
+  color: white;
+}
+
+.hero-content {
+  max-width: 620px;
+}
+
+.hero-eyebrow {
+  color: #4be2e9;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.hero-content h1 {
+  margin: 18px 0;
+  font-size: clamp(42px, 5vw, 76px);
+  line-height: 1.1;
+}
+
+.hero-content h1 span {
+  color: #4ce2ed;
+}
+
+.hero-description {
+  max-width: 480px;
+  font-size: 17px;
+  line-height: 1.7;
+  color: #d9eaf0;
+}
+
+.workshop-hero .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  max-width: 500px;
+  margin-top: 30px;
+}
+
+.workshop-hero .feature-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 66px;
+  padding: 12px 16px;
+  border: 1px solid rgba(106, 236, 242, .45);
+  border-radius: 20px;
+  background: rgba(7, 50, 69, .48);
+  backdrop-filter: blur(14px);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .2);
+  transition: transform .2s ease;
+}
+
+.workshop-hero .feature-card:hover {
+  transform: translateY(-3px);
+}
+
+.workshop-hero .feature-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(44, 215, 228, .18);
+  color: #54e6f0;
+}
+
+.workshop-hero .feature-icon svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+}
+
+.login-panel {
+  display: flex;
+  justify-content: center;
+}
+
+.login-card {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  padding: 46px 34px 32px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.8);
+  border-radius: 36px;
+  background: rgba(244, 251, 253, .94);
+  box-shadow: 0 25px 70px rgba(0, 12, 25, .35);
+  backdrop-filter: blur(22px);
+}
+
+.login-card::before {
+  content: "";
+  position: absolute;
+  top: -30px;
+  left: -10%;
+  width: 120%;
+  height: 70px;
+  border-radius: 0 0 50% 50%;
+  background: rgba(50, 205, 218, .13);
+}
+
+.login-card-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: #075e68;
+}
+
+.login-card-brand strong {
+  font-size: 25px;
+}
+
+.login-card-brand > span {
+  font-size: 11px;
+  letter-spacing: 2px;
+}
+
+.login-card h2 {
+  margin: 28px 0 8px;
+  color: #12384b;
+  font-size: 31px;
+  text-align: center;
+}
+
+.login-subtitle {
+  margin-bottom: 28px;
+  color: #607787;
+  text-align: center;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #173b50;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon .field-icon {
+  position: absolute;
+  left: 15px;
+  width: 20px;
+  height: 20px;
+  color: #087f8c;
+}
+
+.input-with-icon input {
+  width: 100%;
+  height: 50px;
+  padding: 0 45px;
+  border: 1px solid #c5d9e1;
+  border-radius: 13px;
+  outline: none;
+  background: white;
+  color: #173b50;
+}
+
+.input-with-icon input:focus {
+  border-color: #00a8b8;
+  box-shadow: 0 0 0 3px rgba(0, 184, 198, .12);
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: #087f8c;
+  cursor: pointer;
+}
+
+.password-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+.password-toggle:focus-visible,
+.login-button:focus-visible {
+    outline: 3px solid #087f8c;
+    outline-offset: 3px;
+}
+
+.remember-me {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: fit-content;
+    color: #173b50;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.remember-me input {
+    width: 17px;
+    height: 17px;
+    accent-color: #087f8c;
+}
+
+.field-error {
+    color: #b42318;
+    font-size: 12px;
+}
+
+.login-feedback {
+    margin: 0;
+    color: #075e68;
+    font-size: 13px;
+    text-align: center;
+}
+
+.login-button {
+    width: 100%;
+    height: 54px;
+    margin-top: 5px;
+    border: 0;
+    border-radius: 14px;
+    background: linear-gradient(110deg, #00b7c6, #07617a);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 800;
+    box-shadow: 0 9px 20px rgba(0, 130, 149, .22);
+}
+
+.login-button:disabled {
+    cursor: not-allowed;
+    opacity: .65;
+}
+
+.login-button:not(:disabled) {
+    cursor: pointer;
+    opacity: 1;
+}
+
+.login-button:not(:disabled):hover {
+    filter: brightness(1.08);
+}
+
+.security-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #cbdde7;
+    color: #516678;
+    font-size: 12px;
+    text-align: center;
+}
+
+.security-note span {
+    color: #008c9d;
+    font-size: 20px;
+}
+
+/* Responsive */
+@media (max-width: 1100px) {
+    .login-content {
+        grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+        gap: 25px;
+        padding: 40px 4%;
+    }
+
+    .workshop-hero .feature-card {
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+}
+
+@media (max-width: 850px) {
+    .login-page {
+        padding: 10px;
+    }
+
+    .login-shell {
+        min-height: calc(100vh - 20px);
+    }
+
+    .login-content {
+        grid-template-columns: 1fr;
+        gap: 50px;
+        padding: 35px 6%;
+    }
+
+    .workshop-hero {
+        align-items: center;
+    }
+
+    .hero-content h1 {
+        font-size: clamp(38px, 8vw, 58px);
+    }
+
+    .login-card {
+        max-width: 520px;
+    }
+
+    .login-footer {
+        justify-content: center;
+    }
+}
+
+@media (max-width: 600px) {
+    .workshop-hero .feature-grid {
+        gap: 10px;
+        margin-top: 22px;
+    }
+
+    .workshop-hero .feature-card {
+        min-height: 58px;
+        padding: 10px 12px;
+        gap: 8px;
+        font-size: 12px;
+    }
+
+    .workshop-hero .feature-icon {
+        flex-basis: 30px;
+        width: 30px;
+        height: 30px;
+    }
+
+    .workshop-hero .feature-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-header {
+        padding: 18px;
+    }
+
+    .brand-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .brand-text strong {
+        font-size: 22px;
+    }
+
+    .brand-text small {
+        font-size: 9px;
+    }
+
+    .portal-label {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .login-content {
+        padding: 25px 15px;
+    }
+
+    .hero-description {
+        font-size: 14px;
+    }
+
+    .workshop-hero .feature-card {
+        font-size: 11px;
+    }
+
+    .login-card {
+        padding: 42px 20px 26px;
+        border-radius: 30px;
+    }
+
+    .login-card::before {
+        top: -22px;
+        height: 55px;
+    }
+
+    .login-card h2 {
+        font-size: 26px;
+    }
+
+    .login-footer {
+        padding: 12px 10px 20px;
+    }
+
+    .login-footer .footer-features {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 7px;
+    }
+
+    .login-footer .footer-feature-card {
+        width: 100%;
+        min-height: 76px;
+        padding: 10px 5px;
+        column-gap: 4px;
+        border-radius: 16px;
+    }
+
+    .login-footer .footer-feature-icon {
+        font-size: 19px;
+    }
+
+    .login-footer .footer-feature-card strong {
+        font-size: 14px;
+    }
+
+    .login-footer .footer-feature-card small {
+        padding-left: 0;
+        font-size: 10px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .form-field input,
+    .workshop-hero .feature-card {
+        transition: none;
+    }
+
+    .workshop-hero .feature-card:hover {
+        transform: none;
+    }
+}
+
+/* FIXORA Reference Login Card Redesign */
+.login-panel .login-card {
+    overflow: visible;
+    border: 1px solid rgba(255, 255, 255, .85);
+    border-radius: 38px;
+    background: linear-gradient(
+        145deg,
+        rgba(241, 248, 255, .96),
+        rgba(224, 239, 249, .94)
+    );
+    box-shadow:
+        0 25px 65px rgba(0, 16, 35, .4),
+        0 0 30px rgba(0, 215, 235, .24);
+}
+
+.login-panel .login-card::before {
+    left: 0;
+    width: 100%;
+    border-radius: 38px 38px 50% 50%;
+    background: rgba(100, 217, 229, .18);
+}
+
+.login-panel .login-card-brand {
+    gap: 8px;
+}
+
+.login-panel .login-card-logo {
+    border: 3px solid rgba(255, 255, 255, .9);
+    box-shadow: 0 0 20px rgba(0, 193, 215, .35);
+}
+
+.login-panel .login-card h2 {
+    margin-top: 24px;
+    font-weight: 900;
+}
+
+.login-panel .input-with-icon input {
+    border-radius: 22px;
+    background: rgba(255, 255, 255, .85);
+}
+
+.login-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.forgot-password {
+    color: #008e9e;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.login-panel .login-button {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 28px;
+    background: linear-gradient(90deg, #00b9c9, #007f9d);
+    box-shadow: 0 8px 22px rgba(0, 191, 208, .32);
+}
+
+.signin-arrow {
+    position: absolute;
+    right: 12px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: white;
+    color: #008a9a;
+    font-size: 19px;
+}
+
+.login-divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 20px 0;
+    color: #6c8190;
+    font-size: 13px;
+}
+
+.login-divider::before,
+.login-divider::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: #b9cdd8;
+}
+
+.google-login-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 46px;
+    border: 1px solid #b9d1e1;
+    border-radius: 24px;
+    background: rgba(255, 255, 255, .85);
+    color: #264456;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.google-login-button:disabled {
+    cursor: not-allowed;
+    opacity: .7;
+}
+
+.google-g {
+    color: #4285f4;
+    font-size: 20px;
+    font-weight: 900;
+}
+
+.login-panel .security-note {
+    margin-top: 22px;
+    padding-top: 16px;
+}
+
+@media (max-width: 480px) {
+    .login-options {
+        flex-wrap: wrap;
+    }
+
+    .login-panel .login-card {
+        border-radius: 28px;
+    }
+}
+
+/* FIXORA Login Layout Visibility Fix */
+.login-shell {
+    overflow: visible;
+}
+
+.login-content {
+    align-items: start;
+    padding-top: 35px;
+    padding-bottom: 35px;
+}
+
+.login-panel {
+    align-self: start;
+}
+
+@media (max-width: 850px) {
+    .login-content {
+        padding-top: 30px;
+        padding-bottom: 30px;
+    }
+}
+
+/* FIXORA Premium Shield Logo Styling */
+.login-panel .login-card {
+    margin-top: 48px;
+    padding-top: 58px;
+}
+
+.login-panel .login-card-brand {
+    position: relative;
+    z-index: 2;
+}
+
+.login-panel .garage-shield-logo {
+    position: absolute;
+    top: -108px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    display: grid;
+    place-items: center;
+
+    width: 94px;
+    height: 94px;
+    padding: 12px;
+
+    border: 5px solid rgba(255, 255, 255, .95);
+    border-radius: 50%;
+
+    background: linear-gradient(
+        145deg,
+        #f5fcff,
+        #c6eef5
+    );
+
+    box-shadow:
+        0 8px 25px rgba(0, 40, 65, .22),
+        0 0 28px rgba(0, 215, 235, .45);
+}
+
+.login-panel .garage-shield-logo svg {
+    width: 100%;
+    height: 100%;
+}
+
+.login-panel .login-card-brand > strong {
+    margin-top: 0;
+    color: #075b6c;
+    font-size: 25px;
+    letter-spacing: 2px;
+}
+
+.login-panel .login-card-brand > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    color: #183f56;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 3px;
+    white-space: nowrap;
+}
+
+.login-panel .login-card-brand > span::before,
+.login-panel .login-card-brand > span::after {
+    content: "";
+    width: 38px;
+    height: 1px;
+    background: #52b7c7;
+}
+
+@media (max-width: 480px) {
+    .login-panel .garage-shield-logo {
+        width: 80px;
+        height: 80px;
+        top: -96px;
+    }
+
+    .login-panel .login-card {
+        padding-top: 54px;
+    }
+}
+
+/* FIXORA Compact Login Card V2 */
+.login-content {
+    grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+    gap: 36px;
+}
+
+.login-panel .login-card {
+    max-width: 410px;
+    padding: 40px 28px 22px;
+    border-radius: 32px;
+}
+
+.login-panel .garage-shield-logo {
+    width: 76px;
+    height: 76px;
+    top: -88px;
+    padding: 9px;
+}
+
+.login-panel .login-card-brand > strong {
+    font-size: 21px;
+}
+
+.login-panel .login-card h2 {
+    margin: 15px 0 5px;
+    font-size: 27px;
+}
+
+.login-panel .login-subtitle {
+    margin-bottom: 18px;
+    font-size: 13px;
+}
+
+.login-panel .input-with-icon input {
+    height: 44px;
+}
+
+.login-panel .login-button {
+    height: 50px;
+    background: linear-gradient(105deg, #00d8e8 0%, #009bb8 45%, #005d91 100%);
+    box-shadow:
+        0 8px 24px rgba(0, 204, 232, .45),
+        0 0 16px rgba(0, 210, 245, .3);
+    color: #ffffff;
+    font-weight: 800;
+}
+
+.login-panel .login-button:not(:disabled):hover {
+    background: linear-gradient(105deg, #00e7f4, #008cb6, #004e88);
+    box-shadow: 0 10px 28px rgba(0, 210, 245, .55);
+}
+
+.login-divider {
+    margin: 13px 0;
+}
+
+.google-login-button {
+    min-height: 42px;
+}
+
+.login-panel .security-note {
+    margin-top: 14px;
+    padding-top: 12px;
+}
+
+@media (max-width: 850px) {
+    .login-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-panel .login-card {
+        padding: 38px 18px 22px;
+    }
+}
+
+/* FIXORA Theme Switch V1 */
+.login-page {
+    position: relative;
+}
+
+.theme-switch {
+    position: absolute;
+    top: 18px;
+    right: 22px;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px;
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: 40px;
+    background: rgba(5, 27, 43, .78);
+    box-shadow: 0 6px 20px rgba(0,0,0,.25);
+    backdrop-filter: blur(12px);
+}
+
+.theme-option {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: #d5e8f0;
+    cursor: pointer;
+    transition: background .2s, color .2s;
+}
+
+.theme-option svg {
+    width: 20px;
+    height: 20px;
+}
+
+.theme-option.active {
+    background: rgba(255,255,255,.17);
+    color: #ffd34d;
+}
+
+.theme-option:focus-visible {
+    outline: 2px solid #00d8e8;
+    outline-offset: 3px;
+}
+
+/* Dark theme affects the login card only */
+.login-page.dark-theme .login-panel .login-card {
+    background: linear-gradient(145deg, #17384b, #092333);
+    border-color: rgba(91, 218, 235, .45);
+    color: #effaff;
+}
+
+.login-page.dark-theme .login-panel .login-card::before {
+    background: rgba(0, 181, 205, .12);
+}
+
+.login-page.dark-theme .login-card-brand > strong,
+.login-page.dark-theme .login-card-brand > span,
+.login-page.dark-theme .login-card h2,
+.login-page.dark-theme .form-field label,
+.login-page.dark-theme .remember-me {
+    color: #effaff;
+}
+
+.login-page.dark-theme .login-subtitle,
+.login-page.dark-theme .security-note,
+.login-page.dark-theme .login-divider {
+    color: #b6d3e1;
+}
+
+.login-page.dark-theme .input-with-icon input {
+    background: #eaf6fb;
+    color: #15384a;
+}
+
+.login-page.dark-theme .google-login-button {
+    background: #f5fbff;
+    color: #244557;
+}
+
+@media (max-width: 480px) {
+    .theme-switch {
+        top: 10px;
+        right: 10px;
+    }
+}
+
+/* FIXORA Login Height Optimization V1 */
+@media (min-width: 851px) {
+    .login-content {
+        padding-top: 18px;
+        padding-bottom: 18px;
+    }
+
+    .login-panel .login-card {
+        margin-top: 36px;
+        padding-top: 32px;
+        padding-bottom: 16px;
+    }
+
+    .login-panel .login-card h2 {
+        margin-top: 10px;
+    }
+
+    .login-panel .login-subtitle {
+        margin-bottom: 12px;
+    }
+
+    .login-panel .security-note {
+        margin-top: 8px;
+        padding-top: 8px;
+    }
+
+    .login-footer {
+        padding-top: 8px;
+        padding-bottom: 12px;
+    }
+}
+/* FIXORA Dark Button and Clear Background V1 */
+
+/* Make garage image more visible */
+.login-shell {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(3, 20, 33, .48) 0%,
+            rgba(3, 25, 39, .28) 50%,
+            rgba(3, 22, 35, .34) 100%
+        ),
+        url('/images/fixora-workshop.png') center / cover no-repeat;
+}
+
+/* Premium dark sign-in button */
+.login-panel .login-button {
+    background: linear-gradient(
+        105deg,
+        #071b2b 0%,
+        #103c56 55%,
+        #006b83 100%
+    );
+    color: #ffffff;
+    border: 1px solid rgba(65, 221, 235, .55);
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, .32),
+        0 0 12px rgba(0, 200, 220, .16);
+    transition: transform .2s, box-shadow .2s, background .2s;
+}
+
+.login-panel .login-button:not(:disabled):hover {
+    background: linear-gradient(
+        105deg,
+        #0b2b42,
+        #125a70,
+        #008ca5
+    );
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px rgba(0, 0, 0, .35);
+}
+
+.login-panel .login-button:focus-visible {
+    outline: 2px solid #4ce6f0;
+    outline-offset: 3px;
+}
+/* FIXORA Ultra Clear Garage Background V2 */
+.login-shell {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(3, 20, 33, .28) 0%,
+            rgba(3, 25, 39, .12) 50%,
+            rgba(3, 22, 35, .18) 100%
+        ),
+        url('/images/fixora-workshop.png') center / cover no-repeat;
+}
+/* FIXORA Automotive Tech Footer V1 */
+
+.login-footer.fixora-tech-footer {
+    position: relative;
+    z-index: 2;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    width: 100%;
+    min-height: 76px;
+    margin-top: 8px;
+    padding: 14px 5%;
+
+    background: linear-gradient(
+        110deg,
+        rgba(4, 20, 34, .97),
+        rgba(7, 39, 56, .96)
+    );
+
+    border-top: 2px solid #20d5e3;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, .22);
+    color: #ffffff;
+}
+
+.fixora-tech-footer .tech-footer-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+}
+
+.fixora-tech-footer .tech-footer-brand strong {
+    color: #ffffff;
+    font-size: 19px;
+    font-weight: 900;
+    letter-spacing: 3px;
+}
+
+.fixora-tech-footer .tech-footer-brand span {
+    color: #b7dce5;
+    font-size: 12px;
+    letter-spacing: .4px;
+}
+
+.fixora-tech-footer .tech-footer-icon {
+    display: grid;
+    place-items: center;
+
+    width: 44px;
+    height: 44px;
+    color: #20d5e3;
+}
+
+.fixora-tech-footer .tech-footer-icon svg {
+    width: 30px;
+    height: 30px;
+}
+
+@media (max-width: 600px) {
+    .login-footer.fixora-tech-footer {
+        min-height: 68px;
+        padding: 12px 18px;
+    }
+
+    .fixora-tech-footer .tech-footer-brand strong {
+        font-size: 16px;
+    }
+
+    .fixora-tech-footer .tech-footer-brand span {
+        font-size: 10px;
+        letter-spacing: 0;
+    }
+
+    .fixora-tech-footer .tech-footer-icon {
+        width: 34px;
+        height: 34px;
+    }
+
+    .fixora-tech-footer .tech-footer-icon svg {
+        width: 25px;
+        height: 25px;
+    }
+}
+/* FIXORA Final Dark Sign In Button V2 */
+.login-panel .login-button {
+    background: linear-gradient(
+        110deg,
+        #061827 0%,
+        #0b3047 55%,
+        #07536a 100%
+    ) !important;
+
+    color: #ffffff !important;
+    border: 1px solid rgba(37, 215, 231, .55);
+
+    box-shadow:
+        0 8px 22px rgba(0, 0, 0, .30),
+        0 0 12px rgba(0, 205, 225, .12);
+}
+
+.login-panel .login-button:not(:disabled):hover {
+    background: linear-gradient(
+        110deg,
+        #0b2b40,
+        #10506a,
+        #087b91
+    ) !important;
+}
+
+/* FIXORA Car Clear Hero Layout V2 */
+
+@media (min-width: 1101px) {
+    .login-content {
+        align-items: start;
+    }
+
+    .workshop-hero {
+        align-self: start;
+        align-items: flex-start;
+    }
+
+    .workshop-hero .hero-content {
+        width: 100%;
+        max-width: 620px;
+        padding: 4px 0 0;
+    }
+
+    .workshop-hero .hero-content h1 {
+        font-size: clamp(38px, 3.4vw, 54px);
+        line-height: 1.06;
+        margin: 8px 0 12px;
+        text-shadow: 0 3px 12px rgba(0, 0, 0, .85);
+    }
+
+    .workshop-hero .hero-content h1 span {
+        color: #29e1ed;
+        font-style: italic;
+        text-shadow: 0 3px 10px rgba(0, 0, 0, .75);
+    }
+
+    .workshop-hero .hero-description {
+        max-width: 410px;
+        padding: 7px 10px;
+        border-radius: 8px;
+        background: rgba(3, 20, 34, .72);
+        color: #ffffff;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .workshop-hero .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+        max-width: 600px;
+        margin-top: 16px;
+    }
+
+    .workshop-hero .feature-card {
+        min-width: 0;
+        min-height: 66px;
+        padding: 7px 5px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        border: 1px solid rgba(37, 219, 234, .75);
+        border-radius: 12px;
+        background: rgba(3, 24, 42, .92);
+        box-shadow: 0 0 8px rgba(0, 220, 240, .12);
+        text-align: center;
+        font-size: 11px;
+        line-height: 1.2;
+    }
+
+    .workshop-hero .feature-icon {
+        width: 23px;
+        height: 23px;
+        flex: 0 0 23px;
+        background: transparent;
+        color: #31e8f2;
+    }
+
+    .workshop-hero .feature-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+@media (min-width: 1101px) and (max-width: 1400px) {
+    .workshop-hero .feature-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-width: 350px;
+    }
+}
+/* FIXORA Hero Eyebrow Contrast V1 */
+.workshop-hero .hero-eyebrow {
+    display: inline-block;
+    width: fit-content;
+    color: #15a8ca;
+    background: rgba(4, 22, 36, .88);
+    padding: 7px 12px;
+    border: 1px solid rgba(255, 209, 102, .45);
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, .6);
+}
+/* FIXORA Hero Two Line and Car Clearance V3 */
+
+@media (min-width: 1101px) {
+    .workshop-hero .hero-content h1 {
+        max-width: 500px;
+        font-size: clamp(38px, 3.5vw, 56px);
+        line-height: 1.04;
+        margin: 10px 0 12px;
+    }
+
+    .workshop-hero .hero-content h1 span {
+        display: block;
+        font-style: italic;
+        color: #29e1ed;
+    }
+
+    .workshop-hero .hero-description {
+        max-width: 400px;
+        margin-bottom: 0;
+    }
+
+    .workshop-hero .feature-grid {
+        margin-top: 12px;
+        max-width: 560px;
+        gap: 7px;
+    }
+
+    .workshop-hero .feature-card {
+        min-height: 58px;
+        padding: 6px 4px;
+        gap: 3px;
+        font-size: 10px;
+    }
+
+    .workshop-hero .feature-icon {
+        width: 20px;
+        height: 20px;
+        flex-basis: 20px;
+    }
+
+    .workshop-hero .feature-icon svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* FIXORA Full Login Page Theme V1 */
+
+/* Light mode: brighter page and clearer garage image */
+.login-page:not(.dark-theme) {
+  background: #eaf4f6;
+}
+
+.login-page:not(.dark-theme) .login-shell {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(7, 34, 48, .35) 0%,
+      rgba(7, 34, 48, .10) 50%,
+      rgba(7, 34, 48, .18) 100%
+    ),
+    url('/images/fixora-workshop.png') center / cover no-repeat;
+}
+
+/* Dark mode: preserve the existing dark garage appearance */
+.login-page.dark-theme {
+  background: #071b2b;
+}
+
+.login-page.dark-theme .login-shell {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(3, 20, 33, .65) 0%,
+      rgba(3, 25, 39, .42) 50%,
+      rgba(3, 22, 35, .55) 100%
+    ),
+    url('/images/fixora-workshop.png') center / cover no-repeat;
+}

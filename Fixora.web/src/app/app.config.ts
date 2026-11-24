@@ -10,6 +10,10 @@ import {
   DEFAULT_API_CONFIG,
 } from './core/config/api.config';
 
+import { AUTH_GATEWAY } from './core/auth/auth-gateway';
+import { HttpAuthGateway } from './core/auth/http-auth.gateway';
+import { environment } from '../environments/environment';
+
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
@@ -17,7 +21,14 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([errorInterceptor, authInterceptor])),
     {
       provide: API_CONFIG,
-      useValue: DEFAULT_API_CONFIG,
+      useValue: {
+        ...DEFAULT_API_CONFIG,
+        baseUrl: environment.apiBaseUrl,
+      },
+    },
+    {
+      provide: AUTH_GATEWAY,
+      useExisting: HttpAuthGateway,
     },
   ],
 };

@@ -89,3 +89,57 @@
   --fx-transition-fast: 150ms ease;
   --fx-transition-normal: 250ms ease;
 }
+/* FIXORA Manager Portal - Dark Theme */
+:root.dark-theme {
+  --fx-color-primary: #5eead4;
+  --fx-color-primary-hover: #99f6e4;
+  --fx-color-secondary: #2dd4bf;
+  --fx-color-primary-light: #164e53;
+
+  --fx-color-background: #0f172a;
+  --fx-color-surface: #1e293b;
+  --fx-color-border: #334155;
+
+  --fx-color-text: #e2e8f0;
+  --fx-color-text-muted: #94a3b8;
+  --fx-color-text-inverse: #0f172a;
+
+  --fx-color-success: #4ade80;
+  --fx-color-success-light: #14532d;
+
+  --fx-color-warning: #fbbf24;
+  --fx-color-warning-light: #78350f;
+
+  --fx-color-danger: #f87171;
+  --fx-color-danger-hover: #fca5a5;
+  --fx-color-danger-light: #7f1d1d;
+
+  --fx-color-info: #60a5fa;
+  --fx-color-info-light: #1e3a8a;
+
+  --fx-color-disabled: #334155;
+  --fx-color-disabled-text: #94a3b8;
+  --fx-color-focus: #5eead4;
+
+  --fx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --fx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --fx-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+/* FIXORA Sidebar Theme Tokens */
+:root {
+  --fx-sidebar-background: #104e56;
+  --fx-sidebar-text: #ffffff;
+  --fx-sidebar-muted: #b9dcdf;
+  --fx-sidebar-heading: #a9ced2;
+  --fx-sidebar-link: #dbeef0;
+  --fx-sidebar-active: #287d85;
+}
+
+:root.dark-theme {
+  --fx-sidebar-background: #102b35;
+  --fx-sidebar-text: #f1f5f9;
+  --fx-sidebar-muted: #94bfc4;
+  --fx-sidebar-heading: #8fb8bd;
+  --fx-sidebar-link: #d1e7e9;
+  --fx-sidebar-active: #17636b;
+}
