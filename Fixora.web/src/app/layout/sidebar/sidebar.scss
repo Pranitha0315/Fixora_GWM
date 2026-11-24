@@ -9,8 +9,8 @@
   min-height: 100dvh;
   padding: 20px 14px;
   box-sizing: border-box;
-  background: #104e56;
-  color: #ffffff;
+  background: var(--fx-sidebar-background, #104e56);
+  color: var(--fx-sidebar-text, #ffffff);
 }
 
 .brand {
@@ -31,7 +31,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.5px;
-  color: #b9dcdf;
+  color: var(--fx-sidebar-muted, #b9dcdf);
 }
 
 .navigation {
@@ -46,7 +46,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.5px;
-  color: #a9ced2;
+  color: var(--fx-sidebar-heading, #a9ced2);
 }
 
 .navigation-link {
@@ -57,7 +57,7 @@
   padding: 8px 12px;
   box-sizing: border-box;
   border-radius: 8px;
-  color: #dbeef0;
+  color: var(--fx-sidebar-link, #dbeef0);
   text-decoration: none;
   font-size: 14px;
   font-weight: 500;
@@ -66,12 +66,12 @@
 
 .navigation-link:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: #ffffff;
+  color: var(--fx-sidebar-text, #ffffff);
 }
 
 .navigation-link.active {
-  background: #287d85;
-  color: #ffffff;
+  background: var(--fx-sidebar-active, #287d85);
+  color: var(--fx-sidebar-text, #ffffff);
   font-weight: 600;
 }
 
@@ -108,7 +108,7 @@
 
 .footer-subtitle {
   font-size: 11px;
-  color: #b9dcdf;
+  color: var(--fx-sidebar-muted, #b9dcdf);
 }
 
 @media (max-width: 768px) {

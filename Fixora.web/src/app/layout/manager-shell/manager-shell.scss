@@ -7,12 +7,12 @@
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);
   min-height: 100dvh;
-  background: #f4f7f8;
+  background: var(--fx-color-background);
 }
 
 .manager-sidebar {
-  background: #104e56;
-  color: #ffffff;
+  background: var(--fx-sidebar-background, #104e56);
+  color: var(--fx-sidebar-text, #ffffff);
   min-width: 0;
 }
 
@@ -27,8 +27,8 @@
   top: 0;
   z-index: 10;
   min-height: 64px;
-  background: #ffffff;
-  border-bottom: 1px solid #e2e8f0;
+  background: var(--fx-color-surface);
+  border-bottom: 1px solid var(--fx-color-border);
 }
 
 .manager-content {
