@@ -52,6 +52,8 @@ public static class CustomerSeeder
             Reason = "Suspension check recommended — 62% of your driving was on rough roads",
             CreatedAt = now.AddDays(-3),
         });
+        SeedHeatmapTrips(db, now);
+
         db.Loyalty.AddRange(
             new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 200, Source = "drivescore:seed1", Description = "Gentle driving week · score 84", CreatedAt = now.AddDays(-28), ExpiresAt = now.AddMonths(5) },
             new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 100, Source = "drivescore:seed2", Description = "Gentle driving week · score 80", CreatedAt = now.AddDays(-21), ExpiresAt = now.AddMonths(5) },
@@ -60,5 +62,55 @@ public static class CustomerSeeder
             new LoyaltyEntry { CustomerId = DemoIds.CustomerKavitha, Points = 120, Source = "drivescore:seed0", Description = "Gentle driving week · score 86", CreatedAt = now.AddMonths(-13), ExpiresAt = now.AddMonths(-7) });
 
         await db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Demo data for the manager's road-stress heatmap (FX13-D08-NAR-2): three weeks of coarse trip summaries
+    /// around Jaffna from Kavitha's Wagon R plus six synthetic pilot-fleet vehicles (IsDemoReplay = true).
+    /// Only 5-char geohash cells are stored — never a GPS trace.
+    /// </summary>
+    private static void SeedHeatmapTrips(CustomerDbContext db, DateTime now)
+    {
+        var fleet = new[] { DemoIds.VehicleWagonR }
+            .Concat(Enumerable.Range(1, 6).Select(i => Guid.Parse($"5f000000-0000-0000-0000-00000000000{i}"))).ToArray();
+        // (cell, rough-road share, potholes per 10 km): Point Pedro Rd and Kayts Rd are the rough ones.
+        var cells = new (string Hash, double Rough, double Potholes)[]
+        {
+            ("tc8yv", 0.15, 0.6),  // Jaffna town
+            ("tc8zj", 0.25, 1.2),  // Nallur / Kopay
+            ("tc8zk", 0.30, 1.5),  // Manipay
+            ("tc8zm", 0.35, 1.8),  // Chunnakam
+            ("tc8zr", 0.62, 3.4),  // Point Pedro Road
+            ("tc8yg", 0.55, 2.6),  // Kayts Road
+            ("tc9nb", 0.40, 2.0),  // Chavakachcheri
+        };
+        var rnd = new Random(808);
+        for (var day = 21; day >= 1; day--)
+        {
+            foreach (var vehicle in fleet)
+            {
+                if (rnd.Next(3) == 0) continue; // not every vehicle drives every day
+                var route = cells.OrderBy(_ => rnd.Next()).Take(rnd.Next(2, 4)).ToList();
+                var km = 12 + rnd.Next(0, 25);
+                var rough = route.Average(c => c.Rough);
+                db.Trips.Add(new Trip
+                {
+                    CustomerId = vehicle == DemoIds.VehicleWagonR ? DemoIds.CustomerKavitha : Guid.Empty,
+                    VehicleId = vehicle,
+                    StartedAt = now.AddDays(-day).AddHours(rnd.Next(-3, 4)),
+                    DistanceKm = km,
+                    RoughKm = Math.Round(km * rough, 1),
+                    PotholeCount = (int)Math.Round(km / 10.0 * route.Average(c => c.Potholes)),
+                    HarshBrakes = rnd.Next(0, 3),
+                    HarshAccels = rnd.Next(0, 2),
+                    SharpCorners = rnd.Next(0, 2),
+                    Score = 70 + rnd.Next(0, 25),
+                    Confidence = 0.9,
+                    SegmentGeohashesCsv = string.Join(',', route.Select(c => c.Hash)),
+                    IsDemoReplay = true,
+                    UploadedAt = now.AddDays(-day),
+                });
+            }
+        }
     }
 }

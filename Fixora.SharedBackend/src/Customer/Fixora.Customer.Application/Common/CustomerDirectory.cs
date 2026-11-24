@@ -1,3 +1,4 @@
+using Fixora.Customer.Application.DriveSense;
 using Fixora.Customer.Contracts;
 using Fixora.Customer.Domain;
 using Fixora.SharedKernel;
@@ -86,4 +87,47 @@ public sealed class CustomerDirectory(ICustomerDb db, IOptions<CustomerOptions> 
 
     private async Task<int> BalanceAsync(Guid customerId, CancellationToken ct)
         => await db.Loyalty.Where(l => l.CustomerId == customerId && (l.ExpiresAt == null || l.ExpiresAt > clock.UtcNow)).SumAsync(l => (int?)l.Points, ct) ?? 0;
+
+    /// <summary>
+    /// Road-stress heatmap (FX13-D08). Trips carry only 5-char geohash cells (no GPS trace). Each trip's distance,
+    /// rough km and potholes are shared equally across the cells it passed; a cell is returned only when
+    /// at least HeatmapMinVehicles different vehicles drove there, so no single driver's route can be seen.
+    /// </summary>
+    public async Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+    {
+        days = Math.Clamp(days, 1, Math.Max(1, options.Value.TripRetentionDays));
+        var minVehicles = Math.Max(1, options.Value.HeatmapMinVehicles);
+        var since = clock.UtcNow.AddDays(-days);
+        var trips = await db.Trips.AsNoTracking()
+            .Where(t => t.StartedAt >= since && t.SegmentGeohashesCsv != "" && t.Confidence >= 0.6)
+            .Select(t => new { t.VehicleId, t.DistanceKm, t.RoughKm, t.PotholeCount, t.SegmentGeohashesCsv })
+            .ToListAsync(ct);
+
+        var cells = new Dictionary<string, (HashSet<Guid> Vehicles, int Trips, double Km, double RoughKm, double Potholes)>();
+        foreach (var t in trips)
+        {
+            var hashes = t.SegmentGeohashesCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(h => h.Length > 5 ? h[..5] : h).Distinct().ToList();
+            if (hashes.Count == 0) continue;
+            var share = 1.0 / hashes.Count;
+            foreach (var h in hashes)
+            {
+                if (!cells.TryGetValue(h, out var c)) c = (new HashSet<Guid>(), 0, 0, 0, 0);
+                c.Vehicles.Add(t.VehicleId);
+                cells[h] = (c.Vehicles, c.Trips + 1, c.Km + t.DistanceKm * share, c.RoughKm + t.RoughKm * share, c.Potholes + t.PotholeCount * share);
+            }
+        }
+
+        var result = new List<RoadStressCellDto>();
+        foreach (var (hash, c) in cells)
+        {
+            if (c.Vehicles.Count < minVehicles || c.Km <= 0) continue;
+            if (Geohash.Centre(hash) is not { } centre) continue;
+            var roughPct = Math.Round(100 * c.RoughKm / c.Km, 1);
+            var potholesPer100 = Math.Round(100 * c.Potholes / c.Km, 1);
+            var level = roughPct >= 50 || potholesPer100 >= 20 ? "high" : roughPct >= 25 || potholesPer100 >= 10 ? "medium" : "low";
+            result.Add(new RoadStressCellDto(hash, Math.Round(centre.Lat, 4), Math.Round(centre.Lng, 4), c.Vehicles.Count, c.Trips, roughPct, potholesPer100, level));
+        }
+        return result.OrderByDescending(r => r.RoughRoadPct).ToList();
+    }
 }

@@ -134,6 +134,16 @@ public sealed class CustomersController(ICustomerDirectory customers) : StaffCon
     [HttpGet("vehicles/{vehicleId:guid}/drivesense")] public Task<DriveSenseHintDto?> Hint(Guid vehicleId, CancellationToken ct) => customers.GetDriveSenseHintAsync(vehicleId, ct);
 }
 
+/// <summary>DriveSense analytics for the manager web (FX13-D08-NAR-2 heatmap). Aggregated, privacy-safe cells only.</summary>
+[Route("api/v1/manager/drivesense")]
+public sealed class DriveSenseAnalyticsController(ICustomerDirectory customers) : StaffControllerBase
+{
+    /// <summary>GET /api/v1/manager/drivesense/road-stress?days=30 → [{ geohash, lat, lng, vehicles, trips, roughRoadPct, potholesPer100Km, level }]</summary>
+    [HttpGet("road-stress")]
+    public Task<IReadOnlyList<RoadStressCellDto>> RoadStress([FromQuery] int days = 30, CancellationToken ct = default)
+        => customers.GetRoadStressAsync(days, ct);
+}
+
 [Route("api/v1/manager/settings")]
 public sealed class SettingsController(WorkshopSettingsService settings) : StaffControllerBase
 {

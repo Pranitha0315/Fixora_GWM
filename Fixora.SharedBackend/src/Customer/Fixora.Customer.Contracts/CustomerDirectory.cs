@@ -18,6 +18,13 @@ public sealed record SosDto(Guid Id, Guid CustomerId, string CustomerName, strin
 
 public sealed record LoyaltyRedemption(decimal DiscountRupees, int PointsUsed);
 
+/// <summary>
+/// One coarse map cell for the manager's road-stress heatmap (FX13-D08-NAR-2). Aggregated only:
+/// no customer, vehicle or trip ids, and cells with fewer than HeatmapMinVehicles vehicles are hidden.
+/// </summary>
+public sealed record RoadStressCellDto(string Geohash, double Lat, double Lng, int Vehicles, int Trips,
+    double RoughRoadPct, double PotholesPer100Km, string Level);
+
 /// <summary>Read-only customer facts other contexts may use (names, vehicles, hints, loyalty).</summary>
 public interface ICustomerDirectory
 {
@@ -30,6 +37,8 @@ public interface ICustomerDirectory
     /// <summary>Redeems garage-only loyalty points against an invoice, capped by the owner's settings.</summary>
     Task<LoyaltyRedemption> RedeemForInvoiceAsync(Guid customerId, decimal invoiceSubtotal, decimal percent, decimal cap, string invoiceNumber, CancellationToken ct = default);
     Task AwardSpendPointsAsync(Guid customerId, decimal paidAmount, string invoiceNumber, CancellationToken ct = default);
+    /// <summary>Aggregated road stress per coarse geohash cell over the last <paramref name="days"/> days (privacy-safe).</summary>
+    Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default);
 }
 
 /// <summary>SOS is customer-owned; staff and mechanics change its status only through this contract.</summary>

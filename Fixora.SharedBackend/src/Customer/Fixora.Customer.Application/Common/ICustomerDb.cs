@@ -34,4 +34,6 @@ public sealed class CustomerOptions
     public int LoyaltyPointsPerScoreWeek { get; set; } = 100;
     /// <summary>1 point = Rs 1 for redemption.</summary>
     public decimal RupeesPerPoint { get; set; } = 1m;
+    /// <summary>Heatmap privacy: a map cell is shown only when at least this many different vehicles drove there.</summary>
+    public int HeatmapMinVehicles { get; set; } = 3;
 }
