@@ -1,0 +1,140 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 20px 14px;
+  box-sizing: border-box;
+  background: #104e56;
+  color: #ffffff;
+}
+
+.brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.brand-name {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+.brand-subtitle {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #b9dcdf;
+}
+
+.navigation {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-top: 24px;
+}
+
+.navigation-heading {
+  padding: 0 14px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #a9ced2;
+}
+
+.navigation-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  color: #dbeef0;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background-color 150ms ease;
+}
+
+.navigation-link:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.navigation-link.active {
+  background: #287d85;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.navigation-link:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: 2px;
+}
+
+.navigation-icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: auto;
+  padding: 20px 14px 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.footer-title {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.footer-subtitle {
+  font-size: 11px;
+  color: #b9dcdf;
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    min-height: auto;
+  }
+
+  .navigation {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-bottom: 20px;
+  }
+
+  .navigation-heading {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 360px) {
+  .navigation {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navigation-link {
+    transition: none;
+  }
+}

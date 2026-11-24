@@ -1,0 +1,45 @@
+<div
+  class="fx-kpi-card"
+  [attr.aria-busy]="loading() ? 'true' : null"
+>
+  <div class="fx-kpi-header">
+    <span class="fx-kpi-label">{{ label() }}</span>
+
+    @if (showIcon()) {
+      <span
+        [class]="'fx-kpi-icon fx-kpi-tone--' + tone()"
+        aria-hidden="true"
+      >
+        <ng-content select="[kpi-icon]"></ng-content>
+      </span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="fx-kpi-skeleton" aria-hidden="true"></div>
+
+    <span class="fx-visually-hidden" role="status">
+      {{ loadingText() }}
+    </span>
+  } @else {
+    <div class="fx-kpi-value">{{ value() }}</div>
+
+    @if (trend()) {
+      <div
+        [class]="'fx-kpi-trend fx-kpi-text--' + trendTone()"
+      >
+        <span aria-hidden="true">{{ trendSymbol() }}</span>
+
+        <span class="fx-visually-hidden">
+          Trend: {{ trendDirection() }}.
+        </span>
+
+        <span>{{ trend() }}</span>
+      </div>
+    }
+
+    @if (description()) {
+      <p class="fx-kpi-description">{{ description() }}</p>
+    }
+  }
+</div>

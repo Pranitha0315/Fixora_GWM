@@ -1,0 +1,52 @@
+:host {
+  display: block;
+}
+
+.fx-toast-container {
+  position: fixed;
+  right: var(--fx-space-6);
+  bottom: var(--fx-space-6);
+  z-index: var(--fx-z-toast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fx-space-3);
+  width: min(400px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  pointer-events: none;
+}
+
+.fx-toast-item {
+  pointer-events: auto;
+  border-radius: var(--fx-radius-md);
+  box-shadow: var(--fx-shadow-lg);
+  animation: fx-toast-enter 180ms ease-out;
+}
+
+@keyframes fx-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 480px) {
+  .fx-toast-container {
+    left: var(--fx-space-3);
+    right: var(--fx-space-3);
+    bottom: var(--fx-space-3);
+    width: auto;
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-toast-item {
+    animation: none;
+  }
+}

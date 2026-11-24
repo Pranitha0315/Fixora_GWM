@@ -1,0 +1,59 @@
+:host {
+  display: block;
+}
+
+.fx-confirm-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--fx-space-4);
+}
+
+.fx-confirm-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--fx-radius-full);
+}
+
+.fx-confirm-icon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.fx-confirm-icon--primary {
+  color: var(--fx-color-primary);
+  background: var(--fx-color-primary-light);
+}
+
+.fx-confirm-icon--danger {
+  color: var(--fx-color-danger);
+  background: var(--fx-color-danger-light);
+}
+
+.fx-confirm-icon--warning {
+  color: var(--fx-color-warning);
+  background: var(--fx-color-warning-light);
+}
+
+.fx-confirm-icon--success {
+  color: var(--fx-color-success);
+  background: var(--fx-color-success-light);
+}
+
+.fx-confirm-message {
+  margin: 0;
+  color: var(--fx-color-text-muted);
+  font-size: var(--fx-font-sm);
+  line-height: var(--fx-line-height);
+}
+
+.fx-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--fx-space-3);
+}

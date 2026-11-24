@@ -1,0 +1,24 @@
+<button
+  [class]="buttonClasses()"
+  [type]="type()"
+  [disabled]="isDisabled()"
+  [attr.aria-label]="accessibleLabel()"
+  [attr.aria-busy]="loading() ? 'true' : null"
+  (click)="handleClick($event)"
+>
+  @if (loading()) {
+    <span
+      class="fx-button-spinner"
+      aria-hidden="true"
+    ></span>
+
+    <span>{{ loadingText() }}</span>
+  }
+
+  <span
+    class="fx-button-content"
+    [hidden]="loading()"
+  >
+    <ng-content></ng-content>
+  </span>
+</button>

@@ -1,0 +1,24 @@
+<section
+  class="fx-toast-container"
+  aria-label="Notifications"
+>
+  @for (item of notifications(); track item.id) {
+    <div
+      #toastItem
+      class="fx-toast-item"
+      (mouseenter)="service.pause(item.id)"
+      (mouseleave)="onMouseLeave(item.id, toastItem)"
+      (focusin)="service.pause(item.id)"
+      (focusout)="onFocusOut(item.id, toastItem, $event)"
+    >
+      <fx-alert
+        [tone]="item.tone"
+        [title]="item.title"
+        [message]="item.message"
+        [dismissible]="true"
+        [dismissLabel]="'Dismiss notification: ' + item.title"
+        (dismissed)="service.dismiss(item.id)"
+      />
+    </div>
+  }
+</section>

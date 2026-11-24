@@ -1,0 +1,59 @@
+<div class="fx-field">
+  <label
+    class="fx-field-label"
+    [for]="controlId()"
+  >
+    {{ label() }}
+
+    @if (required()) {
+      <span class="fx-field-required" aria-hidden="true">*</span>
+    }
+  </label>
+
+  <select
+    class="fx-field-control fx-select-control"
+    [class.fx-field-invalid]="!!error()"
+    [id]="controlId()"
+    [required]="required()"
+    [disabled]="isDisabled()"
+    [attr.aria-invalid]="error() ? 'true' : null"
+    [attr.aria-describedby]="describedBy()"
+    (change)="handleChange($event)"
+    (blur)="handleBlur()"
+  >
+    <option
+      value=""
+      [selected]="value() === ''"
+      [disabled]="required()"
+    >
+      {{ placeholder() }}
+    </option>
+
+    @for (option of options(); track option.value) {
+      <option
+        [value]="option.value"
+        [selected]="value() === option.value"
+        [disabled]="option.disabled ?? false"
+      >
+        {{ option.label }}
+      </option>
+    }
+  </select>
+
+  @if (error()) {
+    <p
+      class="fx-field-error"
+      [id]="controlId() + '-error'"
+      role="alert"
+    >
+      {{ error() }}
+    </p>
+  } @else if (helperText()) {
+    <p
+      class="fx-field-helper"
+      [id]="controlId() + '-helper'"
+    >
+      {{ helperText() }}
+    </p>
+  }
+</div>
