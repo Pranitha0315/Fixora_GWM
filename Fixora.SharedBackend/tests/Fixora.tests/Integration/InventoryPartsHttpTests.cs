@@ -209,4 +209,14 @@ public sealed class InventoryPartsHttpTests
                 OrdersUrl,
                 new PartsOrderCreate(DemoIds.PartBrakePads, 5, "Jaffna Auto Parts", 1500m, null))).StatusCode);
     }
+
+    [Fact]
+    public async Task Mechanic_cannot_mark_parts_order_delivered()
+    {
+        await using var factory = NewFactory();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsync(DeliveredUrl(Guid.NewGuid()), null)).StatusCode);
+    }
 }
