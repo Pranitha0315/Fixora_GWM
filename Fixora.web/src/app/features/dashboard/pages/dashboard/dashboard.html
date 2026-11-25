@@ -1,1 +1,116 @@
-<p>dashboard works!</p>
+﻿<section class="dashboard-page">
+  <header class="dashboard-header">
+    <div>
+      <h1>Workshop Overview</h1>
+      <p>Monitor your workshop operations and performance.</p>
+    </div>
+
+    <fx-button
+      variant="outline"
+      [disabled]="isLoading()"
+      (pressed)="refresh()"
+    >
+      Refresh
+    </fx-button>
+  </header>
+
+  @if (isLoading()) {
+    <fx-loading-state
+      message="Loading dashboard..."
+      description="Retrieving workshop information."
+    />
+  } @else if (errorMessage(); as error) {
+    <fx-error-state
+      title="Dashboard unavailable"
+      [description]="error"
+      (retryRequested)="refresh()"
+    />
+  } @else if (data(); as stats) {
+    <section aria-labelledby="operations-heading">
+      <h2 id="operations-heading">Workshop Operations</h2>
+
+      <div class="dashboard-grid">
+        <fx-kpi-card
+          label="Today's Bookings"
+          [value]="stats.todayBookings"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Pending Bookings"
+          [value]="stats.pendingBookings"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Active Jobs"
+          [value]="stats.activeJobs"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Proposals to Review"
+          [value]="stats.proposalsToReview"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Approvals to Release"
+          [value]="stats.approvalsToRelease"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Change Requests"
+          [value]="stats.changeRequestsToReview"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Open SOS"
+          [value]="stats.openSos"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Low Stock Parts"
+          [value]="stats.lowStockParts"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Unpaid Invoices"
+          [value]="stats.unpaidInvoices"
+          [showIcon]="false"
+        />
+      </div>
+    </section>
+
+    <section aria-labelledby="financial-heading">
+      <h2 id="financial-heading">Financial Overview</h2>
+
+      <div class="dashboard-grid">
+        <fx-kpi-card
+          label="This Week Revenue"
+          [value]="(stats.revenueThisWeek | number:'1.2-2') ?? ''"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Last Week Revenue"
+          [value]="(stats.revenueLastWeek | number:'1.2-2') ?? ''"
+          [showIcon]="false"
+        />
+        <fx-kpi-card
+          label="Monthly Platform Earnings"
+          [value]="(stats.platformEarningsThisMonth | number:'1.2-2') ?? ''"
+          [showIcon]="false"
+        />
+      </div>
+    </section>
+
+    @if (lastUpdated(); as updated) {
+      <p class="dashboard-updated" role="status">
+        Last updated: {{ updated | date:'medium' }}
+      </p>
+    }
+  } @else {
+    <fx-empty-state
+      title="No dashboard information"
+      description="Refresh to retrieve workshop information."
+      actionLabel="Refresh"
+      (actionRequested)="refresh()"
+    />
+  }
+</section>
