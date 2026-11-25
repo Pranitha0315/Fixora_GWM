@@ -16,7 +16,7 @@ namespace Fixora.Tests.Integration;
 /// F03 manager note stored separately, hidden from customers · F04 priority 0/1/2 · F05 active bay on walk-in
 /// F06 date filter = workshop local date · F07 paged list { items, page, pageSize, total }.
 /// BT09/BT09b characterize the current WalkIn F02 hole (no CapacityLock / EnsureResourcesFree) — tests only.
-/// BT12 staff reschedule of Confirmed into mechanic overlap → 409 (Shared EnsureResourcesFree).
+/// BT12/BT12b staff reschedule of Confirmed into mechanic/bay overlap → 409 (Shared EnsureResourcesFree).
 /// Each test uses its own far-future day so tests never collide with the demo seed or each other.
 /// </summary>
 [Collection("api")]
@@ -162,6 +162,26 @@ public class BookingAuditFixTests(FixoraFactory factory)
             new RescheduleRequest(intoBusy));
         Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
         Assert.Equal("mechanic_busy", await ErrorCode(res));
+    }
+
+    [Fact]
+    public async Task BT12b_staff_reschedule_confirmed_into_bay_overlap_is_409()
+    {
+        // Day(21) can land on Sunday (workshop closed → 400); use a mid-week offset.
+        var slotA = Day(22);
+        var slotB = Day(22).AddHours(3);
+        var intoBusy = Day(22).AddMinutes(30);
+
+        var first = await SeedRequestedAsync(slotA);
+        var second = await SeedRequestedAsync(slotB);
+        Assert.Equal(HttpStatusCode.OK, (await Confirm(first, DemoIds.Bay1, DemoIds.MechanicRavi)).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await Confirm(second, DemoIds.Bay1, DemoIds.MechanicKumar)).StatusCode);
+
+        var res = await (await Manager()).PostAsJsonAsync(
+            $"/api/v1/manager/bookings/{second}/reschedule",
+            new RescheduleRequest(intoBusy));
+        Assert.Equal(HttpStatusCode.Conflict, res.StatusCode);
+        Assert.Equal("bay_busy", await ErrorCode(res));
     }
 
     // BT06 / F03
