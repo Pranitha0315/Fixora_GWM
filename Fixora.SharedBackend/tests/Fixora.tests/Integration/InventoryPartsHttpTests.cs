@@ -196,4 +196,17 @@ public sealed class InventoryPartsHttpTests
                 AdjustUrl(DemoIds.PartBrakePads),
                 new StockAdjust(-1, "mechanic must not adjust"))).StatusCode);
     }
+
+    [Fact]
+    public async Task Mechanic_cannot_list_or_place_parts_orders()
+    {
+        await using var factory = NewFactory();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync(OrdersUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsJsonAsync(
+                OrdersUrl,
+                new PartsOrderCreate(DemoIds.PartBrakePads, 5, "Jaffna Auto Parts", 1500m, null))).StatusCode);
+    }
 }
