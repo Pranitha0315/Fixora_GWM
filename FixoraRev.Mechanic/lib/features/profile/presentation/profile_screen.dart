@@ -185,6 +185,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             onTap: () => context.push(RouteNames.notifications),
           ),
+          const SizedBox(height: 8),
+          Text(
+            'More',
+            style: TextStyle(
+              color: AppColors.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text('Help & settings', style: TextStyle(color: AppColors.ink)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push(RouteNames.moreMenu),
+          ),
           const SizedBox(height: 24),
           ElevatedButton(
             style: BronzeButtons.elevated.copyWith(
