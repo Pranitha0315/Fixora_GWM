@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
-import '../../dashboard/presentation/screens/home_screen.dart';
 import '../../fixproof/presentation/screens/fixproof_hub_screen.dart';
+import '../../home/presentation/screens/home_screen.dart';
 import '../../inventory/presentation/inventory_screen.dart';
-import '../../jobs/presentation/screens/queue_screen.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
+import '../../queue_board/presentation/screens/queue_board_screen.dart';
+
 
 /// Current bottom-nav tab.
 class ShellTabNotifier extends Notifier<int> {
@@ -20,18 +22,24 @@ final shellTabProvider =
     NotifierProvider<ShellTabNotifier, int>(ShellTabNotifier.new);
 
 /// Floating pill bar — icon above label on every tab.
-/// Light: white bar · orange selected · Dark: black bar · orange selected.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
   static const Color _accent = Color(0xFFFF6300);
 
+  static void openAlerts(BuildContext context) =>
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const NotificationsScreen(),
+        ),
+      );
+
   static const _tabs = <_TabSpec>[
-    _TabSpec('Home', Icons.home_outlined, Icons.home),
-    _TabSpec('Jobs', Icons.assignment_outlined, Icons.assignment),
-    _TabSpec('Proof', Icons.verified_outlined, Icons.verified),
-    _TabSpec('Parts', Icons.inventory_2_outlined, Icons.inventory_2),
-    _TabSpec('Profile', Icons.person_outline, Icons.person),
+    _TabSpec('Home', Icons.home_outlined, Icons.home_rounded),
+    _TabSpec('Jobs', Icons.handyman_outlined, Icons.handyman_rounded),
+    _TabSpec('Proof', Icons.photo_camera_outlined, Icons.photo_camera_rounded),
+    _TabSpec('Parts', Icons.inventory_2_outlined, Icons.inventory_2_rounded),
+    _TabSpec('Profile', Icons.person_outline_rounded, Icons.person_rounded),
   ];
 
   @override
@@ -44,7 +52,7 @@ class MainShell extends ConsumerWidget {
 
     const pages = <Widget>[
       HomeScreen(),
-      QueueScreen(),
+      QueueBoardScreen(asTab: true),
       FixproofHubScreen(),
       InventoryScreen(),
       ProfileScreen(),

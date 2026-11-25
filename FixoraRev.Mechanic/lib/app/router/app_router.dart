@@ -2,18 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/loading_screen.dart';
+import '../../features/authentication/presentation/screens/garage_pin_login_screen.dart';
 import '../../features/authentication/presentation/screens/login_screen.dart';
 import '../../features/authentication/presentation/screens/otp_args.dart';
 import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
 import '../../features/authentication/presentation/screens/register_screen.dart';
+import '../../features/drivesense/presentation/screens/drivesense_details_screen.dart';
 import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
+import '../../features/mechanic_invitation/presentation/screens/accept_invitation_screen.dart';
+import '../../features/mechanic_invitation/presentation/screens/expired_invite_screen.dart';
+import '../../features/quick_login/presentation/screens/quick_login_screen.dart';
+import '../../features/fixproof/presentation/screens/diagnosis_flow_screen.dart';
 import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
 import '../../features/fixproof/presentation/screens/report_review_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
 import '../../features/job_progress/presentation/screens/progress_update_screen.dart';
+import '../../features/jobs/presentation/screens/additional_repair_screen.dart';
+import '../../features/jobs/presentation/screens/invoice_screen.dart';
 import '../../features/jobs/presentation/screens/job_detail_screen.dart';
+import '../../features/jobs/presentation/screens/repair_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/passport/presentation/passport_screen.dart';
+import '../../features/profile/presentation/more/about_screen.dart';
+import '../../features/profile/presentation/more/help_screen.dart';
+import '../../features/profile/presentation/more/language_screen.dart';
+import '../../features/profile/presentation/more/more_menu_screen.dart';
 import '../../features/repair_proposal/presentation/screens/repair_proposal_screen.dart';
 import '../../features/shell/presentation/main_shell.dart';
 import '../../features/sos/presentation/sos_screen.dart';
@@ -37,7 +51,34 @@ class AppRouter {
       ),
       GoRoute(
         path: RouteNames.login,
-        builder: (context, state) => const LoginScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          final initial = extra is LoginScreen
+              ? extra.initialEmail
+              : extra is String
+                  ? extra
+                  : state.uri.queryParameters['email'];
+          return LoginScreen(initialEmail: initial);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.garagePin,
+        builder: (context, state) => const GaragePinLoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.quickLogin,
+        builder: (context, state) => const QuickLoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.loading,
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is LoadingScreen) return extra;
+          return const LoadingScreen(
+            title: 'Loading…',
+            next: MainShell(),
+          );
+        },
       ),
       GoRoute(
         path: RouteNames.forgotPassword,
@@ -61,6 +102,22 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: RouteNames.acceptInvitation,
+        builder: (context, state) {
+          final token = state.uri.queryParameters['token'] ??
+              (state.extra is String ? state.extra as String : '');
+          return AcceptInvitationScreen(token: token);
+        },
+      ),
+      GoRoute(
+        path: RouteNames.expiredInvitation,
+        builder: (context, state) => ExpiredInviteScreen(
+          message: state.extra is String
+              ? state.extra as String
+              : 'This invitation link has expired or was already used. Ask your workshop manager to send a new 7-day invite.',
+        ),
+      ),
+      GoRoute(
         path: RouteNames.shell,
         builder: (context, state) => const MainShell(),
       ),
@@ -68,6 +125,22 @@ class AppRouter {
         path: '${RouteNames.jobDetails}/:jobId',
         builder: (context, state) =>
             JobDetailScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.repair}/:jobId',
+        builder: (context, state) =>
+            RepairScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.invoice}/:jobId',
+        builder: (context, state) =>
+            InvoiceScreen(jobId: state.pathParameters['jobId'] ?? ''),
+      ),
+      GoRoute(
+        path: '${RouteNames.additionalRepair}/:jobId',
+        builder: (context, state) => AdditionalRepairScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
       ),
       GoRoute(
         path: '${RouteNames.inspectionCapture}/:jobId',
@@ -78,6 +151,12 @@ class AppRouter {
       GoRoute(
         path: '${RouteNames.reportReview}/:jobId',
         builder: (context, state) => ReportReviewScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.diagnosisFlow}/:jobId',
+        builder: (context, state) => DiagnosisFlowScreen(
           jobId: state.pathParameters['jobId'] ?? '',
         ),
       ),
@@ -96,6 +175,12 @@ class AppRouter {
       GoRoute(
         path: '${RouteNames.progressUpdate}/:jobId',
         builder: (context, state) => ProgressUpdateScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.driveSense}/:jobId',
+        builder: (context, state) => DriveSenseDetailsScreen(
           jobId: state.pathParameters['jobId'] ?? '',
         ),
       ),
@@ -122,6 +207,22 @@ class AppRouter {
         path: RouteNames.parts,
         builder: (context, state) =>
             const InventoryScreen(standalone: true),
+      ),
+      GoRoute(
+        path: RouteNames.moreMenu,
+        builder: (context, state) => const MoreMenuScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.help,
+        builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.about,
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.language,
+        builder: (context, state) => const LanguageScreen(),
       ),
     ],
   );

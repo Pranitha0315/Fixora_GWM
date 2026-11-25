@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'fixora_config.dart';
 import 'session.dart';
 
 /// JSON client for /api/v1 using Dio.
@@ -16,7 +17,7 @@ class ApiClient {
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: _baseUrl,
+                baseUrl: FixoraConfig.apiBase,
                 connectTimeout: _timeout,
                 receiveTimeout: _timeout,
                 headers: {'Accept': 'application/json'},
@@ -34,7 +35,6 @@ class ApiClient {
   Dio get dio => _dio;
 
   static const _timeout = Duration(seconds: 20);
-  static const _baseUrl = 'https://api.fixora.local/api/v1';
 
   Future<void> restore() async {
     try {
@@ -171,6 +171,15 @@ class ApiClient {
     }
   }
 
+  /// Refresh access token; returns new access token or null.
+  Future<String?> refresh() async {
+    if (session?.refreshToken == null || session!.refreshToken.isEmpty) {
+      return session?.accessToken;
+    }
+    final ok = await _refreshAccessToken();
+    return ok ? session?.accessToken : null;
+  }
+
   Future<bool> _refreshAccessToken() async {
     final existing = _refreshing;
     if (existing != null) {
@@ -235,6 +244,13 @@ class ApiException implements Exception {
   final int? statusCode;
   final String? code;
   final Object? cause;
+
+  int? get status => statusCode;
+
+  bool get isNetwork =>
+      code == 'timeout' ||
+      code == 'connection_error' ||
+      (code == 'dio_error' && statusCode == null);
 
   @override
   String toString() =>
