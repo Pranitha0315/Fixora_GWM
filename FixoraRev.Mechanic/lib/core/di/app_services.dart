@@ -1,4 +1,6 @@
 import '../../features/authentication/presentation/auth_controller.dart';
+import '../../features/fixproof/data/media_upload_service.dart';
+import '../../features/fixproof/data/voice_recording_service.dart';
 import '../../features/jobs/presentation/job_controller.dart';
 import '../../features/notifications/presentation/notifications_controller.dart';
 import '../../features/quick_login/data/quick_login_store.dart';
@@ -13,6 +15,8 @@ class AppServices {
   static final AuthController auth = AuthController();
   static final QuickLoginStore quickLogin = QuickLoginStore();
   static final JobController jobs = JobController();
+  static final MediaUploadService media = MediaUploadService();
+  static final VoiceRecordingService voice = VoiceRecordingService();
   static final NotificationsController notifications =
       NotificationsController();
   static final SosController sos = SosController();
