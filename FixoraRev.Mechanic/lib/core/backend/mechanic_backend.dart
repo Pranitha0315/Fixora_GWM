@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/jobs/domain/job_entities.dart';
-import '../../features/jobs/presentation/job_controller.dart';
+import '../../features/jobs/data/mechanic_job_repository.dart';
 import '../di/app_services.dart';
 import 'api_client.dart';
+import 'fixora_hub.dart';
 
 /// App-wide backend facade shared with Riverpod [ProviderContainer].
 class MechanicBackend extends ChangeNotifier {
@@ -17,6 +17,8 @@ class MechanicBackend extends ChangeNotifier {
   ProviderContainer? container;
 
   final ApiClient api = ApiClient('fixora.mechanic.session');
+  late final MechanicJobRepository _jobRepo =
+      MechanicJobRepository(api: api);
 
   bool live = false;
   bool get enabled => live || api.signedIn;
@@ -41,6 +43,13 @@ class MechanicBackend extends ChangeNotifier {
           type.startsWith('queue')) {
         unawaited(refreshJobs().catchError((Object _) {}));
       }
+      if (type.startsWith('sos')) {
+        notifyListeners();
+      }
+    });
+    FixoraHub.instance.events.listen((type) {
+      if (live) return;
+      emitRealtime(type);
     });
   }
 
@@ -128,21 +137,7 @@ class MechanicBackend extends ChangeNotifier {
         notifyListeners();
         return;
       }
-      final raw = await api.get('/mechanic/jobs/assigned');
-      final list = <Job>[];
-      if (raw is List) {
-        for (final item in raw) {
-          if (item is Map) {
-            list.add(Job.fromJson(Map<String, dynamic>.from(item)));
-          }
-        }
-      } else if (raw is Map && raw['jobs'] is List) {
-        for (final item in raw['jobs'] as List) {
-          if (item is Map) {
-            list.add(Job.fromJson(Map<String, dynamic>.from(item)));
-          }
-        }
-      }
+      final list = await _jobRepo.fetchAssigned();
       if (list.isNotEmpty) {
         AppServices.jobs.replaceAll(list);
       }
