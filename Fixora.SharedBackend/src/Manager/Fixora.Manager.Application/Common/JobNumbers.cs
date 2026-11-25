@@ -25,8 +25,9 @@ public static class JobNumbers
         MechanicId = a.MechanicId,
         BayId = a.BayId,
         Complaint = a.Notes ?? a.ServiceName,
+        ManagerNote = a.ManagerNote,
         EstimatedMinutes = estimatedMinutes,
-        Priority = a.Source == BookingSource.Sos ? 2 : 0,
+        Priority = a.Source == BookingSource.Sos ? JobPriority.Urgent : JobPriority.Normal,
         QueueOrder = queueOrder,
         CreatedAt = now,
     };

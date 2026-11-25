@@ -11,7 +11,10 @@ public sealed record BookingRequest(Guid VehicleId, Guid ServiceId, DateTime Slo
 
 public sealed record BookingDto(Guid Id, Guid CustomerId, string CustomerName, Guid VehicleId, string VehicleLabel, Guid ServiceId, string ServiceName,
     DateTime SlotStart, DateTime SlotEnd, string Status, string Source, Guid? JobCardId, Guid? BayId, string? BayName, Guid? MechanicId, string? MechanicName,
-    string? Notes, string? PromoCode, string? DeclineReason, DateTime CreatedAt);
+    string? Notes, string? PromoCode, string? DeclineReason, DateTime CreatedAt, string? ManagerNote = null);
+
+/// <summary>One page of a list (audit F07). Total = all matching rows.</summary>
+public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
 
 public sealed record QueueEstimateDto(Guid JobId, int Position, DateTime? EtaAt, string Status, bool Indicative = true);
 
@@ -19,7 +22,7 @@ public sealed record ProgressDto(string Stage, string Message, int Percent, stri
 
 public sealed record JobSummaryDto(Guid Id, string Number, Guid CustomerId, string CustomerName, Guid VehicleId, string VehicleLabel,
     Guid? MechanicId, string? MechanicName, Guid? BayId, string? BayName, string Status, int Priority, int QueuePosition, DateTime? EtaAt,
-    int EstimatedMinutes, double ElapsedMinutes, DateTime CreatedAt, DateTime? StartedAt, DateTime? CompletedAt, string? Complaint);
+    int EstimatedMinutes, double ElapsedMinutes, DateTime CreatedAt, DateTime? StartedAt, DateTime? CompletedAt, string? Complaint, string? ManagerNote = null);
 
 public sealed record IssueDto(Guid Id, string Component, string FindingEn, string FindingTa, string RecommendationEn, string RecommendationTa,
     string Severity, IReadOnlyList<string> MediaUrls, int ReportVersion, DateTime ConfirmedAt);

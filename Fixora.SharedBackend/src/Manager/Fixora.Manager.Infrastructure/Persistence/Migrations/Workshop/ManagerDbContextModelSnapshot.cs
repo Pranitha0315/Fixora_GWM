@@ -151,6 +151,10 @@ namespace Fixora.Manager.Infrastructure.Persistence.Migrations.Workshop
                     b.Property<Guid?>("JobCardId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("ManagerNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
                     b.Property<Guid?>("MechanicId")
                         .HasColumnType("uniqueidentifier");
 
@@ -604,6 +608,10 @@ namespace Fixora.Manager.Infrastructure.Persistence.Migrations.Workshop
 
                     b.Property<DateTime?>("EtaAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<string>("ManagerNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<Guid?>("MechanicId")
                         .HasColumnType("uniqueidentifier");
