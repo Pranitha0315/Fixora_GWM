@@ -183,4 +183,17 @@ public sealed class InventoryPartsHttpTests
         var response = await kavitha.GetAsync(PartsUrl);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Mechanic_cannot_list_or_adjust_inventory()
+    {
+        await using var factory = NewFactory();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync(PartsUrl)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsJsonAsync(
+                AdjustUrl(DemoIds.PartBrakePads),
+                new StockAdjust(-1, "mechanic must not adjust"))).StatusCode);
+    }
 }
