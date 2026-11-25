@@ -5,6 +5,8 @@ import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/bronze_buttons.dart';
 import '../../../../core/di/app_services.dart';
+import '../../../drivesense/presentation/widgets/drivesense_hint_card.dart';
+import '../../../fixproof/presentation/widgets/fixproof_job_section.dart';
 import '../../domain/job_entities.dart';
 
 class JobDetailScreen extends StatefulWidget {
@@ -124,6 +126,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           Text('Summary', style: TextStyle(color: AppColors.body)),
           const SizedBox(height: 6),
           Text(job.summary, style: TextStyle(color: AppColors.ink, height: 1.4)),
+          const SizedBox(height: 20),
+          DriveSenseHintCard(jobId: job.id),
           if (job.logs.isNotEmpty) ...[
             const SizedBox(height: 20),
             Text('Activity', style: TextStyle(color: AppColors.body)),
@@ -152,6 +156,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                 ),
               ),
           ],
+          const SizedBox(height: 24),
+          FixproofJobSection(jobId: job.id),
           const SizedBox(height: 28),
           ElevatedButton(
             style: BronzeButtons.elevated,
