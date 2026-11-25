@@ -74,11 +74,11 @@ public sealed class FixProofCaptureController(FixProofCaptureService fixproof) :
     [HttpGet("media")] public Task<IReadOnlyList<MediaUploadResult>> Media(Guid jobId, CancellationToken ct) => fixproof.ListMediaAsync(MechanicId, jobId, ct);
 
     [HttpPost("transcribe")]
-    public async Task<object> Transcribe(Guid jobId, IFormFile audio, [FromForm] string language = "ta", CancellationToken ct = default)
+    [RequestSizeLimit(16 * 1024 * 1024)]
+    public async Task<TranscriptResult> Transcribe(Guid jobId, IFormFile audio, [FromForm] string language = "ta", CancellationToken ct = default)
     {
         await using var stream = audio.OpenReadStream();
-        var text = await fixproof.TranscribeAsync(stream, audio.ContentType, language, ct);
-        return new { transcript = text, available = text is not null };
+        return await fixproof.TranscribeAsync(MechanicId, jobId, stream, audio.ContentType, audio.Length, language, ct);
     }
 
     [HttpGet("drafts")] public Task<IReadOnlyList<DraftDto>> Drafts(Guid jobId, CancellationToken ct) => fixproof.ListDraftsAsync(MechanicId, jobId, ct);

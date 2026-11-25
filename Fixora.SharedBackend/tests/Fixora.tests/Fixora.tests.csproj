@@ -26,4 +26,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Parked: NID-only LocalDB atomic/Version/CrossContext suite — file kept, not compiled against Shared. -->
+  <ItemGroup>
+    <Compile Remove="Integration\InvitationAtomicAcceptanceTests.cs" />
+  </ItemGroup>
+
 </Project>

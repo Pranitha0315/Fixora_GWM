@@ -16,8 +16,15 @@ public static class DependencyInjection
         services.AddFixoraDbContext<MechanicDbContext>(config, MechanicDbContext.Schema);
         services.AddScoped<IMechanicDb>(sp => sp.GetRequiredService<MechanicDbContext>());
         services.AddSingleton<TemplateInspectionDrafter>();
-        services.AddSingleton<ISpeechToText, NullSpeechToText>();
-        if (string.Equals(config["Ai:Provider"], "Anthropic", StringComparison.OrdinalIgnoreCase))
+        // FX13-D06-NID-1: server speech-to-text. "Gemini" = Gemini STT; anything else = none (app sends typed / device text).
+        if (string.Equals(config["Stt:Provider"], "Gemini", StringComparison.OrdinalIgnoreCase))
+            services.AddHttpClient<ISpeechToText, GeminiSpeechToText>();
+        else
+            services.AddSingleton<ISpeechToText, NullSpeechToText>();
+        // FX13-D06-NID-2: FixProof draft. Gemini / Anthropic with template fallback; default = template only.
+        if (string.Equals(config["Ai:Provider"], "Gemini", StringComparison.OrdinalIgnoreCase))
+            services.AddHttpClient<IInspectionDrafter, GeminiInspectionDrafter>();
+        else if (string.Equals(config["Ai:Provider"], "Anthropic", StringComparison.OrdinalIgnoreCase))
             services.AddHttpClient<IInspectionDrafter, AnthropicInspectionDrafter>();
         else
             services.AddSingleton<IInspectionDrafter>(sp => sp.GetRequiredService<TemplateInspectionDrafter>());
