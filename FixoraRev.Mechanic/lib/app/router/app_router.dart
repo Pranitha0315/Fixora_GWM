@@ -8,10 +8,12 @@ import '../../features/authentication/presentation/screens/login_screen.dart';
 import '../../features/authentication/presentation/screens/otp_args.dart';
 import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
 import '../../features/authentication/presentation/screens/register_screen.dart';
+import '../../features/drivesense/presentation/screens/drivesense_details_screen.dart';
 import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/accept_invitation_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/expired_invite_screen.dart';
 import '../../features/quick_login/presentation/screens/quick_login_screen.dart';
+import '../../features/fixproof/presentation/screens/diagnosis_flow_screen.dart';
 import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
 import '../../features/fixproof/presentation/screens/report_review_screen.dart';
 import '../../features/inventory/presentation/inventory_screen.dart';
@@ -22,6 +24,10 @@ import '../../features/jobs/presentation/screens/job_detail_screen.dart';
 import '../../features/jobs/presentation/screens/repair_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/passport/presentation/passport_screen.dart';
+import '../../features/profile/presentation/more/about_screen.dart';
+import '../../features/profile/presentation/more/help_screen.dart';
+import '../../features/profile/presentation/more/language_screen.dart';
+import '../../features/profile/presentation/more/more_menu_screen.dart';
 import '../../features/repair_proposal/presentation/screens/repair_proposal_screen.dart';
 import '../../features/shell/presentation/main_shell.dart';
 import '../../features/sos/presentation/sos_screen.dart';
@@ -149,6 +155,12 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '${RouteNames.diagnosisFlow}/:jobId',
+        builder: (context, state) => DiagnosisFlowScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: '${RouteNames.repairProposal}/:jobId',
         builder: (context, state) => RepairProposalScreen(
           jobId: state.pathParameters['jobId'] ?? '',
@@ -163,6 +175,12 @@ class AppRouter {
       GoRoute(
         path: '${RouteNames.progressUpdate}/:jobId',
         builder: (context, state) => ProgressUpdateScreen(
+          jobId: state.pathParameters['jobId'] ?? '',
+        ),
+      ),
+      GoRoute(
+        path: '${RouteNames.driveSense}/:jobId',
+        builder: (context, state) => DriveSenseDetailsScreen(
           jobId: state.pathParameters['jobId'] ?? '',
         ),
       ),
@@ -189,6 +207,22 @@ class AppRouter {
         path: RouteNames.parts,
         builder: (context, state) =>
             const InventoryScreen(standalone: true),
+      ),
+      GoRoute(
+        path: RouteNames.moreMenu,
+        builder: (context, state) => const MoreMenuScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.help,
+        builder: (context, state) => const HelpScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.about,
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.language,
+        builder: (context, state) => const LanguageScreen(),
       ),
     ],
   );

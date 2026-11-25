@@ -18,6 +18,7 @@ class RouteNames {
   static const additionalRepair = '/jobs/additional-repair';
   static const inspectionCapture = '/fixproof/capture';
   static const reportReview = '/fixproof/review';
+  static const diagnosisFlow = '/fixproof/diagnosis';
   static const repairProposal = '/jobs/proposal';
   static const evidencePassport = '/jobs/evidence';
   static const progressUpdate = '/jobs/progress';
@@ -26,6 +27,11 @@ class RouteNames {
   static const notifications = '/notifications';
   static const passport = '/passport';
   static const parts = '/parts';
+  static const driveSense = '/jobs/drivesense';
+  static const moreMenu = '/profile/more';
+  static const help = '/profile/help';
+  static const about = '/profile/about';
+  static const language = '/profile/language';
 
   static String jobDetailsPath(String jobId) => '$jobDetails/$jobId';
   static String repairPath(String jobId) => '$repair/$jobId';
@@ -35,9 +41,11 @@ class RouteNames {
   static String inspectionCapturePath(String jobId) =>
       '$inspectionCapture/$jobId';
   static String reportReviewPath(String jobId) => '$reportReview/$jobId';
+  static String diagnosisFlowPath(String jobId) => '$diagnosisFlow/$jobId';
   static String repairProposalPath(String jobId) => '$repairProposal/$jobId';
   static String evidencePassportPath(String jobId) =>
       '$evidencePassport/$jobId';
   static String progressUpdatePath(String jobId) => '$progressUpdate/$jobId';
   static String sosDetailPath(String requestId) => '$sosDetail/$requestId';
+  static String driveSensePath(String jobId) => '$driveSense/$jobId';
 }
