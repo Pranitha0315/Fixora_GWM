@@ -186,12 +186,80 @@ public sealed class AdvisorBriefingHttpTests
     }
 
     [Fact]
-    public async Task Customer_cannot_run_advisor()
+    public async Task Customer_cannot_run_or_simulate_advisor()
     {
         await using var factory = NewFactory();
         var kavitha = await factory.Customer();
 
-        var response = await kavitha.PostAsync($"{Base}/run", null);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Mechanic_cannot_run_or_simulate_advisor()
+    {
+        await using var factory = NewFactory();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_run_and_simulate_return_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Customer_and_mechanic_cannot_chat_advisor()
+    {
+        await using var factory = NewFactory();
+        var kavitha = await factory.Customer();
+        var ravi = await factory.Mechanic();
+        var body = new ChatRequest("What is this week revenue?");
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await kavitha.PostAsJsonAsync($"{Base}/chat", body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsJsonAsync($"{Base}/chat", body)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_chat_returns_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            $"{Base}/chat",
+            new ChatRequest("What is this week revenue?"));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Customer_and_mechanic_cannot_read_advisor_briefing_or_metrics()
+    {
+        await using var factory = NewFactory();
+        var kavitha = await factory.Customer();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.GetAsync($"{Base}/briefing")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.GetAsync($"{Base}/metrics")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync($"{Base}/briefing")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync($"{Base}/metrics")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_briefing_returns_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"{Base}/briefing")).StatusCode);
     }
 }

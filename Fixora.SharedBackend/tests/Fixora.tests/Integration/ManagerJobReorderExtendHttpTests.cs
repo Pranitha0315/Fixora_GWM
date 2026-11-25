@@ -63,6 +63,21 @@ public sealed class ManagerJobReorderExtendHttpTests
         Assert.True(after.QueuePosition >= 0);
     }
 
+    [Theory]
+    [InlineData(5)]
+    [InlineData(-1)]
+    [InlineData(99)]
+    public async Task Manager_reorder_rejects_invalid_priority(int priority)
+    {
+        await using var factory = NewFactory();
+        var manager = await factory.Manager();
+
+        var response = await manager.PostAsJsonAsync(
+            $"/api/v1/manager/jobs/{DemoIds.JobArunToday}/reorder",
+            new ReorderJobRequest(Priority: priority, QueueOrder: 1));
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task Extend_rejects_extra_minutes_outside_allowed_range()
     {

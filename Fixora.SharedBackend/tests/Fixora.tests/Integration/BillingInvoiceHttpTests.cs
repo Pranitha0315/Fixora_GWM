@@ -162,6 +162,26 @@ public sealed class BillingInvoiceHttpTests
     }
 
     [Fact]
+    public async Task Mechanic_cannot_create_invoice_or_record_payment()
+    {
+        await using var factory = NewFactory();
+        var manager = await factory.Manager();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsync(CreateUrl(DemoIds.JobKavithaToday), null)).StatusCode);
+
+        var invoice = (await (await manager.PostAsync(CreateUrl(DemoIds.JobKavithaToday), null))
+            .EnsureSuccessStatusCode()
+            .Content.ReadFromJsonAsync<InvoiceDto>())!;
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsJsonAsync(
+                PayUrl(invoice.Id),
+                new { method = "Cash", reference = (string?)null })).StatusCode);
+    }
+
+    [Fact]
     public async Task Other_customer_does_not_see_foreign_invoice()
     {
         await using var factory = NewFactory();
