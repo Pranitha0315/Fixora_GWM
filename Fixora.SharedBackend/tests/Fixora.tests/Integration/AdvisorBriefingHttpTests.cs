@@ -220,4 +220,26 @@ public sealed class AdvisorBriefingHttpTests
             new ChatRequest("What is this week revenue?"));
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Customer_and_mechanic_cannot_read_advisor_briefing_or_metrics()
+    {
+        await using var factory = NewFactory();
+        var kavitha = await factory.Customer();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.GetAsync($"{Base}/briefing")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.GetAsync($"{Base}/metrics")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync($"{Base}/briefing")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.GetAsync($"{Base}/metrics")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_briefing_returns_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync($"{Base}/briefing")).StatusCode);
+    }
 }
