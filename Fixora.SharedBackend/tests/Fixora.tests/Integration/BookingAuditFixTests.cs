@@ -15,6 +15,7 @@ namespace Fixora.Tests.Integration;
 /// F01 mechanic must exist + be active (on-duty only for walk-ins) · F02 no mechanic/bay overlap on confirm (409)
 /// F03 manager note stored separately, hidden from customers · F04 priority 0/1/2 · F05 active bay on walk-in
 /// F06 date filter = workshop local date · F07 paged list { items, page, pageSize, total }.
+/// BT09/BT09b characterize the current WalkIn F02 hole (no CapacityLock / EnsureResourcesFree) — tests only.
 /// Each test uses its own far-future day so tests never collide with the demo seed or each other.
 /// </summary>
 [Collection("api")]
@@ -194,6 +195,72 @@ public class BookingAuditFixTests(FixoraFactory factory)
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
         var job = (await res.Content.ReadFromJsonAsync<JobSummaryDto>(Web))!;
         Assert.Equal(JobPriority.Urgent, job.Priority);
+    }
+
+    /// <summary>
+    /// CURRENT IMPLEMENTATION (F02 hole): Confirm rejects mechanic overlap with 409, but WalkIn
+    /// into the same mechanic/bay window still succeeds — WalkIn skips CapacityLock/EnsureResourcesFree.
+    /// Characterization only; does not change BookingService.
+    /// </summary>
+    [Fact]
+    public async Task BT09_current_walk_in_does_not_409_against_overlapping_confirmed()
+    {
+        var now = DateTime.UtcNow;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<IManagerDb>();
+            db.Appointments.Add(new Appointment
+            {
+                CustomerId = DemoIds.CustomerKavitha,
+                CustomerName = "Kavitha",
+                VehicleId = DemoIds.VehicleWagonR,
+                VehicleLabel = "Wagon R",
+                ServiceId = DemoIds.ServiceOil,
+                ServiceName = "Oil change",
+                SlotStart = now.AddMinutes(-30),
+                SlotEnd = now.AddMinutes(90),
+                Status = AppointmentStatus.Confirmed,
+                BayId = DemoIds.Bay1,
+                MechanicId = DemoIds.MechanicRavi,
+                Notes = "bt09-overlap-anchor",
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var walkIn = await (await Manager()).PostAsJsonAsync(
+            "/api/v1/manager/bookings/walk-in",
+            WalkIn(DemoIds.Bay1, DemoIds.MechanicRavi));
+        Assert.Equal(HttpStatusCode.OK, walkIn.StatusCode);
+        var job = (await walkIn.Content.ReadFromJsonAsync<JobSummaryDto>(Web))!;
+        Assert.Equal(DemoIds.Bay1, job.BayId);
+        Assert.Equal(DemoIds.MechanicRavi, job.MechanicId);
+        Assert.Equal("Open", job.Status);
+    }
+
+    /// <summary>
+    /// CURRENT IMPLEMENTATION (F02 hole): two back-to-back walk-ins on the same on-duty mechanic + active bay
+    /// both succeed (no overlap gate). When THA adds WalkIn CapacityLock, expect the second to become 409.
+    /// </summary>
+    [Fact]
+    public async Task BT09b_current_second_walk_in_same_mechanic_bay_still_succeeds()
+    {
+        var mgr = await Manager();
+        var first = await mgr.PostAsJsonAsync(
+            "/api/v1/manager/bookings/walk-in",
+            new WalkInRequest(null, "Walk-in A", null, "WP CAB-A001", DemoIds.ServiceOil, DemoIds.Bay1, DemoIds.MechanicRavi, JobPriority.Normal, "first"));
+        var second = await mgr.PostAsJsonAsync(
+            "/api/v1/manager/bookings/walk-in",
+            new WalkInRequest(null, "Walk-in B", null, "WP CAB-B002", DemoIds.ServiceOil, DemoIds.Bay1, DemoIds.MechanicRavi, JobPriority.Normal, "second"));
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var jobA = (await first.Content.ReadFromJsonAsync<JobSummaryDto>(Web))!;
+        var jobB = (await second.Content.ReadFromJsonAsync<JobSummaryDto>(Web))!;
+        Assert.NotEqual(jobA.Id, jobB.Id);
+        Assert.Equal(DemoIds.MechanicRavi, jobA.MechanicId);
+        Assert.Equal(DemoIds.MechanicRavi, jobB.MechanicId);
+        Assert.Equal(DemoIds.Bay1, jobA.BayId);
+        Assert.Equal(DemoIds.Bay1, jobB.BayId);
     }
 
     // BT10 / F06 — local 00:30 belongs to the asked date; local 00:30 next day does not.
