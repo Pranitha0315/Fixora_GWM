@@ -60,7 +60,32 @@ class JobController extends ChangeNotifier {
     }
   }
 
+  void customerApproved(Job job) {
+    if (job.status != JobStatus.awaitingApproval) return;
+    job.status = JobStatus.approved;
+    job.log('Customer approved proposal', icon: Icons.check_circle_outline);
+    notifyListeners();
+  }
+
+  bool canComplete(Job job) =>
+      job.status == JobStatus.inProgress &&
+      !job.paused &&
+      job.progressPercent >= 80;
+
+  void setProgress(String jobId, int percent, String? message) {
+    final job = byId(jobId);
+    if (job == null) return;
+    job.progressPercent = percent.clamp(0, 100);
+    final detail = message != null && message.isNotEmpty
+        ? '$percent% — $message'
+        : '$percent%';
+    job.log('Progress update', detail: detail, icon: Icons.trending_up);
+    notifyListeners();
+  }
+
   void startRepair(Job job) {
+    if (job.status == JobStatus.awaitingApproval) return;
+    if (job.status != JobStatus.approved) return;
     job.status = JobStatus.inProgress;
     job.startedAt = DateTime.now();
     job.paused = false;

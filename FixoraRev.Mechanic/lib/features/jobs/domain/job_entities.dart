@@ -109,6 +109,7 @@ class Job {
     this.bay,
     this.startedAt,
     this.paused = false,
+    this.progressPercent = 0,
     List<JobLogEntry>? logs,
   }) : logs = logs ?? <JobLogEntry>[];
 
@@ -123,6 +124,7 @@ class Job {
   final String? bay;
   DateTime? startedAt;
   bool paused;
+  int progressPercent;
   final List<JobLogEntry> logs;
 
   JobCustomer get customer => JobCustomer(name: customerName);
@@ -151,6 +153,7 @@ class Job {
       bay: bay,
       startedAt: startedAt ?? this.startedAt,
       paused: paused ?? this.paused,
+      progressPercent: progressPercent,
       logs: List<JobLogEntry>.from(logs),
     );
     return j;
@@ -188,7 +191,18 @@ class Job {
         (json['startedAt'] ?? json['started_at'] ?? '').toString(),
       ),
       paused: paused || json['paused'] == true,
+      progressPercent: _progressFrom(json),
     );
+  }
+
+  static int _progressFrom(Map<String, dynamic> json) {
+    final raw = json['progressPercent'] ?? json['progress_percent'];
+    return switch (raw) {
+      final int n => n.clamp(0, 100),
+      final num n => n.round().clamp(0, 100),
+      final String s => int.tryParse(s)?.clamp(0, 100) ?? 0,
+      _ => 0,
+    };
   }
 
   static JobPriority _priorityFrom(String? raw) {
