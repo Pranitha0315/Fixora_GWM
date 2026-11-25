@@ -194,4 +194,30 @@ public sealed class AdvisorBriefingHttpTests
         var response = await kavitha.PostAsync($"{Base}/run", null);
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Customer_and_mechanic_cannot_chat_advisor()
+    {
+        await using var factory = NewFactory();
+        var kavitha = await factory.Customer();
+        var ravi = await factory.Mechanic();
+        var body = new ChatRequest("What is this week revenue?");
+
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await kavitha.PostAsJsonAsync($"{Base}/chat", body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await ravi.PostAsJsonAsync($"{Base}/chat", body)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_chat_returns_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(
+            $"{Base}/chat",
+            new ChatRequest("What is this week revenue?"));
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
 }
