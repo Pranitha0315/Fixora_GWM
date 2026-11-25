@@ -196,6 +196,26 @@ public sealed class AdvisorBriefingHttpTests
     }
 
     [Fact]
+    public async Task Mechanic_cannot_run_or_simulate_advisor()
+    {
+        await using var factory = NewFactory();
+        var ravi = await factory.Mechanic();
+
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await ravi.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task Anonymous_run_and_simulate_return_unauthorized()
+    {
+        await using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
+    }
+
+    [Fact]
     public async Task Customer_and_mechanic_cannot_chat_advisor()
     {
         await using var factory = NewFactory();
