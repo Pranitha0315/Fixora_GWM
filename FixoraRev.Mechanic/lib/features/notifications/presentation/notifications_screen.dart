@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/di/app_services.dart';
@@ -27,13 +28,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (mounted) setState(() {});
   }
 
+  void _onTap(String id, String? route) {
+    AppServices.notifications.markRead(id);
+    if (route != null && route.isNotEmpty && mounted) {
+      context.push(route);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = AppServices.notifications.all;
+    final unread = AppServices.notifications.unread;
     return Scaffold(
       backgroundColor: AppColors.surface,
       appBar: AppBar(
-        title: const Text('Alerts'),
+        title: Text(unread > 0 ? 'Alerts ($unread)' : 'Alerts'),
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.ink,
         actions: [
@@ -75,7 +84,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     n.body,
                     style: TextStyle(color: AppColors.body),
                   ),
-                  onTap: () => AppServices.notifications.markRead(n.id),
+                  trailing: n.route != null
+                      ? Icon(Icons.chevron_right, color: AppColors.body)
+                      : null,
+                  onTap: () => _onTap(n.id, n.route),
                 );
               },
             ),

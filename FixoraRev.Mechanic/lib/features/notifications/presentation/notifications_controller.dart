@@ -6,18 +6,24 @@ class AppNotification {
     required this.title,
     required this.body,
     this.read = false,
+    this.type,
+    this.route,
   });
 
   final String id;
   final String title;
   final String body;
   final bool read;
+  final String? type;
+  final String? route;
 
   AppNotification copyWith({bool? read}) => AppNotification(
         id: id,
         title: title,
         body: body,
         read: read ?? this.read,
+        type: type,
+        route: route,
       );
 }
 
@@ -27,18 +33,26 @@ class NotificationsController extends ChangeNotifier {
       id: 'n1',
       title: 'Job A18 assigned',
       body: 'Honda City oil service is in your queue.',
+      type: 'job',
     ),
     const AppNotification(
       id: 'n2',
       title: 'Customer approved',
       body: 'Creta AC diagnosis proposal was approved.',
       read: true,
+      type: 'approval',
+      route: '/jobs/proposal/job-demo-2',
     ),
   ];
 
   List<AppNotification> get all => List.unmodifiable(_items);
 
   int get unread => _items.where((n) => !n.read).length;
+
+  void push(AppNotification item) {
+    _items.insert(0, item);
+    notifyListeners();
+  }
 
   void markAllRead() {
     for (var i = 0; i < _items.length; i++) {
