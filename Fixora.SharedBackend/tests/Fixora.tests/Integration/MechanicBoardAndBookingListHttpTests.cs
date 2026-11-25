@@ -76,9 +76,9 @@ public sealed class MechanicBoardAndBookingListHttpTests
         await using var factory = NewFactory();
         var manager = await factory.Manager();
 
-        var list = (await manager.GetFromJsonAsync<List<BookingDto>>(
+        var list = (await manager.GetFromJsonAsync<PagedResult<BookingDto>>(
             "/api/v1/manager/bookings?status=Requested"))!;
-        var requested = Assert.Single(list, b =>
+        var requested = Assert.Single(list.Items, b =>
             b.CustomerId == DemoIds.CustomerArun
             && b.ServiceId == DemoIds.ServiceAlignment
             && b.Status == "Requested");
@@ -91,9 +91,9 @@ public sealed class MechanicBoardAndBookingListHttpTests
         Assert.Equal("Declined", declined.Status);
         Assert.Contains("Bay full", declined.DeclineReason ?? "", StringComparison.OrdinalIgnoreCase);
 
-        var stillRequested = (await manager.GetFromJsonAsync<List<BookingDto>>(
+        var stillRequested = (await manager.GetFromJsonAsync<PagedResult<BookingDto>>(
             "/api/v1/manager/bookings?status=Requested"))!;
-        Assert.DoesNotContain(stillRequested, b => b.Id == requested.Id);
+        Assert.DoesNotContain(stillRequested.Items, b => b.Id == requested.Id);
     }
 
     [Fact]

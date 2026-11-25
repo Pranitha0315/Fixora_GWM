@@ -19,10 +19,9 @@ namespace Fixora.Tests.Integration;
 public sealed class BookingConfirmWalkInAssignGateHttpCollection;
 
 /// <summary>
-/// Conflict-safe tests-only: CURRENT IMPLEMENTATION asymmetry —
-/// Job Assign gates inactive/unknown mechanic+bay, but Confirm/WalkIn do not
-/// (Confirm only requires an active bay). Documents coded behaviour; does not
-/// change BookingService / Confirm/CheckIn timing or THA production files.
+/// Characterization against Shared BookingAudit (F01/F05): Confirm/WalkIn now
+/// reject unknown/inactive mechanic and inactive bay (aligned with Job Assign).
+/// Tests-only; does not change Confirm/CheckIn job-creation timing.
 /// </summary>
 [Collection("booking-confirm-walkin-assign-gate-http")]
 public sealed class BookingConfirmWalkInAssignGateHttpTests
@@ -97,7 +96,7 @@ public sealed class BookingConfirmWalkInAssignGateHttpTests
     }
 
     [Fact]
-    public async Task Current_Confirm_accepts_unknown_mechanic_guid()
+    public async Task Current_Confirm_rejects_unknown_mechanic_guid()
     {
         await using var factory = NewFactory();
         var kavitha = await factory.Customer();
@@ -114,15 +113,11 @@ public sealed class BookingConfirmWalkInAssignGateHttpTests
         var confirm = await manager.PostAsJsonAsync(
             $"/api/v1/manager/bookings/{booking.Id}/confirm",
             new ConfirmBookingRequest(DemoIds.Bay1, unknownMechanic, null));
-        Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
-        var confirmed = (await confirm.Content.ReadFromJsonAsync<BookingDto>())!;
-        Assert.Equal("Confirmed", confirmed.Status);
-        Assert.Equal(unknownMechanic, confirmed.MechanicId);
-        Assert.Null(confirmed.JobCardId);
+        Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
     }
 
     [Fact]
-    public async Task Current_Confirm_accepts_inactive_mechanic()
+    public async Task Current_Confirm_rejects_inactive_mechanic()
     {
         await using var factory = NewFactory();
         var kavitha = await factory.Customer();
@@ -141,9 +136,7 @@ public sealed class BookingConfirmWalkInAssignGateHttpTests
             var confirm = await manager.PostAsJsonAsync(
                 $"/api/v1/manager/bookings/{booking.Id}/confirm",
                 new ConfirmBookingRequest(DemoIds.Bay1, DemoIds.MechanicSenthil, null));
-            Assert.Equal(HttpStatusCode.OK, confirm.StatusCode);
-            Assert.Equal(DemoIds.MechanicSenthil,
-                (await confirm.Content.ReadFromJsonAsync<BookingDto>())!.MechanicId);
+            Assert.Equal(HttpStatusCode.BadRequest, confirm.StatusCode);
         }
         finally
         {
@@ -180,7 +173,7 @@ public sealed class BookingConfirmWalkInAssignGateHttpTests
     }
 
     [Fact]
-    public async Task Current_WalkIn_accepts_inactive_bay_and_inactive_mechanic()
+    public async Task Current_WalkIn_rejects_inactive_bay_and_inactive_mechanic()
     {
         await using var factory = NewFactory();
         var manager = await factory.Manager();
@@ -201,13 +194,9 @@ public sealed class BookingConfirmWalkInAssignGateHttpTests
                     bayId = DemoIds.Bay2,
                     mechanicId = DemoIds.MechanicSenthil,
                     priority = 0,
-                    complaint = "characterize ungated walk-in"
+                    complaint = "characterize gated walk-in"
                 });
-            Assert.Equal(HttpStatusCode.OK, walkIn.StatusCode);
-            var job = (await walkIn.Content.ReadFromJsonAsync<JobSummaryDto>())!;
-            Assert.Equal(DemoIds.Bay2, job.BayId);
-            Assert.Equal(DemoIds.MechanicSenthil, job.MechanicId);
-            Assert.Equal("Open", job.Status);
+            Assert.Equal(HttpStatusCode.BadRequest, walkIn.StatusCode);
         }
         finally
         {

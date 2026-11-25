@@ -117,6 +117,9 @@ public sealed class BookingConfirmCheckInJobLinkageTests
             string invoiceNumber,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RoadStressCellDto>>(Array.Empty<RoadStressCellDto>());
     }
 
     private sealed class EmptyMechanicDirectory : IMechanicDirectory
@@ -150,7 +153,7 @@ public sealed class BookingConfirmCheckInJobLinkageTests
         var notifier = new CapturingNotifier();
         var read = new WorkshopReadModel(db, new EmptyMechanicDirectory(), new StubMedia(), clock);
         var queue = new QueueService(db, notifier, read, clock);
-        var bookings = new BookingService(db, read, notifier, queue, new StubCustomers(), clock);
+        var bookings = new BookingService(db, read, notifier, queue, new StubCustomers(), new EmptyMechanicDirectory(), clock);
         return new Harness { Db = db, Bookings = bookings, Notifier = notifier };
     }
 
@@ -279,16 +282,23 @@ public sealed class BookingConfirmCheckInJobLinkageTests
         Assert.Null(assigned.Message.JobId);
         Assert.Contains(assigned.Recipients, r => r.Role == Roles.Mechanic && r.UserId == mechanicId);
 
-        var bookingUpdated = Assert.Single(
-            harness.Notifier.Publishes,
-            p => p.EventName == RealtimeEvents.BookingUpdated);
-        var payload = Assert.IsType<BookingDto>(bookingUpdated.Payload);
-        Assert.Equal(booking.Id, payload.Id);
-        Assert.Null(payload.JobCardId);
-        Assert.Equal(nameof(AppointmentStatus.Confirmed), payload.Status);
-        Assert.Contains(RealtimeGroups.Staff, bookingUpdated.Groups);
-        Assert.Contains(RealtimeGroups.User(customerId), bookingUpdated.Groups);
-        Assert.Contains(RealtimeGroups.User(mechanicId), bookingUpdated.Groups);
+        // Shared PublishSplit: full DTO → staff+mechanic; ForCustomer → customer group.
+        var bookingUpdated = harness.Notifier.Publishes
+            .Where(p => p.EventName == RealtimeEvents.BookingUpdated)
+            .ToList();
+        Assert.Equal(2, bookingUpdated.Count);
+        Assert.All(bookingUpdated, p =>
+        {
+            var payload = Assert.IsType<BookingDto>(p.Payload);
+            Assert.Equal(booking.Id, payload.Id);
+            Assert.Null(payload.JobCardId);
+            Assert.Equal(nameof(AppointmentStatus.Confirmed), payload.Status);
+        });
+        Assert.Contains(bookingUpdated, p =>
+            p.Groups.Contains(RealtimeGroups.Staff) &&
+            p.Groups.Contains(RealtimeGroups.User(mechanicId)));
+        Assert.Contains(bookingUpdated, p =>
+            p.Groups.Contains(RealtimeGroups.User(customerId)));
     }
 
     /// <summary>
@@ -389,14 +399,18 @@ public sealed class BookingConfirmCheckInJobLinkageTests
         Assert.Equal(dto.JobCardId, customerNotify.Message.JobId);
         Assert.Contains(customerNotify.Recipients, r => r.Role == Roles.Customer && r.UserId == customerId);
 
-        var bookingUpdated = Assert.Single(
-            harness.Notifier.Publishes,
-            p => p.EventName == RealtimeEvents.BookingUpdated &&
-                 p.Payload is BookingDto b &&
-                 b.Status == nameof(AppointmentStatus.CheckedIn));
-        var payload = Assert.IsType<BookingDto>(bookingUpdated.Payload);
-        Assert.Equal(booking.Id, payload.Id);
-        Assert.Equal(dto.JobCardId, payload.JobCardId);
+        var bookingUpdated = harness.Notifier.Publishes
+            .Where(p => p.EventName == RealtimeEvents.BookingUpdated &&
+                        p.Payload is BookingDto b &&
+                        b.Status == nameof(AppointmentStatus.CheckedIn))
+            .ToList();
+        Assert.Equal(2, bookingUpdated.Count);
+        Assert.All(bookingUpdated, p =>
+        {
+            var payload = Assert.IsType<BookingDto>(p.Payload);
+            Assert.Equal(booking.Id, payload.Id);
+            Assert.Equal(dto.JobCardId, payload.JobCardId);
+        });
     }
 
     /// <summary>

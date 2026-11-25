@@ -192,9 +192,9 @@ public sealed class BookingConfirmCheckInHttpTests
         var manager = await factory.Manager();
         var anon = factory.CreateClient();
 
-        var list = (await manager.GetFromJsonAsync<List<BookingDto>>(
+        var list = (await manager.GetFromJsonAsync<PagedResult<BookingDto>>(
             "/api/v1/manager/bookings?status=Requested"))!;
-        var requested = Assert.Single(list, b =>
+        var requested = Assert.Single(list.Items, b =>
             b.CustomerId == DemoIds.CustomerArun
             && b.ServiceId == DemoIds.ServiceAlignment);
 

@@ -112,6 +112,9 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
             string invoiceNumber,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RoadStressCellDto>>(Array.Empty<RoadStressCellDto>());
     }
 
     /// <summary>Directory stub that can expose active, inactive, or unknown mechanics.</summary>
@@ -193,7 +196,7 @@ public sealed class ManagerJobAssignmentAndServiceHistoryTests
         var inventory = new InventoryService(db, notifier, clock);
         // Shared JobService ctor: (db, read, notifier, queue, billing, clock) — no IMechanicDirectory.
         var jobs = new JobService(db, read, notifier, queue, billing, clock);
-        var bookings = new BookingService(db, read, notifier, queue, customers, clock);
+        var bookings = new BookingService(db, read, notifier, queue, customers, mechanics, clock);
         var approvals = new ApprovalWorkflowService(db, read, notifier, queue, inventory, clock);
         var changes = new ChangeRequestService(db, notifier, clock);
         var settings = new WorkshopSettingsService(db);

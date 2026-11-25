@@ -95,6 +95,9 @@ public sealed class JobCardMechanicVisibilityAndTransitionTests
             string invoiceNumber,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RoadStressCellDto>>(Array.Empty<RoadStressCellDto>());
     }
 
     private static ManagerDbContext CreateDb()

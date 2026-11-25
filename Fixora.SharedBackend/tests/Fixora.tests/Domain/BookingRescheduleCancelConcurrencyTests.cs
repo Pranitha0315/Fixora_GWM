@@ -120,6 +120,9 @@ public sealed class BookingRescheduleCancelConcurrencyTests
             string invoiceNumber,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RoadStressCellDto>>(Array.Empty<RoadStressCellDto>());
     }
 
     private sealed class EmptyMechanicDirectory : IMechanicDirectory
@@ -154,7 +157,7 @@ public sealed class BookingRescheduleCancelConcurrencyTests
         var notifier = new CapturingNotifier();
         var read = new WorkshopReadModel(db, new EmptyMechanicDirectory(), new StubMedia(), clock);
         var queue = new QueueService(db, notifier, read, clock);
-        var bookings = new BookingService(db, read, notifier, queue, new StubCustomers(), clock);
+        var bookings = new BookingService(db, read, notifier, queue, new StubCustomers(), new EmptyMechanicDirectory(), clock);
         return new Harness
         {
             Db = db,

@@ -106,6 +106,9 @@ public sealed class QueueRecalculationTriggerTests
             string invoiceNumber,
             CancellationToken ct = default)
             => Task.CompletedTask;
+
+        public Task<IReadOnlyList<RoadStressCellDto>> GetRoadStressAsync(int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<RoadStressCellDto>>(Array.Empty<RoadStressCellDto>());
     }
 
     private sealed class EmptyMechanicDirectory : IMechanicDirectory
@@ -146,7 +149,7 @@ public sealed class QueueRecalculationTriggerTests
         var billing = new BillingService(db, customers, notifier, clock);
         // Shared JobService ctor: (db, read, notifier, queue, billing, clock) — no IMechanicDirectory.
         var jobs = new JobService(db, read, notifier, queue, billing, clock);
-        var bookings = new BookingService(db, read, notifier, queue, customers, clock);
+        var bookings = new BookingService(db, read, notifier, queue, customers, mechanics, clock);
         return new Harness
         {
             Db = db,
