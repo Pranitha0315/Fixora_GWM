@@ -6,3 +6,15 @@ obj/
 TestResults/
 App_Data/
 appsettings.*.local.json
+
+# Secrets: Gemini / API keys (never commit)
+**/appsettings.Local.json
+
+# local backups (never commit)
+_backup_before_migrations/
+
+# docker secrets
+.env
+
+# local run logs
+test_results.txt

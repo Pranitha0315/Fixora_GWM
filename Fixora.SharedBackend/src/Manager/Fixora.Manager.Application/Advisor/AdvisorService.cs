@@ -22,7 +22,7 @@ public sealed record ChatAnswer(string Answer, string Intent, IReadOnlyDictionar
 /// Smart Advisor (USP 3): observe → advise → act → learn. Every number comes from code;
 /// narration uses templates (an LLM can rephrase but never invents numbers — fallback is always available).
 /// </summary>
-public sealed class AdvisorService(IManagerDb db, ICustomerDirectory customers, InventoryService inventory, INotificationService notifier, IClock clock, WorkshopReadModel read)
+public sealed class AdvisorService(IManagerDb db, ICustomerDirectory customers, InventoryService inventory, INotificationService notifier, IClock clock, WorkshopReadModel read, IAdvisorAi ai)
 {
     private const int ConfidenceFloor = 2;
 
@@ -281,6 +281,19 @@ public sealed class AdvisorService(IManagerDb db, ICustomerDirectory customers, 
     {
         var q = (req.Question ?? "").ToLowerInvariant();
         var m = await ComputeMetricsAsync(ct);
+
+        // 1) AI first (when configured): Gemini phrases the answer from these computed facts only.
+        var insights = await db.Insights.AsNoTracking().OrderByDescending(i => i.CreatedAt).Take(6).ToListAsync(ct);
+        var facts = JsonSerializer.Serialize(new
+        {
+            metrics = m,
+            insights = insights.Select(i => new { i.Title, narrative = i.Narrative.Split('\n')[0], i.RupeeImpact, severity = i.Severity.ToString(), status = i.Status.ToString() }),
+        });
+        var aiAnswer = await ai.AnswerAsync(req.Question ?? "", facts, ct);
+        if (!string.IsNullOrWhiteSpace(aiAnswer))
+            return new ChatAnswer(aiAnswer, "ai", new Dictionary<string, string>());
+
+        // 2) Template fallback (no key, quota hit, timeout, error): rule-based answers from the same numbers.
         var mech = m.Comebacks.FirstOrDefault(c => q.Contains(c.Name.Split(' ')[0].ToLowerInvariant()));
         if (mech is not null)
             return new ChatAnswer(mech.Comebacks == 0

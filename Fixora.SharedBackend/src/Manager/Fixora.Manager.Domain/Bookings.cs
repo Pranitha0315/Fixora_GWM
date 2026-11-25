@@ -21,6 +21,8 @@ public sealed class Appointment : Entity
     public Guid? BayId { get; set; }
     public Guid? MechanicId { get; set; }
     public string? Notes { get; set; }
+    /// <summary>Manager instruction for the mechanic (set on confirm). Never shown to the customer.</summary>
+    public string? ManagerNote { get; set; }
     public string? PromoCode { get; set; }
     public Guid? SuggestionId { get; set; }
     public string? IdempotencyKey { get; set; }

@@ -16,7 +16,9 @@ public static class Gemini
     public const string DefaultModel = "gemini-flash-lite-latest";
     private const string DefaultEndpoint = "https://generativelanguage.googleapis.com/v1beta/models";
 
-    public static string? ApiKey(IConfiguration config) => config["Ai:GeminiApiKey"] is { Length: > 0 } k ? k : null;
+    /// <summary>The key, or null when it is empty or still the "PASTE-..." placeholder (then callers use their fallback).</summary>
+    public static string? ApiKey(IConfiguration config) =>
+        config["Ai:GeminiApiKey"]?.Trim() is { Length: > 0 } k && !k.StartsWith("PASTE-", StringComparison.OrdinalIgnoreCase) ? k : null;
 
     public static async Task<string?> GenerateAsync(
         HttpClient http, IConfiguration config, ILogger logger,

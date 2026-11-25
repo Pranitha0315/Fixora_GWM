@@ -31,7 +31,7 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         j.Id, j.Number, j.CustomerId, j.CustomerName, j.VehicleId, j.VehicleLabel,
         j.MechanicId, await MechanicNameAsync(j.MechanicId, ct), j.BayId, await BayNameAsync(j.BayId, ct),
         j.Status.ToString(), j.Priority, j.QueuePosition, j.EtaAt, j.EstimatedMinutes,
-        Math.Round(j.ElapsedMinutes(clock.UtcNow), 1), j.CreatedAt, j.StartedAt, j.CompletedAt, j.Complaint);
+        Math.Round(j.ElapsedMinutes(clock.UtcNow), 1), j.CreatedAt, j.StartedAt, j.CompletedAt, j.Complaint, j.ManagerNote);
 
     public async Task<IReadOnlyList<JobSummaryDto>> JobsAsync(IEnumerable<JobCard> jobs, CancellationToken ct = default)
     {
@@ -43,7 +43,7 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
     public async Task<BookingDto> BookingAsync(Appointment a, CancellationToken ct = default) => new(
         a.Id, a.CustomerId, a.CustomerName, a.VehicleId, a.VehicleLabel, a.ServiceId, a.ServiceName, a.SlotStart, a.SlotEnd,
         a.Status.ToString(), a.Source.ToString(), a.JobCardId, a.BayId, await BayNameAsync(a.BayId, ct),
-        a.MechanicId, await MechanicNameAsync(a.MechanicId, ct), a.Notes, a.PromoCode, a.DeclineReason, a.CreatedAt);
+        a.MechanicId, await MechanicNameAsync(a.MechanicId, ct), a.Notes, a.PromoCode, a.DeclineReason, a.CreatedAt, a.ManagerNote);
 
     public IssueDto Issue(InspectionIssue i) => new(
         i.Id, i.Component, i.FindingEn, i.FindingTa, i.RecommendationEn, i.RecommendationTa, i.Severity.ToString(),
@@ -112,7 +112,18 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
 
         var invoice = await db.Invoices.Include(i => i.Lines).AsNoTracking().FirstOrDefaultAsync(i => i.JobCardId == job.Id, ct);
 
-        return new JobDetailDto(await JobAsync(job, ct), timeline, issues, proposals, changes,
+        var summary = await JobAsync(job, ct);
+        if (viewer == Viewer.Customer) summary = summary.ForCustomer();
+        return new JobDetailDto(summary, timeline, issues, proposals, changes,
             invoice is null ? null : Invoice(invoice), Queue(job));
     }
+}
+
+/// <summary>The manager note is internal (manager → mechanic). Strip it from everything a customer receives.</summary>
+public static class ManagerNoteVisibility
+{
+    public static BookingDto ForCustomer(this BookingDto dto) => dto with { ManagerNote = null };
+    public static JobSummaryDto ForCustomer(this JobSummaryDto dto) => dto with { ManagerNote = null };
+    public static IReadOnlyList<BookingDto> ForCustomer(this IReadOnlyList<BookingDto> list) => list.Select(d => d.ForCustomer()).ToList();
+    public static IReadOnlyList<JobSummaryDto> ForCustomer(this IReadOnlyList<JobSummaryDto> list) => list.Select(d => d.ForCustomer()).ToList();
 }

@@ -36,19 +36,19 @@ public sealed class WorkshopGateway(
 
     public Task<IReadOnlyList<SlotDto>> GetSlotsAsync(DateOnly date, Guid serviceId, CancellationToken ct = default) => bookings.GetSlotsAsync(date, serviceId, ct);
 
-    public Task<BookingDto> RequestBookingAsync(Guid customerId, string customerName, string vehicleLabel, BookingRequest request, string idempotencyKey, CancellationToken ct = default)
-        => bookings.RequestAsync(customerId, customerName, vehicleLabel, request, idempotencyKey, ct);
+    public async Task<BookingDto> RequestBookingAsync(Guid customerId, string customerName, string vehicleLabel, BookingRequest request, string idempotencyKey, CancellationToken ct = default)
+        => (await bookings.RequestAsync(customerId, customerName, vehicleLabel, request, idempotencyKey, ct)).ForCustomer();
 
-    public Task<IReadOnlyList<BookingDto>> ListBookingsAsync(Guid customerId, CancellationToken ct = default) => bookings.ListForCustomerAsync(customerId, ct);
+    public async Task<IReadOnlyList<BookingDto>> ListBookingsAsync(Guid customerId, CancellationToken ct = default) => (await bookings.ListForCustomerAsync(customerId, ct)).ForCustomer();
 
-    public Task<BookingDto> CancelBookingAsync(Guid customerId, Guid bookingId, CancellationToken ct = default)
-        => bookings.CancelAsync(customerId, Roles.Customer, bookingId, ct);
+    public async Task<BookingDto> CancelBookingAsync(Guid customerId, Guid bookingId, CancellationToken ct = default)
+        => (await bookings.CancelAsync(customerId, Roles.Customer, bookingId, ct)).ForCustomer();
 
-    public Task<BookingDto> RescheduleBookingAsync(Guid customerId, Guid bookingId, DateTime newSlotStart, CancellationToken ct = default)
-        => bookings.RescheduleAsync(customerId, Roles.Customer, bookingId, newSlotStart, ct);
+    public async Task<BookingDto> RescheduleBookingAsync(Guid customerId, Guid bookingId, DateTime newSlotStart, CancellationToken ct = default)
+        => (await bookings.RescheduleAsync(customerId, Roles.Customer, bookingId, newSlotStart, ct)).ForCustomer();
 
-    public Task<IReadOnlyList<JobSummaryDto>> ListJobsAsync(Guid customerId, bool activeOnly, CancellationToken ct = default)
-        => jobs.ListAsync(activeOnly, null, customerId, ct);
+    public async Task<IReadOnlyList<JobSummaryDto>> ListJobsAsync(Guid customerId, bool activeOnly, CancellationToken ct = default)
+        => (await jobs.ListAsync(activeOnly, null, customerId, ct)).ForCustomer();
 
     public Task<JobDetailDto> GetJobAsync(Guid customerId, Guid jobId, CancellationToken ct = default)
         => jobs.GetAsync(jobId, WorkshopReadModel.Viewer.Customer, null, customerId, ct);

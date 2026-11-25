@@ -28,6 +28,8 @@ public sealed class JobCard : Entity
     public Guid? BayId { get; set; }
     public JobStatus Status { get; set; } = JobStatus.Open;
     public string? Complaint { get; set; }
+    /// <summary>Copied from the booking: manager instruction for the mechanic. Never shown to the customer.</summary>
+    public string? ManagerNote { get; set; }
     /// <summary>Higher runs first: SOS conversion 2, loyalty priority tier 1, normal 0.</summary>
     public int Priority { get; set; }
     public int EstimatedMinutes { get; set; } = 60;
@@ -129,4 +131,14 @@ public sealed class InspectionIssue : Entity
     public bool PublishedToCustomer { get; set; }
 
     public IReadOnlyList<string> MediaRefs => MediaRefsCsv.Split(',', StringSplitOptions.RemoveEmptyEntries);
+}
+
+/// <summary>Job priority (audit F04). 0 = Normal, 1 = High, 2 = Urgent (SOS jobs use Urgent). Higher runs first.</summary>
+public static class JobPriority
+{
+    public const int Normal = 0;
+    public const int High = 1;
+    public const int Urgent = 2;
+    public static bool IsValid(int value) => value is >= Normal and <= Urgent;
+    public const string Message = "Priority must be 0 (Normal), 1 (High) or 2 (Urgent).";
 }

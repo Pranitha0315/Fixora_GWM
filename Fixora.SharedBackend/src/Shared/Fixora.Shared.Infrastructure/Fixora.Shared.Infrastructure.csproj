@@ -12,6 +12,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+    <!-- Audit F10: lift the transitive System.Security.Cryptography.Pkcs 9.0.4 (vulnerable) to the patched version -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
   </ItemGroup>
 
   <ItemGroup>

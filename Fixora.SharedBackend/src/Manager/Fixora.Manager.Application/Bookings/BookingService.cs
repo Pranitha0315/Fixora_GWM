@@ -3,6 +3,7 @@ using Fixora.Manager.Application.Common;
 using Fixora.Manager.Application.Jobs;
 using Fixora.Manager.Contracts;
 using Fixora.Manager.Domain;
+using Fixora.Mechanic.Contracts;
 using Fixora.Shared.Contracts;
 using Fixora.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -21,10 +22,14 @@ public sealed class BookingService(
     INotificationService notifier,
     QueueService queue,
     ICustomerDirectory customers,
+    IMechanicDirectory mechanics,
     IClock clock)
 {
     // One branch, one API instance: a process-wide lock makes the capacity check + insert atomic.
     private static readonly SemaphoreSlim CapacityLock = new(1, 1);
+
+    public const int ManagerNoteMaxLength = 500;
+    public const int MaxPageSize = 100;
 
     /// <param name="date">The workshop's local calendar date.</param>
     public async Task<IReadOnlyList<SlotDto>> GetSlotsAsync(DateOnly date, Guid serviceId, CancellationToken ct = default)
@@ -110,9 +115,24 @@ public sealed class BookingService(
     public async Task<BookingDto> ConfirmAsync(Guid staffId, Guid bookingId, ConfirmBookingRequest req, CancellationToken ct = default)
     {
         var appt = await db.Appointments.FirstOrDefaultAsync(a => a.Id == bookingId, ct) ?? throw new NotFoundException("Booking");
-        Guard.Against(!await db.Bays.AnyAsync(b => b.Id == req.BayId && b.Active, ct), "Pick an active bay.");
-        appt.Confirm(req.BayId, req.MechanicId, clock.UtcNow);
-        await db.SaveChangesAsync(ct);
+        var note = string.IsNullOrWhiteSpace(req.Note) ? null : req.Note.Trim();
+        Guard.Against(note is { Length: > ManagerNoteMaxLength }, $"The note can be at most {ManagerNoteMaxLength} characters.");
+        await EnsureActiveBayAsync(req.BayId, ct);
+        // Future booking: the mechanic must exist and be employed (Active). On-duty is NOT required (decision for BT03).
+        await EnsureMechanicAsync(req.MechanicId, requireOnDuty: false, ct);
+
+        await CapacityLock.WaitAsync(ct); // check + save as one step, so two managers cannot double-book (F02)
+        try
+        {
+            await EnsureResourcesFreeAsync(req.MechanicId, req.BayId, appt.SlotStart, appt.SlotEnd, appt.Id, ct);
+            appt.Confirm(req.BayId, req.MechanicId, clock.UtcNow);
+            appt.ManagerNote = note;
+            await db.SaveChangesAsync(ct);
+        }
+        finally
+        {
+            CapacityLock.Release();
+        }
 
         var dto = await read.BookingAsync(appt, ct);
         await notifier.NotifyAsync(new NotificationMessage(
@@ -124,7 +144,7 @@ public sealed class BookingService(
         await notifier.NotifyAsync(new NotificationMessage(
                 NotificationTypes.JobAssigned,
                 "New booking assigned to you",
-                $"{appt.VehicleLabel} · {appt.ServiceName} · {LocalTime.Format(appt.SlotStart)} · {dto.BayName}",
+                $"{appt.VehicleLabel} · {appt.ServiceName} · {LocalTime.Format(appt.SlotStart)} · {dto.BayName}" + (note is null ? "" : $" · Manager: {note}"),
                 "booking", appt.Id),
             new[] { Recipient.User(Roles.Mechanic, req.MechanicId) }, ct);
         await PublishAsync(dto, ct);
@@ -177,6 +197,8 @@ public sealed class BookingService(
         try
         {
             await EnsureCapacityAsync(newStart, newStart + length, appt.Id, ct);
+            if (byStaff && appt.Status == AppointmentStatus.Confirmed)
+                await EnsureResourcesFreeAsync(appt.MechanicId, appt.BayId, newStart, newStart + length, appt.Id, ct);
             appt.SlotStart = newStart;
             appt.SlotEnd = newStart + length;
             if (!byStaff) appt.Status = AppointmentStatus.Requested; // customer move needs manager confirmation again
@@ -213,7 +235,13 @@ public sealed class BookingService(
     /// <summary>Walk-in inserted by the manager; ETAs of everyone behind it move (BR-AQ-05).</summary>
     public async Task<JobSummaryDto> WalkInAsync(Guid staffId, WalkInRequest req, CancellationToken ct = default)
     {
+        Guard.Against(!JobPriority.IsValid(req.Priority), JobPriority.Message);
+        Guard.Against(string.IsNullOrWhiteSpace(req.CustomerName), "Enter the customer's name.");
+        Guard.Against(string.IsNullOrWhiteSpace(req.VehicleLabel), "Enter the vehicle.");
         var service = await db.Services.AsNoTracking().FirstOrDefaultAsync(s => s.Id == req.ServiceId, ct) ?? throw new NotFoundException("Service");
+        await EnsureActiveBayAsync(req.BayId, ct);
+        // Walk-in work starts now, so the mechanic must also be on duty.
+        await EnsureMechanicAsync(req.MechanicId, requireOnDuty: true, ct);
         var now = clock.UtcNow;
         var appt = new Appointment
         {
@@ -253,19 +281,31 @@ public sealed class BookingService(
         return dto;
     }
 
-    public async Task<IReadOnlyList<BookingDto>> ListForStaffAsync(DateOnly? date, string? status, CancellationToken ct = default)
+    /// <param name="date">The workshop's LOCAL calendar date (Sri Lanka), converted to a UTC range (audit F06).</param>
+    /// <param name="page">1-based page number.</param>
+    /// <param name="pageSize">1..100, default 50 (audit F07).</param>
+    public async Task<PagedResult<BookingDto>> ListForStaffAsync(DateOnly? date, string? status, int page = 1, int pageSize = 50, CancellationToken ct = default)
     {
+        Guard.Against(page < 1, "Page starts at 1.");
+        Guard.Against(pageSize is < 1 or > MaxPageSize, $"Page size must be between 1 and {MaxPageSize}.");
         var q = db.Appointments.AsNoTracking();
         if (date is { } d)
         {
-            var from = d.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-            q = q.Where(a => a.SlotStart >= from && a.SlotStart < from.AddDays(1));
+            var workshop = await db.Workshops.AsNoTracking().FirstAsync(ct);
+            var fromUtc = workshop.ToUtc(d.ToDateTime(TimeOnly.MinValue));
+            var toUtc = workshop.ToUtc(d.AddDays(1).ToDateTime(TimeOnly.MinValue));
+            q = q.Where(a => a.SlotStart >= fromUtc && a.SlotStart < toUtc);
         }
-        if (Enum.TryParse<AppointmentStatus>(status, true, out var s)) q = q.Where(a => a.Status == s);
-        var rows = await q.OrderBy(a => a.SlotStart).Take(300).ToListAsync(ct);
+        if (!string.IsNullOrWhiteSpace(status) && !status.Equals("all", StringComparison.OrdinalIgnoreCase))
+        {
+            Guard.Against(!Enum.TryParse<AppointmentStatus>(status, true, out var st), $"Unknown status '{status}'.");
+            q = q.Where(a => a.Status == st);
+        }
+        var total = await q.CountAsync(ct);
+        var rows = await q.OrderBy(a => a.SlotStart).ThenBy(a => a.Id).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
         var list = new List<BookingDto>();
         foreach (var a in rows) list.Add(await read.BookingAsync(a, ct));
-        return list;
+        return new PagedResult<BookingDto>(list, page, pageSize, total);
     }
 
     public async Task<IReadOnlyList<BookingDto>> ListForCustomerAsync(Guid customerId, CancellationToken ct = default)
@@ -274,6 +314,46 @@ public sealed class BookingService(
         var list = new List<BookingDto>();
         foreach (var a in rows) list.Add(await read.BookingAsync(a, ct));
         return list;
+    }
+
+    private async Task EnsureActiveBayAsync(Guid bayId, CancellationToken ct)
+    {
+        var bay = await db.Bays.AsNoTracking().FirstOrDefaultAsync(b => b.Id == bayId, ct);
+        Guard.Against(bay is null, "That bay does not exist.");
+        Guard.Against(!bay!.Active, "That bay is not active. Pick an active bay.");
+    }
+
+    private async Task<MechanicSummary> EnsureMechanicAsync(Guid mechanicId, bool requireOnDuty, CancellationToken ct)
+    {
+        var m = await mechanics.GetAsync(mechanicId, ct);
+        Guard.Against(m is null, "That mechanic does not exist.");
+        Guard.Against(!m!.Active, $"{m.Name} is not an active mechanic.");
+        Guard.Against(requireOnDuty && !m.OnDuty, $"{m.Name} is off duty. Pick a mechanic who is on duty.");
+        return m;
+    }
+
+    /// <summary>
+    /// Audit F02: one mechanic and one bay cannot hold two confirmed / checked-in bookings at the same time.
+    /// Call inside <see cref="CapacityLock"/> together with the save.
+    /// </summary>
+    private async Task EnsureResourcesFreeAsync(Guid? mechanicId, Guid? bayId, DateTime start, DateTime end, Guid ignoreId, CancellationToken ct)
+    {
+        var busy = db.Appointments.AsNoTracking().Where(a => a.Id != ignoreId && a.SlotStart < end && a.SlotEnd > start &&
+            (a.Status == AppointmentStatus.Confirmed || a.Status == AppointmentStatus.CheckedIn));
+        if (mechanicId is { } m)
+        {
+            var clash = await busy.Where(a => a.MechanicId == m).OrderBy(a => a.SlotStart).FirstOrDefaultAsync(ct);
+            if (clash is not null)
+                throw new ConflictException("mechanic_busy",
+                    $"{await read.MechanicNameAsync(m, ct) ?? "This mechanic"} is already booked {LocalTime.Format(clash.SlotStart)}–{LocalTime.Format(clash.SlotEnd)}.");
+        }
+        if (bayId is { } b)
+        {
+            var clash = await busy.Where(a => a.BayId == b).OrderBy(a => a.SlotStart).FirstOrDefaultAsync(ct);
+            if (clash is not null)
+                throw new ConflictException("bay_busy",
+                    $"{await read.BayNameAsync(b, ct) ?? "This bay"} is already booked {LocalTime.Format(clash.SlotStart)}–{LocalTime.Format(clash.SlotEnd)}.");
+        }
     }
 
     private async Task EnsureCapacityAsync(DateTime start, DateTime end, Guid? ignoreId, CancellationToken ct)
@@ -318,9 +398,15 @@ public sealed class BookingService(
 
     private Task PublishAsync(BookingDto dto, CancellationToken ct)
     {
+        return PublishSplitAsync(dto, ct);
+    }
+
+    private async Task PublishSplitAsync(BookingDto dto, CancellationToken ct)
+    {
         var groups = new List<string> { RealtimeGroups.Staff };
-        if (dto.CustomerId != Guid.Empty) groups.Add(RealtimeGroups.User(dto.CustomerId));
         if (dto.MechanicId is { } m) groups.Add(RealtimeGroups.User(m));
-        return notifier.PublishAsync(RealtimeEvents.BookingUpdated, dto, groups, ct);
+        await notifier.PublishAsync(RealtimeEvents.BookingUpdated, dto, groups, ct);
+        if (dto.CustomerId != Guid.Empty)
+            await notifier.PublishAsync(RealtimeEvents.BookingUpdated, dto.ForCustomer(), new[] { RealtimeGroups.User(dto.CustomerId) }, ct);
     }
 }
