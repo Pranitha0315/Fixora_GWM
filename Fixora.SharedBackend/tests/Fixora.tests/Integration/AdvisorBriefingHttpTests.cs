@@ -186,13 +186,13 @@ public sealed class AdvisorBriefingHttpTests
     }
 
     [Fact]
-    public async Task Customer_cannot_run_advisor()
+    public async Task Customer_cannot_run_or_simulate_advisor()
     {
         await using var factory = NewFactory();
         var kavitha = await factory.Customer();
 
-        var response = await kavitha.PostAsync($"{Base}/run", null);
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.PostAsync($"{Base}/run", null)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await kavitha.PostAsync($"{Base}/simulate-next-week", null)).StatusCode);
     }
 
     [Fact]
