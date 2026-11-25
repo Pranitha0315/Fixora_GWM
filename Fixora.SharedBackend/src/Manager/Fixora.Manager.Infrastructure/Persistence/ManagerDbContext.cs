@@ -54,6 +54,7 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
             e.Property(x => x.Source).HasConversion<string>().HasMaxLength(20);
             e.Property(x => x.IdempotencyKey).HasMaxLength(100);
             e.Property(x => x.PromoCode).HasMaxLength(32);
+            e.Property(x => x.ManagerNote).HasMaxLength(500);
             e.HasIndex(x => new { x.CustomerId, x.IdempotencyKey });
             e.HasIndex(x => x.SlotStart);
         });
@@ -62,6 +63,7 @@ public sealed class ManagerDbContext(DbContextOptions<ManagerDbContext> options)
         {
             e.Property(x => x.Status).HasConversion<string>().HasMaxLength(32);
             e.Property(x => x.Number).HasMaxLength(32);
+            e.Property(x => x.ManagerNote).HasMaxLength(500);
             e.HasIndex(x => x.Number).IsUnique();
             e.HasIndex(x => x.CustomerId);
             e.HasIndex(x => x.MechanicId);

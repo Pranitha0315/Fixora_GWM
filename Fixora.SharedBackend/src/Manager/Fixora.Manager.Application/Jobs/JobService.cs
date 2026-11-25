@@ -121,6 +121,7 @@ public sealed class JobService(
     public async Task<JobSummaryDto> ReorderAsync(Guid jobId, ReorderJobRequest req, CancellationToken ct = default)
     {
         var job = await db.JobCards.FirstOrDefaultAsync(j => j.Id == jobId, ct) ?? throw new NotFoundException("Job");
+        Guard.Against(!JobPriority.IsValid(req.Priority), JobPriority.Message);
         job.Priority = req.Priority;
         job.QueueOrder = req.QueueOrder;
         await db.SaveChangesAsync(ct);
@@ -163,9 +164,12 @@ public sealed class JobService(
     private async Task PublishJobAsync(JobCard job, CancellationToken ct)
     {
         var dto = await read.JobAsync(job, ct);
-        var groups = new List<string> { RealtimeGroups.Staff, RealtimeGroups.Job(job.Id) };
-        if (job.CustomerId != Guid.Empty) groups.Add(RealtimeGroups.User(job.CustomerId));
-        if (job.MechanicId is { } m) groups.Add(RealtimeGroups.User(m));
-        await notifier.PublishAsync(RealtimeEvents.JobUpdated, dto, groups, ct);
+        // Staff + assigned mechanic get the manager note; the job group and the customer do not.
+        var full = new List<string> { RealtimeGroups.Staff };
+        if (job.MechanicId is { } m) full.Add(RealtimeGroups.User(m));
+        await notifier.PublishAsync(RealtimeEvents.JobUpdated, dto, full, ct);
+        var masked = new List<string> { RealtimeGroups.Job(job.Id) };
+        if (job.CustomerId != Guid.Empty) masked.Add(RealtimeGroups.User(job.CustomerId));
+        await notifier.PublishAsync(RealtimeEvents.JobUpdated, dto.ForCustomer(), masked, ct);
     }
 }

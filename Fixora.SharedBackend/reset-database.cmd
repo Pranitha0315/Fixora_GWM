@@ -3,6 +3,8 @@ REM FIXORA - DELETE the old FixoraDb (made by the old EnsureSchemaAsync) so migr
 REM Uses the same connection string as the app (appsettings.Development.json). ALL DATA IN FixoraDb IS DELETED.
 cd /d "%~dp0"
 set PATH=%PATH%;%USERPROFILE%\.dotnet\tools
+set ASPNETCORE_ENVIRONMENT=Development
+set DOTNET_ENVIRONMENT=Development
 echo This will PERMANENTLY delete the FixoraDb database (demo data only - the app seeds it again).
 echo Stop the app in Visual Studio first.
 choice /M "Delete FixoraDb now"

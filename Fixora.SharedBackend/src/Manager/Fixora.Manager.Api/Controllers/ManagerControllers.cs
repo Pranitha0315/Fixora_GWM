@@ -52,7 +52,9 @@ public sealed class DashboardController(DashboardService dashboard) : StaffContr
 [Route("api/v1/manager/bookings")]
 public sealed class BookingsController(BookingService bookings) : StaffControllerBase
 {
-    [HttpGet] public Task<IReadOnlyList<BookingDto>> List([FromQuery] DateOnly? date, [FromQuery] string? status, CancellationToken ct) => bookings.ListForStaffAsync(date, status, ct);
+    /// <summary>Paged (audit F07): ?date=2026-11-25 (workshop local date)&amp;status=Requested&amp;page=1&amp;pageSize=50 → { items, page, pageSize, total }.</summary>
+    [HttpGet] public Task<PagedResult<BookingDto>> List([FromQuery] DateOnly? date, [FromQuery] string? status, [FromQuery] int page = 1, [FromQuery] int pageSize = 50, CancellationToken ct = default)
+        => bookings.ListForStaffAsync(date, status, page, pageSize, ct);
     [HttpGet("slots")] public Task<IReadOnlyList<SlotDto>> Slots([FromQuery] DateOnly date, [FromQuery] Guid serviceId, CancellationToken ct) => bookings.GetSlotsAsync(date, serviceId, ct);
     [HttpPost("{id:guid}/confirm")] public Task<BookingDto> Confirm(Guid id, ConfirmBookingRequest req, CancellationToken ct) => bookings.ConfirmAsync(StaffId, id, req, ct);
     [HttpPost("{id:guid}/decline")] public Task<BookingDto> Decline(Guid id, DeclineBookingRequest req, CancellationToken ct) => bookings.DeclineAsync(StaffId, id, req.Reason, ct);

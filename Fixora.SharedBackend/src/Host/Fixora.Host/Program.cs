@@ -67,8 +67,9 @@ builder.Services.AddCors(o => o.AddPolicy("apps", p =>
 var app = builder.Build();
 
 app.UseMiddleware<CorrelationIdMiddleware>();
-app.UseMiddleware<ErrorHandlingMiddleware>();
+// Audit F11: request log wraps the error handler, so it records the FINAL status (404, not 500).
 app.UseSerilogRequestLogging();
+app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseCors("apps");
 app.UseRateLimiter();
 app.UseAuthentication();
