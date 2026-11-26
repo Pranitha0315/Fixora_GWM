@@ -7,6 +7,7 @@ import '../../features/authentication/presentation/screens/login_screen.dart';
 import '../../features/authentication/presentation/screens/otp_verification_screen.dart';
 import '../../features/authentication/presentation/screens/register_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/accept_invitation_screen.dart';
+import '../../features/quick_login/presentation/screens/quick_login_screen.dart';
 import '../../features/mechanic_invitation/presentation/screens/expired_invite_screen.dart';
 import '../../features/evidence_passport/presentation/screens/evidence_passport_screen.dart';
 import '../../features/fixproof/presentation/screens/inspection_capture_screen.dart';
