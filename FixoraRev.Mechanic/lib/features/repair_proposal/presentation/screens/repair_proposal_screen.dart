@@ -2,167 +2,285 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/bronze_buttons.dart';
+import '../../../../app/theme/app_typography.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/common.dart';
+import '../../../../core/widgets/rev_common.dart' show EmptyState;
+import '../../../../core/widgets/status_chip.dart';
+import '../../../../core/di/app_services.dart';
 import '../../domain/entities/repair_item.dart';
 import '../providers/proposal_provider.dart';
+import '../../../../core/backend/api_client.dart';
+import '../../../../core/backend/mechanic_backend.dart';
 
-class RepairProposalScreen extends ConsumerStatefulWidget {
+/// Itemised repair proposal. Customer approves or declines each line.
+class RepairProposalScreen extends ConsumerWidget {
   const RepairProposalScreen({super.key, required this.jobId});
-
   final String jobId;
 
-  @override
-  ConsumerState<RepairProposalScreen> createState() =>
-      _RepairProposalScreenState();
-}
+  Future<void> _addItem(BuildContext context, WidgetRef ref) async {
+    final titleCtrl = TextEditingController();
+    final priceCtrl = TextEditingController();
+    var type = RepairItemType.part;
+    final formKey = GlobalKey<FormState>();
 
-class _RepairProposalScreenState extends ConsumerState<RepairProposalScreen> {
-  void _addItem() {
-    ref.read(proposalProvider.notifier).add(
-          widget.jobId,
-          RepairItem(
-            title: 'New line item',
-            type: 'Labour',
-            price: 0,
-          ),
-        );
-  }
-
-  Future<void> _editItem(RepairItem item) async {
-    final titleCtrl = TextEditingController(text: item.title);
-    final typeCtrl = TextEditingController(text: item.type);
-    final priceCtrl = TextEditingController(text: item.price.toStringAsFixed(0));
-
-  final saved = await showDialog<bool>(
+    final added = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit line item'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleCtrl,
-                decoration: const InputDecoration(labelText: 'Title'),
-              ),
-              TextField(
-                controller: typeCtrl,
-                decoration: const InputDecoration(labelText: 'Type'),
-              ),
-              TextField(
-                controller: priceCtrl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Price (₹)'),
-              ),
-            ],
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => Padding(
+          padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(ctx).viewInsets.bottom + 20),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Add repair item', style: AppText.title),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    for (final t in RepairItemType.values) ...[
+                      ChoiceChip(
+                        label: Text(t == RepairItemType.part ? 'Part' : 'Labour'),
+                        selected: type == t,
+                        showCheckmark: false,
+                        selectedColor: AppColors.primarySoft,
+                        backgroundColor: AppColors.surface,
+                        labelStyle: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: type == t ? AppColors.primaryStrong : AppColors.body,
+                        ),
+                        side: BorderSide(color: type == t ? AppColors.primaryBorder : AppColors.border),
+                        onSelected: (_) => setSheet(() => type = t),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text('Item', style: AppText.label),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: titleCtrl,
+                  decoration: const InputDecoration(hintText: 'e.g. Rear brake shoes'),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Enter the item name' : null,
+                ),
+                const SizedBox(height: 12),
+                Text('Price (LKR)', style: AppText.label),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: priceCtrl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(hintText: 'e.g. 6500', prefixText: 'Rs. '),
+                  validator: (v) => int.tryParse(v ?? '') == null ? 'Enter a number' : null,
+                ),
+                const SizedBox(height: 18),
+                FilledButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() ?? false) Navigator.of(ctx).pop(true);
+                  },
+                  child: const Text('Add item'),
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
-        ],
       ),
     );
 
-    if (saved == true) {
-      final price = double.tryParse(priceCtrl.text.trim()) ?? item.price;
-      ref.read(proposalProvider.notifier).update(
-            widget.jobId,
-            item.copyWith(
-              title: titleCtrl.text.trim(),
-              type: typeCtrl.text.trim(),
-              price: price,
-            ),
+    if (added == true) {
+      ref.read(proposalProvider.notifier).add(
+            jobId,
+            title: titleCtrl.text.trim(),
+            price: int.parse(priceCtrl.text),
+            type: type,
           );
     }
-    titleCtrl.dispose();
-    typeCtrl.dispose();
-    priceCtrl.dispose();
   }
 
-  void _send() {
-    final state = ref.read(proposalProvider)[widget.jobId] ?? const ProposalState();
-    if (state.items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one line item')),
-      );
-      return;
-    }
-    ref.read(proposalProvider.notifier).sendForApproval(widget.jobId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Sent for customer approval')),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final job = AppServices.jobs.byId(jobId);
+    final items = ref.watch(proposalProvider)[jobId] ?? const <RepairItem>[];
+
+    final total = items.fold<int>(0, (s, i) => s + i.price);
+    final approvedTotal = items
+        .where((i) => i.decision == ApprovalDecision.approved)
+        .fold<int>(0, (s, i) => s + i.price);
+    final unsent = items.where((i) => i.decision == ApprovalDecision.notSent).length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Repair proposal'),
+        actions: [
+          IconButton(
+            tooltip: 'Add item',
+            onPressed: () => _addItem(context, ref),
+            icon: const Icon(Icons.add_circle_outline_rounded),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+        children: [
+          Row(
+            children: [
+              PlateBadge(plate: job.vehicle.plate),
+              const SizedBox(width: 10),
+              Expanded(child: Text('${job.vehicle.title} · ${job.customer.name}', style: AppText.label)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          InfoBanner(
+            text: MechanicBackend.instance.routes[jobId]?.label ??
+                (MechanicBackend.instance.live
+                    ? 'Items go to the service manager first. The manager prices them and sends them to the customer, then releases what the customer approves.'
+                    : 'The customer approves or declines each item separately. If a price or scope changes, the item needs a fresh approval.'),
+          ),
+          SectionHeader(
+            title: 'Items (${items.length})',
+            action: 'Add item',
+            onAction: () => _addItem(context, ref),
+          ),
+          if (items.isEmpty)
+            AppCard(
+              child: EmptyState(
+                compact: true,
+                icon: Icons.request_quote_outlined,
+                title: 'No items yet',
+                message: 'Add the parts and labour you found in your FixProof report.',
+                actionLabel: 'Add item',
+                actionIcon: Icons.add_rounded,
+                onAction: () => _addItem(context, ref),
+              ),
+            ),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: AppCard(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconBox(
+                      icon: item.type == RepairItemType.part ? Icons.settings_rounded : Icons.handyman_rounded,
+                      size: 42,
+                      background: AppColors.surfaceAlt,
+                      foreground: AppColors.body,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(item.title, style: AppText.bodyStrong),
+                          const SizedBox(height: 2),
+                          Text(
+                            item.linkedIssue ?? (item.type == RepairItemType.part ? 'Part' : 'Labour'),
+                            style: AppText.caption,
+                          ),
+                          const SizedBox(height: 8),
+                          StatusChip.decision(item.decision),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          formatLkr(item.price),
+                          style: AppText.bodyStrong.copyWith(
+                            decoration: item.decision == ApprovalDecision.declined ? TextDecoration.lineThrough : null,
+                            color: item.decision == ApprovalDecision.declined ? AppColors.muted : AppColors.ink,
+                          ),
+                        ),
+                        if (item.decision == ApprovalDecision.notSent)
+                          IconButton(
+                            tooltip: 'Remove ${item.title}',
+                            onPressed: () => ref.read(proposalProvider.notifier).remove(jobId, item.id),
+                            icon: Icon(Icons.delete_outline_rounded, color: AppColors.muted),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (items.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            AppCard(
+              color: AppColors.surfaceAlt,
+              child: Column(
+                children: [
+                  _TotalRow(label: 'Proposed total', value: formatLkr(total)),
+                  const SizedBox(height: 8),
+                  _TotalRow(label: 'Approved by customer', value: formatLkr(approvedTotal), strong: true),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+      bottomNavigationBar: BottomActionBar(
+        children: [
+          FilledButton.icon(
+            onPressed: unsent == 0
+                ? null
+                : () async {
+                    final messenger = ScaffoldMessenger.of(context);
+                    final backend = MechanicBackend.instance;
+                    if (backend.live) {
+                      final toSend = items.where((i) => i.decision == ApprovalDecision.notSent).toList();
+                      try {
+                        await backend.submitProposal(jobId, toSend);
+                        ref.read(proposalProvider.notifier).markSent(jobId);
+                        messenger.showSnackBar(SnackBar(
+                            content: Text('${toSend.length} item${toSend.length == 1 ? '' : 's'} sent to the service manager')));
+                      } on ApiException catch (e) {
+                        messenger.showSnackBar(SnackBar(content: Text(e.message)));
+                      }
+                      return;
+                    }
+                    // Not signed in to the garage server: the manager would never see it.
+                    await showDialog<void>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        icon: const Icon(Icons.cloud_off_rounded),
+                        title: const Text('Not connected to the garage'),
+                        content: const Text(
+                            'You are using demo data, so this proposal cannot reach the service manager. '
+                            'Sign out and sign in with your employee ID and PIN while the garage server is running.'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('OK')),
+                        ],
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.send_rounded),
+            label: Text(unsent == 0 ? 'All items sent' : 'Send $unsent item${unsent == 1 ? '' : 's'} for approval'),
+          ),
+        ],
+      ),
     );
-    Navigator.of(context).maybePop();
   }
+}
+
+class _TotalRow extends StatelessWidget {
+  const _TotalRow({required this.label, required this.value, this.strong = false});
+  final String label;
+  final String value;
+  final bool strong;
 
   @override
   Widget build(BuildContext context) {
-    final proposal =
-        ref.watch(proposalProvider)[widget.jobId] ?? const ProposalState();
-
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Repair proposal'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.ink,
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Text('Job ${widget.jobId}', style: TextStyle(color: AppColors.body)),
-          const SizedBox(height: 16),
-          if (proposal.items.isEmpty)
-            Text('No line items', style: TextStyle(color: AppColors.body))
-          else
-            for (final item in proposal.items)
-              Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                child: ListTile(
-                  title: Text(item.title, style: TextStyle(color: AppColors.ink)),
-                  subtitle: Text(
-                    '${item.type} · ₹${item.price.toStringAsFixed(0)} · ${item.decision.label}',
-                    style: TextStyle(color: AppColors.body),
-                  ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined),
-                        onPressed: () => _editItem(item),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => ref
-                            .read(proposalProvider.notifier)
-                            .remove(widget.jobId, item.id),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          OutlinedButton.icon(
-            onPressed: _addItem,
-            icon: const Icon(Icons.add),
-            label: const Text('Add line item'),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Total ₹${proposal.total.toStringAsFixed(0)}',
-            style: TextStyle(
-              color: AppColors.ink,
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            style: BronzeButtons.elevated,
-            onPressed: _send,
-            child: const Text('Send for approval'),
-          ),
-        ],
-      ),
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: strong ? AppText.bodyStrong : AppText.body)),
+        Text(
+          value,
+          style: strong ? AppText.title.copyWith(color: AppColors.primaryStrong) : AppText.bodyStrong,
+        ),
+      ],
     );
   }
 }

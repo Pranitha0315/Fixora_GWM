@@ -1,41 +1,47 @@
+enum RepairItemType { part, labour }
+
 enum ApprovalDecision { notSent, pending, approved, declined }
 
 extension ApprovalDecisionX on ApprovalDecision {
-  String get label => switch (this) {
-        ApprovalDecision.notSent => 'Not sent',
-        ApprovalDecision.pending => 'Pending',
-        ApprovalDecision.approved => 'Approved',
-        ApprovalDecision.declined => 'Declined',
-      };
+  String get label {
+    switch (this) {
+      case ApprovalDecision.notSent:
+        return 'Not sent';
+      case ApprovalDecision.pending:
+        return 'Waiting';
+      case ApprovalDecision.approved:
+        return 'Approved';
+      case ApprovalDecision.declined:
+        return 'Declined';
+    }
+  }
 }
 
 class RepairItem {
-  RepairItem({
+  const RepairItem({
+    required this.id,
     required this.title,
     required this.type,
     required this.price,
-    this.decision = ApprovalDecision.notSent,
-    String? id,
-  }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
+    required this.decision,
+    this.linkedIssue,
+  });
 
   final String id;
-  String title;
-  String type;
-  double price;
-  ApprovalDecision decision;
+  final String title;
+  final RepairItemType type;
+  final int price; // LKR
+  final ApprovalDecision decision;
+  final String? linkedIssue;
 
-  RepairItem copyWith({
-    String? title,
-    String? type,
-    double? price,
-    ApprovalDecision? decision,
-  }) {
+  RepairItem copyWith({ApprovalDecision? decision}) {
     return RepairItem(
       id: id,
-      title: title ?? this.title,
-      type: type ?? this.type,
-      price: price ?? this.price,
+      title: title,
+      type: type,
+      price: price,
       decision: decision ?? this.decision,
+      linkedIssue: linkedIssue,
     );
   }
 }

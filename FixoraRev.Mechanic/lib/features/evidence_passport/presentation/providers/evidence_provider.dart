@@ -1,81 +1,59 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:path_provider/path_provider.dart';
 
-import '../../domain/evidence_record.dart';
+import '../../../../core/mock/mock_data.dart';
+import '../../domain/entities/evidence_record.dart';
 
-class EvidenceState {
-  const EvidenceState({this.records = const []});
+class EvidenceNotifier extends Notifier<List<EvidenceRecord>> {
+  int _counter = 100;
 
-  final List<EvidenceRecord> records;
-
-  EvidenceState copyWith({List<EvidenceRecord>? records}) =>
-      EvidenceState(records: records ?? this.records);
-
-  List<EvidenceRecord> forPhase(EvidencePhase phase) =>
-      records.where((r) => r.phase == phase).toList(growable: false);
-}
-
-class EvidenceNotifier extends Notifier<Map<String, EvidenceState>> {
   @override
-  Map<String, EvidenceState> build() => {};
+  List<EvidenceRecord> build() => List<EvidenceRecord>.from(MockData.evidence);
 
-  EvidenceState stateFor(String jobId) =>
-      state[jobId] ?? const EvidenceState();
-
-  Future<void> add(
-    String jobId, {
+  void add({
+    required String jobId,
+    required String label,
     required EvidencePhase phase,
-    String? caption,
-  }) async {
-    String path;
-    try {
-      final dir = await getTemporaryDirectory();
-      path = '${dir.path}/evidence_${jobId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    } catch (_) {
-      path = '/tmp/evidence_${jobId}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    }
-    final record = EvidenceRecord(
-      phase: phase,
-      localPath: path,
-      caption: caption ?? '${phase.label} capture',
-    );
-    final current = stateFor(jobId);
-    state = {
+    required MediaKind kind,
+    String? localPath,
+    EvidenceUploadStatus uploadStatus = EvidenceUploadStatus.local,
+  }) {
+    _counter++;
+    final now = DateTime.now();
+    final time = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+    state = [
       ...state,
-      jobId: current.copyWith(records: [...current.records, record]),
-    };
-    unawaited(upload(jobId, record.id));
-  }
-
-  Future<void> upload(String jobId, String recordId) async {
-    final current = stateFor(jobId);
-    final index = current.records.indexWhere((r) => r.id == recordId);
-    if (index < 0) return;
-    final record = current.records[index];
-    record.status = EvidenceUploadStatus.uploading;
-    _replaceRecord(jobId, record);
-
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    record.status = EvidenceUploadStatus.uploaded;
-    _replaceRecord(jobId, record);
-  }
-
-  Future<void> retry(String jobId, String recordId) =>
-      upload(jobId, recordId);
-
-  void _replaceRecord(String jobId, EvidenceRecord record) {
-    final current = stateFor(jobId);
-    final next = [
-      for (final r in current.records)
-        if (r.id == record.id) record else r,
+      EvidenceRecord(
+        id: 'e$_counter',
+        jobId: jobId,
+        label: label,
+        phase: phase,
+        kind: kind,
+        time: time,
+        localPath: localPath,
+        uploadStatus: uploadStatus,
+      ),
     ];
-    state = {...state, jobId: current.copyWith(records: next)};
+  }
+
+  /// Marks upload done and keeps the record linked to [jobId].
+  void markUploaded(String id) {
+    state = [
+      for (final e in state)
+        e.id == id
+            ? EvidenceRecord(
+                id: e.id,
+                jobId: e.jobId,
+                label: e.label,
+                phase: e.phase,
+                kind: e.kind,
+                time: e.time,
+                localPath: e.localPath,
+                uploadStatus: EvidenceUploadStatus.uploaded,
+              )
+            : e,
+    ];
   }
 }
 
 final evidenceProvider =
-    NotifierProvider<EvidenceNotifier, Map<String, EvidenceState>>(
-  EvidenceNotifier.new,
-);
+    NotifierProvider<EvidenceNotifier, List<EvidenceRecord>>(EvidenceNotifier.new);
