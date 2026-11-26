@@ -3,6 +3,7 @@ class RouteNames {
 
   static const splash = '/';
   static const login = '/login';
+  static const quickLogin = '/quick-login';
   static const forgotPassword = '/forgot-password';
   static const register = '/register';
   static const otpVerification = '/verify-otp';
