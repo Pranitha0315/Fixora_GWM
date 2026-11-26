@@ -64,7 +64,7 @@ class _QuickLoginScreenState extends State<QuickLoginScreen> {
       await _store.disable();
       if (!mounted) return;
       context.toast('Please sign in with your password again.', icon: Icons.info_outline_rounded);
-      context.resetTo(const LoginScreen());
+      context.goRoute(RouteNames.login);
     }
   }
 
@@ -97,13 +97,13 @@ class _QuickLoginScreenState extends State<QuickLoginScreen> {
       case PinCheck.locked:
         context.toast('Too many wrong PINs. Quick login is off – sign in with your password.',
             icon: Icons.lock_outline_rounded);
-        context.resetTo(LoginScreen(initialEmail: email));
+        context.goRoute(RouteNames.login, extra: email);
     }
   }
 
   Future<void> _switchAccount() async {
     await _store.disable();
-    if (mounted) context.resetTo(const LoginScreen());
+    if (mounted) context.goRoute(RouteNames.login);
   }
 
   @override
@@ -158,7 +158,7 @@ class _QuickLoginScreenState extends State<QuickLoginScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       TextButton(
-                        onPressed: () => context.push(LoginScreen(initialEmail: _store.email ?? '')),
+                        onPressed: () => context.pushRoute(RouteNames.login, extra: _store.email ?? ''),
                         child: const Text('Use password'),
                       ),
                       TextButton(
