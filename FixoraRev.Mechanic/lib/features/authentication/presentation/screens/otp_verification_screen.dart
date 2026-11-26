@@ -289,7 +289,7 @@ class _SuccessView extends StatelessWidget {
               Text('Account created', style: AppText.display, textAlign: TextAlign.center),
               const SizedBox(height: 8),
               Text(
-                'Your email is verified. Log in with the invitation code from your garage. Your workshop manager approves new accounts before jobs are assigned.',
+                'Your email is verified. You can start now. Your workshop manager approves new accounts before jobs are assigned.',
                 style: AppText.body.copyWith(color: AppColors.muted),
                 textAlign: TextAlign.center,
               ),
