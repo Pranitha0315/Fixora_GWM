@@ -114,7 +114,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
     if (!ok) return;
     await AppServices.auth.logout();
-    if (mounted) context.resetTo(const LoginScreen());
+    if (mounted) context.goRoute(RouteNames.login);
   }
 
   void _scrollToPrefs() {
