@@ -634,6 +634,8 @@ class DemoSeed {
           vehicle: wagonR,
           issue: "Car won't start – battery dead",
           locationLabel: 'Galle Road, Wellawatte (near Savoy)',
+          lat: 6.8741,
+          lng: 79.8606,
           distanceKm: 2.4,
           channel: SosChannel.bleRelay,
           hops: 2,
