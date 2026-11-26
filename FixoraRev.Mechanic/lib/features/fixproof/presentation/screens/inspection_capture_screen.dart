@@ -1,281 +1,346 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../app/theme/bronze_buttons.dart';
+import '../../../../app/theme/app_typography.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/common.dart';
+import '../../../../core/widgets/rev_common.dart' show EmptyState;
 import '../../../../core/di/app_services.dart';
-import '../../data/media_upload_service.dart';
-import '../../data/voice_recording_service.dart';
-import '../../domain/inspection_issue.dart';
 import '../providers/fixproof_provider.dart';
-import '../widgets/inspection_issue_form.dart';
 
+/// FixProof step 1: capture photo/video evidence and a Tamil voice note.
 class InspectionCaptureScreen extends ConsumerStatefulWidget {
   const InspectionCaptureScreen({super.key, required this.jobId});
-
   final String jobId;
 
   @override
-  ConsumerState<InspectionCaptureScreen> createState() =>
-      _InspectionCaptureScreenState();
+  ConsumerState<InspectionCaptureScreen> createState() => _InspectionCaptureScreenState();
 }
 
-class _InspectionCaptureScreenState
-    extends ConsumerState<InspectionCaptureScreen> {
-  @override
-  void initState() {
-    super.initState();
-    AppServices.media.addListener(_refresh);
-    AppServices.voice.addListener(_refresh);
-  }
+class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScreen> {
+  static const _areas = ['Brakes', 'Engine', 'Suspension', 'Tyres', 'Electrical', 'AC', 'Body'];
+
+  Timer? _timer;
+  int _seconds = 0;
+  bool _recording = false;
+  bool _generating = false;
 
   @override
   void dispose() {
-    AppServices.media.removeListener(_refresh);
-    AppServices.voice.removeListener(_refresh);
+    _timer?.cancel();
     super.dispose();
   }
 
-  void _refresh() {
-    if (mounted) setState(() {});
-  }
-
-  Future<void> _capturePhoto() async {
-    final item = await AppServices.media.capturePhoto(widget.jobId);
-    if (item != null) {
-      ref.read(captureProvider.notifier).increment(widget.jobId);
-      await AppServices.media.upload(item);
+  void _toggleRecording() {
+    if (_recording) {
+      _timer?.cancel();
+      ref.read(captureProvider.notifier).addVoiceNote(math.max(_seconds, 1));
+      setState(() {
+        _recording = false;
+        _seconds = 0;
+      });
+    } else {
+      setState(() => _recording = true);
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted) setState(() => _seconds++);
+      });
     }
   }
 
-  Future<void> _captureVideo() async {
-    final item = await AppServices.media.captureVideo(widget.jobId);
-    if (item != null) {
-      ref.read(captureProvider.notifier).increment(widget.jobId);
-      await AppServices.media.upload(item);
-    }
+  Future<void> _generate() async {
+    setState(() => _generating = true);
+    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    if (!mounted) return;
+    ref.read(reportStateProvider.notifier).set(widget.jobId, ReportState.draft);
+    AppServices.jobs.startFixProof(AppServices.jobs.byId(widget.jobId));
+    setState(() => _generating = false);
+    Navigator.of(context).pushReplacementNamed(RouteNames.reportReview, arguments: widget.jobId);
   }
 
-  void _openIssueSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: AppColors.surface,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
-          ),
-          child: SingleChildScrollView(
-            child: InspectionIssueForm(
-              onSave: (issue) {
-                ref.read(captureProvider.notifier).addManual(widget.jobId, issue);
-                Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Issue added')),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
+  String get _clock {
+    final m = (_seconds ~/ 60).toString().padLeft(2, '0');
+    final s = (_seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   @override
   Widget build(BuildContext context) {
-    final capture = ref.watch(captureProvider)[widget.jobId] ?? const CaptureState();
-    final media = AppServices.media.forJob(widget.jobId);
-    final voice = AppServices.voice;
+    final capture = ref.watch(captureProvider);
+    final notifier = ref.read(captureProvider.notifier);
+    final job = AppServices.jobs.byId(widget.jobId);
 
     return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: const Text('Inspection capture'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.ink,
-        actions: [
-          TextButton(
-            onPressed: () => context.push(RouteNames.reportReviewPath(widget.jobId)),
-            child: const Text('Review'),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('FixProof inspection')),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
-          Text(
-            'Job ${widget.jobId}',
-            style: TextStyle(color: AppColors.body, fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${capture.issues.length} issues · ${capture.count} media',
-            style: TextStyle(color: AppColors.ink),
-          ),
-          const SizedBox(height: 20),
-          Text('Media', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
+          const _StepBar(current: 0),
+          const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _capturePhoto,
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('Photo'),
-                ),
-              ),
+              PlateBadge(plate: job.vehicle.plate),
               const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _captureVideo,
-                  icon: const Icon(Icons.videocam_outlined),
-                  label: const Text('Video'),
-                ),
-              ),
+              Expanded(child: Text('${job.vehicle.title} ${job.vehicle.year}', style: AppText.bodyStrong)),
             ],
           ),
-          if (media.isEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: Text('No media yet', style: TextStyle(color: AppColors.body)),
-            )
-          else
-            ...media.map((m) => _MediaTile(item: m)),
-          const SizedBox(height: 20),
-          Text('Voice note', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
+
+          // Areas
+          const SectionHeader(title: 'What are you checking?'),
           Wrap(
             spacing: 8,
-            children: VoiceLanguage.values
-                .map(
-                  (l) => ChoiceChip(
-                    label: Text(l.label),
-                    selected: voice.language == l,
-                    onSelected: (_) => AppServices.voice.setLanguage(l),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            voice.status == VoiceRecordStatus.recording
-                ? 'Recording ${voice.duration.inSeconds}s'
-                : 'Status: ${voice.status.name}',
-            style: TextStyle(color: AppColors.body),
-          ),
-          const SizedBox(height: 8),
-          Row(
+            runSpacing: 8,
             children: [
-              if (voice.status != VoiceRecordStatus.recording)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: AppServices.voice.start,
-                    child: const Text('Record'),
+              for (final a in _areas)
+                FilterChip(
+                  label: Text(a),
+                  selected: capture.areas.contains(a),
+                  onSelected: (_) => notifier.toggleArea(a),
+                  showCheckmark: true,
+                  checkmarkColor: AppColors.primaryStrong,
+                  labelStyle: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: capture.areas.contains(a) ? AppColors.primaryStrong : AppColors.body,
                   ),
-                )
-              else
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: AppServices.voice.stop,
-                    child: const Text('Stop'),
-                  ),
-                ),
-              const SizedBox(width: 8),
-              if (voice.localPath != null)
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: AppServices.voice.upload,
-                    child: const Text('Upload'),
-                  ),
+                  backgroundColor: AppColors.surface,
+                  selectedColor: AppColors.primarySoft,
+                  side: BorderSide(color: capture.areas.contains(a) ? AppColors.primaryBorder : AppColors.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                 ),
             ],
           ),
-          const SizedBox(height: 24),
-          Text('Issues', style: TextStyle(color: AppColors.ink, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          for (final issue in capture.issues) _IssueRow(issue: issue),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _openIssueSheet,
-            icon: const Icon(Icons.add),
-            label: const Text('Add issue manually'),
+
+          // Media
+          SectionHeader(title: 'Photos & videos (${capture.media.length})'),
+          // Add buttons first (big, one per row), then one captured item per row.
+          Row(
+            children: [
+              Expanded(child: _AddMediaButton(icon: Icons.add_a_photo_rounded, label: 'Photo', onTap: () => notifier.addMedia(isVideo: false))),
+              const SizedBox(width: 10),
+              Expanded(child: _AddMediaButton(icon: Icons.videocam_rounded, label: 'Video', onTap: () => notifier.addMedia(isVideo: true))),
+            ],
           ),
-          const SizedBox(height: 12),
-          ElevatedButton(
-            style: BronzeButtons.elevated,
-            onPressed: () => context.push(RouteNames.diagnosisFlowPath(widget.jobId)),
-            child: const Text('Guided diagnosis flow'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MediaTile extends StatelessWidget {
-  const _MediaTile({required this.item});
-
-  final MediaUploadItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(top: 8),
-      child: ListTile(
-        leading: Icon(
-          item.kind == MediaUploadKind.photo
-              ? Icons.image_outlined
-              : Icons.movie_outlined,
-          color: AppColors.primary,
-        ),
-        title: Text(
-          item.localPath.split(RegExp(r'[/\\]')).last,
-          style: TextStyle(color: AppColors.ink, fontSize: 13),
-        ),
-        subtitle: LinearProgressIndicator(
-          value: item.progress,
-          color: AppColors.primary,
-        ),
-        trailing: item.status == MediaUploadStatus.failed
-            ? IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: () => AppServices.media.retry(item),
-              )
-            : Text(
-                item.status.name,
-                style: TextStyle(color: AppColors.body, fontSize: 11),
+          const SizedBox(height: 10),
+          if (capture.media.isEmpty)
+            AppCard(
+              child: EmptyState(
+                compact: true,
+                icon: Icons.photo_camera_outlined,
+                title: 'No photos yet',
+                message: 'Add one close-up per problem. The customer sees these in the report.',
               ),
-      ),
-    );
-  }
-}
+            )
+          else
+            for (final m in capture.media)
+              MediaRow(
+                thumbnail: MediaThumb(isVideo: m.isVideo),
+                title: m.label,
+                subtitle: m.isVideo ? 'Video' : 'Photo',
+                onRemove: () => notifier.removeMedia(m.id),
+              ),
+          const SizedBox(height: 8),
+          Text('Tip: one close-up per problem. Keep the part in focus and in good light.', style: AppText.caption),
 
-class _IssueRow extends StatelessWidget {
-  const _IssueRow({required this.issue});
-
-  final InspectionIssue issue;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Icon(Icons.report_outlined, size: 18, color: AppColors.primary),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              '${issue.title} · ${issue.severity.label}',
-              style: TextStyle(color: AppColors.ink, fontSize: 13),
+          // Voice
+          const SectionHeader(title: 'Voice note'),
+          AppCard(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.translate_rounded, size: 18, color: AppColors.muted),
+                    const SizedBox(width: 6),
+                    Text('Speak in Tamil · தமிழில் பேசுங்கள்', style: AppText.label),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _Waveform(active: _recording, tick: _seconds),
+                const SizedBox(height: 10),
+                Text(
+                  _recording ? _clock : 'Tap the mic and describe what you found',
+                  style: _recording
+                      ? AppText.title.copyWith(fontFeatures: const [FontFeature.tabularFigures()])
+                      : AppText.caption,
+                ),
+                const SizedBox(height: 16),
+                Semantics(
+                  button: true,
+                  label: _recording ? 'Stop recording' : 'Start recording',
+                  child: InkResponse(
+                    onTap: _toggleRecording,
+                    radius: 48,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 76,
+                      height: 76,
+                      decoration: BoxDecoration(
+                        color: _recording ? AppColors.dangerBright : AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _recording ? AppColors.dangerSoft : AppColors.primarySoft,
+                          width: 8,
+                          strokeAlign: BorderSide.strokeAlignOutside,
+                        ),
+                      ),
+                      child: Icon(_recording ? Icons.stop_rounded : Icons.mic_rounded, color: AppColors.onPrimary, size: 34),
+                    ),
+                  ),
+                ),
+                if (capture.voiceNotes.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  const Divider(),
+                  for (final v in capture.voiceNotes)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const IconBox(icon: Icons.play_arrow_rounded, size: 40),
+                      title: Text('Voice note · ${v.duration}', style: AppText.bodyStrong),
+                      subtitle: Text('Tamil · ready for AI', style: AppText.caption),
+                      trailing: IconButton(
+                        tooltip: 'Delete voice note',
+                        onPressed: () => notifier.removeVoiceNote(v.id),
+                        icon: Icon(Icons.delete_outline_rounded, color: AppColors.muted),
+                      ),
+                    ),
+                ],
+              ],
             ),
           ),
         ],
+      ),
+      bottomNavigationBar: BottomActionBar(
+        children: [
+          if (!capture.canGenerate)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(
+                'Add at least 1 photo and 1 voice note to create the AI draft.',
+                style: AppText.caption,
+                textAlign: TextAlign.center,
+              ),
+            ),
+          FilledButton.icon(
+            onPressed: capture.canGenerate && !_generating && !_recording ? _generate : null,
+            icon: _generating
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.muted),
+                  )
+                : const Icon(Icons.auto_awesome_rounded),
+            label: Text(_generating ? 'AI is writing the report…' : 'Create AI draft'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepBar extends StatelessWidget {
+  const _StepBar({required this.current});
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Capture', 'Review', 'Publish'];
+    return Row(
+      children: [
+        for (var i = 0; i < labels.length; i++)
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(right: i == labels.length - 1 ? 0 : 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: i <= current ? AppColors.primary : AppColors.border,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${i + 1}. ${labels[i]}',
+                    style: AppText.caption.copyWith(
+                      color: i <= current ? AppColors.ink : AppColors.muted,
+                      fontWeight: i == current ? FontWeight.w800 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _AddMediaButton extends StatelessWidget {
+  const _AddMediaButton({required this.icon, required this.label, required this.onTap});
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.primarySoft,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: AppColors.primaryBorder, width: 1.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: AppColors.primaryStrong, size: 24),
+              const SizedBox(width: 8),
+              Text('Add $label', style: AppText.label.copyWith(color: AppColors.primaryStrong)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Simple animated bars that move while recording.
+class _Waveform extends StatelessWidget {
+  const _Waveform({required this.active, required this.tick});
+  final bool active;
+  final int tick;
+
+  @override
+  Widget build(BuildContext context) {
+    const bars = 28;
+    return ExcludeSemantics(
+      child: SizedBox(
+        height: 40,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < bars; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                width: 4,
+                height: active ? 8 + 28 * ((math.sin(i * 0.7 + tick * 1.3) + 1) / 2) : 6,
+                decoration: BoxDecoration(
+                  color: active ? AppColors.primary : AppColors.border,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

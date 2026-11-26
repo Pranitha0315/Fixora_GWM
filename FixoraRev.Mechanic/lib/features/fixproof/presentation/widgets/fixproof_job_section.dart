@@ -1,79 +1,108 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_typography.dart';
+import '../../../../core/utils/nav.dart';
+import '../../../../core/widgets/app_card.dart';
+import '../../../../core/widgets/common.dart';
+import '../../../evidence_passport/presentation/providers/evidence_provider.dart';
+import '../../../jobs/domain/job_entities.dart';
+import '../../../repair_proposal/domain/entities/repair_item.dart';
+import '../../../repair_proposal/presentation/providers/proposal_provider.dart';
+import '../providers/fixproof_provider.dart';
 
-/// Quick links from job detail into FixProof / proposal / evidence flows.
-class FixproofJobSection extends StatelessWidget {
-  const FixproofJobSection({super.key, required this.jobId});
-
-  final String jobId;
+/// "Customer proof" block shown on the job screen: FixProof report,
+/// item-by-item approval, before/after evidence and delay updates.
+class FixProofJobSection extends ConsumerWidget {
+  const FixProofJobSection({super.key, required this.job});
+  final Job job;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final report = ref.watch(reportStateProvider)[job.id] ?? ReportState.notStarted;
+    final items = ref.watch(proposalProvider)[job.id] ?? const <RepairItem>[];
+    final evidence = ref.watch(evidenceProvider).where((e) => e.jobId == job.id).length;
+
+    final approved = items.where((i) => i.decision == ApprovalDecision.approved).length;
+    final pending = items.where((i) => i.decision == ApprovalDecision.pending).length;
+    final notSent = items.where((i) => i.decision == ApprovalDecision.notSent).length;
+
+    void open(String route) => context.pushRoute(route, extra: job.id);
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'FixProof',
-          style: TextStyle(
-            color: AppColors.ink,
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-          ),
+        const SectionHeader(title: 'Customer proof'),
+        _Row(
+          icon: Icons.photo_camera_rounded,
+          title: 'FixProof inspection',
+          subtitle: report.label,
+          done: report == ReportState.published,
+          onTap: () => open(report == ReportState.draft ? RouteNames.reportReview : RouteNames.inspectionCapture),
         ),
-        const SizedBox(height: 10),
-        _LinkTile(
-          icon: Icons.photo_camera_outlined,
-          label: 'Inspection capture',
-          onTap: () => context.push(RouteNames.inspectionCapturePath(jobId)),
+        _Row(
+          icon: Icons.request_quote_rounded,
+          title: 'Item-by-item approval',
+          subtitle: items.isEmpty
+              ? 'No items yet'
+              : '$approved approved · $pending waiting${notSent > 0 ? ' · $notSent not sent' : ''}',
+          done: items.isNotEmpty && pending == 0 && notSent == 0,
+          onTap: () => open(RouteNames.repairProposal),
         ),
-        _LinkTile(
-          icon: Icons.description_outlined,
-          label: 'Report review',
-          onTap: () => context.push(RouteNames.reportReviewPath(jobId)),
+        _Row(
+          icon: Icons.collections_rounded,
+          title: 'Job evidence · before & after',
+          subtitle: '$evidence photos & videos · time-stamped',
+          done: false,
+          onTap: () => open(RouteNames.evidencePassport),
         ),
-        _LinkTile(
-          icon: Icons.request_quote_outlined,
-          label: 'Repair proposal',
-          onTap: () => context.push(RouteNames.repairProposalPath(jobId)),
-        ),
-        _LinkTile(
-          icon: Icons.verified_outlined,
-          label: 'Evidence passport',
-          onTap: () => context.push(RouteNames.evidencePassportPath(jobId)),
-        ),
-        _LinkTile(
-          icon: Icons.timeline_outlined,
-          label: 'Progress update',
-          onTap: () => context.push(RouteNames.progressUpdatePath(jobId)),
+        _Row(
+          icon: Icons.update_rounded,
+          title: 'Progress note / running late',
+          subtitle: 'Updates the queue ETA',
+          done: false,
+          onTap: () => open(RouteNames.progressUpdate),
         ),
       ],
     );
   }
 }
 
-class _LinkTile extends StatelessWidget {
-  const _LinkTile({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
+class _Row extends StatelessWidget {
+  const _Row({required this.icon, required this.title, required this.subtitle, required this.done, required this.onTap});
 
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
+  final bool done;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Icon(icon, color: AppColors.primary),
-        title: Text(label, style: TextStyle(color: AppColors.ink)),
-        trailing: Icon(Icons.chevron_right, color: AppColors.body),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: AppCard(
         onTap: onTap,
+        child: Row(
+          children: [
+            IconBox(icon: icon),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppText.bodyStrong),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: AppText.caption),
+                ],
+              ),
+            ),
+            Icon(done ? Icons.check_circle_rounded : Icons.chevron_right_rounded,
+                color: done ? const Color(0xFF16A34A) : AppColors.muted),
+          ],
+        ),
       ),
     );
   }
