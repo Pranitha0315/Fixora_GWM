@@ -270,6 +270,7 @@ class Job {
     this.completedAt,
     this.passportEntryId,
     this.customerNote,
+    this.managerNote,
   })  : tasks = tasks ?? [],
         timeline = timeline ?? [];
 
@@ -300,6 +301,9 @@ class Job {
   DateTime? completedAt;
   String? passportEntryId;
   String? customerNote;
+
+  /// Manager → mechanic instruction from the booking (never shown to the customer).
+  String? managerNote;
 
   double get taskProgress =>
       tasks.isEmpty ? 0 : tasks.where((t) => t.done).length / tasks.length;
