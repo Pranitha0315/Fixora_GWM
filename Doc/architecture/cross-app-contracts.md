@@ -367,6 +367,48 @@ workload warnings and notification delivery should be handled.
 - Failed requests must not leave partially applied workflow changes.
 - Error responses must not expose another customer's data.
 
+## Ownership Matrix And No-Duplicate-Write Rule (Proposed)
+
+Task: FX13-D01-NID-2
+
+This section consolidates the per-workflow Ownership notes above. It is a
+proposed rule set for owner agreement. It does not confirm implementation.
+
+### Ownership Matrix
+
+| Record | Created by | Changed by | Read by |
+|---|---|---|---|
+| Vehicle and customer profile | Customer | Customer | Customer; manager and mechanic only for assigned work |
+| Booking request | Customer | Manager (confirm, decline, reschedule, cancel) | Customer (own); manager |
+| Mechanic invitation | Manager | Manager (revoke); mechanic (accept once) | Manager; invited mechanic |
+| Job assignment | Manager | Manager (reassign, reorder) | Manager; assigned mechanic |
+| Inspection findings | Assigned mechanic | Assigned mechanic until submitted | Manager; assigned mechanic |
+| Repair proposal and item prices | Manager | Manager until sent | Customer (after send); manager |
+| Item decision | Customer | Customer, once per item | Customer; manager |
+| Repair progress | Assigned mechanic | Assigned mechanic | Manager; customer (status only) |
+| Invoice | Manager | Manager (issue, void with reason) | Customer (own); manager |
+
+### No-Duplicate-Write Rules
+
+- Each record has exactly one writer role per transition. A second role
+  must not overwrite the same field.
+- A repeated create or transition with the same request key returns the
+  existing result. It must not create a second record.
+  Example: repeating booking confirmation does not create a second job card.
+- Two concurrent transitions on one record: one wins, the other receives a
+  conflict response. Neither leaves a partial change.
+- Client-supplied ids never change ownership. The backend derives the owner
+  from the authenticated session and role.
+- Notifications and realtime events are sent only after the write commits.
+  A retried write must not send a second notification.
+
+### Open Points For Owner Agreement
+
+- Which endpoints accept an explicit idempotency key versus rely on
+  natural idempotency.
+- Whether manager may edit an inspection after it is submitted.
+- Whether customer may decide items after manager has released the work.
+
 ## Pending Contract Review
 
 - Confirm actual repository paths and existing implementations.
