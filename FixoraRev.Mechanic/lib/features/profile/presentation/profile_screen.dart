@@ -9,7 +9,6 @@ import '../../../core/utils/nav.dart';
 import '../../../core/widgets/rev_common.dart' show confirmDialog;
 import '../../../core/widgets/common.dart' show StatStrip;
 import '../../../core/widgets/rev_ui.dart';
-import '../../authentication/presentation/screens/login_screen.dart';
 import '../../fixproof/presentation/providers/fixproof_provider.dart';
 import '../../jobs/domain/job_entities.dart';
 import '../../quick_login/data/quick_login_store.dart';
