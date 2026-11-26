@@ -13,8 +13,6 @@ import '../../../shell/presentation/main_shell.dart';
 import '../../../../core/di/app_services.dart';
 import '../../../quick_login/data/quick_login_store.dart';
 import '../../../quick_login/presentation/screens/quick_login_setup_screen.dart';
-import 'login_screen.dart';
-
 enum OtpPurpose { register, login }
 
 class OtpArgs {
@@ -155,7 +153,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_verified) return _SuccessView(email: widget.email);
+    if (_verified) return _SuccessView(email: widget.email, onContinue: () => _goToGarage());
 
     return Scaffold(
       backgroundColor: AppColors.surface,
@@ -266,8 +264,9 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
 }
 
 class _SuccessView extends StatelessWidget {
-  const _SuccessView({required this.email});
+  const _SuccessView({required this.email, required this.onContinue});
   final String email;
+  final VoidCallback onContinue;
 
   @override
   Widget build(BuildContext context) {
@@ -311,8 +310,8 @@ class _SuccessView extends StatelessWidget {
               ),
               const Spacer(),
               FilledButton(
-                onPressed: () => context.resetTo(LoginScreen(initialEmail: email)),
-                child: const Text('Back to sign in'),
+                onPressed: onContinue,
+                child: const Text('Continue to my garage'),
               ),
             ],
           ),
