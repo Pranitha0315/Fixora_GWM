@@ -10,7 +10,6 @@ import '../../../../core/widgets/warm_ui.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../auth/domain/auth_entities.dart';
 import '../../../auth/presentation/screens/status_screens.dart';
-import '../../../authentication/presentation/screens/login_screen.dart';
 import '../../../shell/presentation/main_shell.dart';
 import '../../data/quick_login_store.dart';
 import '../widgets/pin_pad.dart';
