@@ -1,54 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../app/router/route_names.dart';
-import '../../app/theme/bronze_colors.dart';
-import '../../features/authentication/presentation/screens/login_screen.dart';
-import '../../features/shell/presentation/main_shell.dart';
+import '../../app/theme/app_colors.dart';
 
-/// Navigation shortcuts used across the app.
+/// Navigation shortcuts used across the app (GoRouter + imperative pushes).
 extension NavX on BuildContext {
-  void goRoute(String location, {Object? extra}) =>
-      go(location, extra: extra);
-
-  Future<T?> pushRoute<T extends Object?>(String location, {Object? extra}) =>
-      push<T>(location, extra: extra);
-
-  Future<T?> pushPage<T>(Widget page) =>
+  Future<T?> push<T>(Widget page) =>
       Navigator.of(this).push<T>(MaterialPageRoute(builder: (_) => page));
 
-  Future<T?> replaceWithPage<T>(Widget page) => Navigator.of(this)
+  Future<T?> pushRoute<T extends Object?>(String location, {Object? extra}) =>
+      GoRouter.of(this).push<T>(location, extra: extra);
+
+  void goRoute(String location, {Object? extra}) => GoRouter.of(this).go(location, extra: extra);
+
+  Future<T?> replaceWith<T>(Widget page) => Navigator.of(this)
       .pushReplacement<T, void>(MaterialPageRoute(builder: (_) => page));
 
-  /// Clears the stack. Known shell/login widgets use GoRouter; others fade-replace.
-  Future<T?> resetTo<T>(Widget page) {
-    if (page is MainShell) {
-      go(RouteNames.shell);
-      return Future<T?>.value(null);
-    }
-    if (page is LoginScreen) {
-      go(RouteNames.login);
-      return Future<T?>.value(null);
-    }
-    return Navigator.of(this).pushAndRemoveUntil<T>(
-      PageRouteBuilder<T>(
-        transitionDuration: const Duration(milliseconds: 450),
-        pageBuilder: (context, animation, secondaryAnimation) => page,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
-            FadeTransition(opacity: animation, child: child),
-      ),
-      (_) => false,
-    );
-  }
+  /// Clears the whole stack and shows [page] (used after login / logout).
+  Future<T?> resetTo<T>(Widget page) =>
+      Navigator.of(this).pushAndRemoveUntil<T>(
+        PageRouteBuilder<T>(
+          transitionDuration: const Duration(milliseconds: 450),
+          pageBuilder: (_, __, ___) => page,
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+        ),
+        (_) => false,
+      );
 
-  void popToRoot() {
-    final router = GoRouter.maybeOf(this);
-    if (router != null) {
-      go(RouteNames.shell);
-      return;
-    }
-    Navigator.of(this).popUntil((route) => route.isFirst);
-  }
+  /// Clears stack via GoRouter path (preferred for named destinations).
+  void resetToRoute(String location, {Object? extra}) => go(location, extra: extra);
+
+  void popToRoot() => Navigator.of(this).popUntil((route) => route.isFirst);
 
   void toast(String message, {IconData? icon}) {
     ScaffoldMessenger.of(this)
@@ -58,7 +41,7 @@ extension NavX on BuildContext {
           content: Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, color: BronzeColors.charcoal, size: 18),
+                Icon(icon, color: AppColors.onPrimary, size: 18),
                 const SizedBox(width: 10),
               ],
               Expanded(child: Text(message)),
