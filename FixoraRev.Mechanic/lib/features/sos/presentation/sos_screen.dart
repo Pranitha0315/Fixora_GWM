@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' hide Path;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/di/app_services.dart';
 import '../../../core/theme/app_colors.dart';
@@ -6,6 +8,7 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/utils/nav.dart';
 import '../../../core/widgets/action_sheet.dart';
 import '../../../core/widgets/buttons.dart';
+import '../../../core/widgets/osm_map.dart';
 import '../../../core/widgets/rev_common.dart';
 import '../../jobs/presentation/screens/job_detail_screen.dart';
 import '../domain/sos_entities.dart';
@@ -190,6 +193,44 @@ class SosDetailScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              if (r.hasLocation) ...[
+                const SizedBox(height: 12),
+                FxOsmMap(
+                  center: LatLng(r.lat!, r.lng!),
+                  height: 200,
+                  pins: [
+                    FxMapPin(
+                      LatLng(r.lat!, r.lng!),
+                      color: AppColors.danger,
+                      pulse: r.isOpen,
+                      label: 'Customer',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => openDirections(r.lat!, r.lng!),
+                        icon: const Icon(Icons.navigation_rounded),
+                        label: const Text('Navigate'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: r.customer.phone.isEmpty
+                            ? null
+                            : () => launchUrl(
+                                Uri.parse('tel:${r.customer.phone}')),
+                        icon: const Icon(Icons.call_rounded),
+                        label: const Text('Call'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (r.channel == SosChannel.bleRelay) ...[
                 const SizedBox(height: 12),
                 AppCard(
