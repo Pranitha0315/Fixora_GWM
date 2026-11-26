@@ -1,34 +1,27 @@
-import '../../../core/backend/api_client.dart';
-import '../../../core/di/app_services.dart';
 import '../domain/drivesense_models.dart';
 
-/// Fetches DriveSense snapshots (API with demo fallback).
+/// Loads DriveSense hints for a job/vehicle. Demo returns mock opted-in data.
 class DriveSenseRepository {
-  DriveSenseRepository({ApiClient? api}) : _api = api ?? AppServices.api;
-
-  final ApiClient _api;
-
-  Future<DriveSenseSnapshot> fetchSnapshot(String jobId) async {
-    try {
-      final raw = await _api.get('/mechanic/jobs/$jobId/drivesense');
-      if (raw is Map) {
-        return DriveSenseSnapshot.fromJson(Map<String, dynamic>.from(raw));
-      }
-    } catch (_) {
-      // Demo data when offline / unsigned.
+  Future<DriveSenseSnapshot> forJob(String jobId, {required bool customerOptedIn}) async {
+    await Future<void>.delayed(const Duration(milliseconds: 250));
+    if (!customerOptedIn) return DriveSenseSnapshot.empty;
+    if (jobId.toLowerCase().contains('err')) {
+      return const DriveSenseSnapshot(
+        vehicleScore: 0,
+        roughRoadPercent: 0,
+        wearFlags: [],
+        optedIn: true,
+        errorMessage: 'Could not load DriveSense data. Try again.',
+      );
     }
-    return _demoFor(jobId);
-  }
-
-  DriveSenseSnapshot _demoFor(String jobId) {
-    final hash = jobId.hashCode.abs();
-    final score = 55 + (hash % 40);
     return DriveSenseSnapshot(
-      vehicleScore: score,
-      roughRoadPercent: (hash % 30) + 5.0,
-      wearFlags: score < 70
-          ? const ['Brake pads', 'Tyre front-left']
-          : const ['Oil interval'],
+      vehicleScore: 72,
+      roughRoadPercent: 18.5,
+      wearFlags: const [
+        'Front suspension load spikes',
+        'Brake pad wear trend rising',
+        'Tyre sidewall stress on left rear',
+      ],
       optedIn: true,
     );
   }
