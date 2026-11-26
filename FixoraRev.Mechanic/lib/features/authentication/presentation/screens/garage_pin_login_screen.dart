@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/route_names.dart';
-import '../../../../app/theme/bronze_buttons.dart';
-import '../../../../app/theme/bronze_colors.dart';
-import '../../../../app/theme/bronze_inputs.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_typography.dart';
 import '../../../../core/backend/api_client.dart';
 import '../../../../core/backend/mechanic_backend.dart';
-import '../../../../core/di/app_services.dart';
-import '../../../auth/presentation/screens/loading_screen.dart';
-import '../../../auth/presentation/widgets/auth_scaffold.dart';
+import '../../../../core/utils/nav.dart';
+import '../../../auth/presentation/screens/status_screens.dart';
 import '../../../shell/presentation/main_shell.dart';
 
-/// Garage PIN — employee code + 4-digit PIN.
+/// Sign in to the garage's Fixora backend with the employee code and the 4-digit PIN
+/// set by the manager's invitation (BR-SF-17). Jobs, approvals and alerts then arrive live.
 class GaragePinLoginScreen extends StatefulWidget {
   const GaragePinLoginScreen({super.key});
 
@@ -48,23 +45,13 @@ class _GaragePinLoginScreenState extends State<GaragePinLoginScreen> {
     });
     try {
       await MechanicBackend.instance.pinLogin(code, pin);
-      await AppServices.auth.signInRemote(login: code);
       if (!mounted) return;
-      context.go(
-        RouteNames.loading,
-        extra: const LoadingScreen(
-          title: 'Signing you in…',
-          subtitle: 'Loading your jobs',
-          next: MainShell(),
-        ),
-      );
+      context.resetTo(const LoadingScreen(title: 'Signing you in…', subtitle: 'Loading your jobs', next: MainShell()));
     } on ApiException catch (e) {
       if (!mounted) return;
-      setState(
-        () => _error = e.isNetwork
-            ? 'Cannot reach the garage server. Check your connection and try again.'
-            : e.message,
-      );
+      setState(() => _error = e.isNetwork
+          ? 'Cannot reach the garage server. Check your connection and try again.'
+          : e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -72,67 +59,47 @@ class _GaragePinLoginScreenState extends State<GaragePinLoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AuthScaffold(
-      showBack: true,
-      onBack: () => context.go(RouteNames.login),
-      title: 'Garage PIN',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 12),
-          Text(
-            'Sign in with garage PIN',
-            style: Theme.of(context).textTheme.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Use your employee code and the 4-digit PIN from your garage.',
-            style: TextStyle(color: BronzeColors.creamMuted),
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _code,
-            textInputAction: TextInputAction.next,
-            decoration: BronzeInputs.decoration(
-              labelText: 'Employee code',
-              hintText: 'EMP-001',
-              prefixIcon: const Icon(Icons.badge_outlined),
+    return Scaffold(
+      appBar: AppBar(title: const Text('Garage PIN sign-in')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          children: [
+            Text('Sign in to your garage', style: AppText.title),
+            const SizedBox(height: 6),
+            Text('Use the employee code and PIN from your workshop manager. Your jobs, approvals and SOS alerts load live.',
+                style: AppText.body),
+            const SizedBox(height: 20),
+            Text('Employee code or phone', style: AppText.label),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _code,
+              textCapitalization: TextCapitalization.characters,
+              decoration: const InputDecoration(hintText: 'Employee code'),
             ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _pin,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _signIn(),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(4),
+            const SizedBox(height: 14),
+            Text('PIN', style: AppText.label),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _pin,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: const InputDecoration(hintText: '4 digits', counterText: ''),
+              onSubmitted: (_) => _signIn(),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(_error!, style: AppText.caption.copyWith(color: AppColors.danger)),
             ],
-            decoration: BronzeInputs.decoration(
-              labelText: 'PIN',
-              hintText: '••••',
-              prefixIcon: const Icon(Icons.pin_outlined),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _loading ? null : _signIn,
+              child: Text(_loading ? 'Signing in…' : 'Sign in'),
             ),
-          ),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: BronzeColors.danger)),
           ],
-          const Spacer(),
-          ElevatedButton(
-            style: BronzeButtons.elevated,
-            onPressed: _loading ? null : _signIn,
-            child: _loading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
-                  )
-                : const Text('Sign in'),
-          ),
-        ],
+        ),
       ),
     );
   }

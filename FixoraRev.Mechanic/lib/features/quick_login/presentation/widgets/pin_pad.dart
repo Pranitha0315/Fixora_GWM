@@ -1,112 +1,147 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../app/theme/bronze_colors.dart';
+import '../../../../app/theme/app_colors.dart';
 
-/// Numeric PIN pad — digits + backspace.
+/// Four dots that fill as the PIN is typed. Shakes when [error] is set.
+class PinDots extends StatelessWidget {
+  const PinDots({super.key, required this.length, required this.filled, this.error = false});
+
+  final int length;
+  final int filled;
+  final bool error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: '$filled of $length digits entered',
+      child: TweenAnimationBuilder<double>(
+        key: ValueKey(error),
+        tween: Tween(begin: error ? 1 : 0, end: 0),
+        duration: const Duration(milliseconds: 420),
+        builder: (_, t, child) => Transform.translate(
+          offset: Offset(error ? math.sin(t * math.pi * 6) * 10 * t : 0, 0),
+          child: child,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            for (var i = 0; i < length; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                width: 54,
+                height: 58,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: error ? AppColors.dangerBright : (i == filled ? AppColors.primaryStrong : Colors.transparent),
+                    width: 2,
+                  ),
+                  boxShadow: AppColors.cardShadow,
+                ),
+                child: AnimatedScale(
+                  scale: i < filled ? 1 : 0,
+                  duration: const Duration(milliseconds: 150),
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: error ? AppColors.dangerBright : AppColors.primaryStrong,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Keypad on a white card: big cream keys (easy with gloves), delete key bottom right.
 class PinPad extends StatelessWidget {
   const PinPad({
     super.key,
     required this.onDigit,
     required this.onBackspace,
+    this.compact = false,
   });
 
   final ValueChanged<String> onDigit;
   final VoidCallback onBackspace;
 
-  @override
-  Widget build(BuildContext context) {
-    Widget key(String label, {VoidCallback? onTap, IconData? icon}) {
-      return Expanded(
-        child: Padding(
-          padding: const EdgeInsets.all(6),
-          child: Material(
-            color: BronzeColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () {
-                HapticFeedback.selectionClick();
-                onTap?.call();
-              },
-              child: SizedBox(
-                height: 64,
-                child: Center(
-                  child: icon != null
-                      ? Icon(icon, color: BronzeColors.cream)
-                      : Text(
-                          label,
-                          style: Theme.of(context).textTheme.headlineMedium,
-                        ),
+  /// Shorter keys for short screens so the pad fits without overflow.
+  final bool compact;
+
+  Widget _key({String? digit, IconData? icon, VoidCallback? onTap, String? label}) {
+    final keyH = compact ? 52.0 : 60.0;
+    return Expanded(
+      child: Padding(
+        padding: EdgeInsets.all(compact ? 3 : 4),
+        child: onTap == null
+            ? SizedBox(height: keyH)
+            : Semantics(
+                button: true,
+                label: label ?? digit,
+                excludeSemantics: true,
+                child: Material(
+                  color: digit != null ? AppColors.surfaceAlt : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onTap();
+                    },
+                    child: SizedBox(
+                      height: keyH,
+                      child: Center(
+                        child: digit != null
+                            ? Text(digit,
+                                style: TextStyle(
+                                  fontSize: compact ? 22 : 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.ink,
+                                ))
+                            : Icon(icon, size: compact ? 24 : 26, color: AppColors.ink),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        Row(children: [
-          key('1', onTap: () => onDigit('1')),
-          key('2', onTap: () => onDigit('2')),
-          key('3', onTap: () => onDigit('3')),
-        ]),
-        Row(children: [
-          key('4', onTap: () => onDigit('4')),
-          key('5', onTap: () => onDigit('5')),
-          key('6', onTap: () => onDigit('6')),
-        ]),
-        Row(children: [
-          key('7', onTap: () => onDigit('7')),
-          key('8', onTap: () => onDigit('8')),
-          key('9', onTap: () => onDigit('9')),
-        ]),
-        Row(children: [
-          const Expanded(child: SizedBox(height: 64)),
-          key('0', onTap: () => onDigit('0')),
-          key('', icon: Icons.backspace_outlined, onTap: onBackspace),
-        ]),
-      ],
+      ),
     );
   }
-}
-
-class PinDots extends StatelessWidget {
-  const PinDots({
-    super.key,
-    required this.length,
-    this.max = 4,
-    this.error = false,
-  });
-
-  final int length;
-  final int max;
-  final bool error;
 
   @override
   Widget build(BuildContext context) {
-    final fill = error ? BronzeColors.danger : BronzeColors.bronze;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(max, (i) {
-        final on = i < length;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          margin: const EdgeInsets.symmetric(horizontal: 8),
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: on ? fill : Colors.transparent,
-            border: Border.all(
-              color: error ? BronzeColors.danger : BronzeColors.outline,
-              width: 1.5,
-            ),
-          ),
-        );
-      }),
+    Widget d(String n) => _key(digit: n, onTap: () => onDigit(n));
+    return Container(
+      padding: EdgeInsets.all(compact ? 8 : 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: AppColors.cardShadow,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [d('1'), d('2'), d('3')]),
+          Row(children: [d('4'), d('5'), d('6')]),
+          Row(children: [d('7'), d('8'), d('9')]),
+          Row(children: [
+            _key(),
+            d('0'),
+            _key(icon: Icons.backspace_outlined, onTap: onBackspace, label: 'Delete last digit'),
+          ]),
+        ],
+      ),
     );
   }
 }

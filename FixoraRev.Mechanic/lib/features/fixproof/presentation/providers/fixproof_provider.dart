@@ -1,100 +1,190 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../domain/inspection_issue.dart';
+import '../../../../core/mock/mock_data.dart';
+import '../../domain/entities/inspection_issue.dart';
+import '../../domain/entities/report_state.dart';
 
+export '../../domain/entities/report_state.dart';
+
+/// Capture state for one FixProof inspection session.
 class CaptureState {
   const CaptureState({
-    this.count = 0,
-    this.issues = const [],
-    this.aiDraft = '',
+    required this.media,
+    required this.voiceNotes,
+    required this.areas,
   });
 
-  final int count;
-  final List<InspectionIssue> issues;
-  final String aiDraft;
+  final List<CapturedMedia> media;
+  final List<VoiceNote> voiceNotes;
+  final Set<String> areas;
+
+  bool get canGenerate => media.isNotEmpty && voiceNotes.isNotEmpty;
 
   CaptureState copyWith({
-    int? count,
-    List<InspectionIssue>? issues,
-    String? aiDraft,
+    List<CapturedMedia>? media,
+    List<VoiceNote>? voiceNotes,
+    Set<String>? areas,
   }) {
     return CaptureState(
-      count: count ?? this.count,
-      issues: issues ?? this.issues,
-      aiDraft: aiDraft ?? this.aiDraft,
+      media: media ?? this.media,
+      voiceNotes: voiceNotes ?? this.voiceNotes,
+      areas: areas ?? this.areas,
     );
   }
 }
 
-class CaptureNotifier extends Notifier<Map<String, CaptureState>> {
-  @override
-  Map<String, CaptureState> build() => {};
+class CapturedMedia {
+  const CapturedMedia({required this.id, required this.label, required this.isVideo});
+  final String id;
+  final String label;
+  final bool isVideo;
+}
 
-  CaptureState stateFor(String jobId) =>
-      state[jobId] ?? const CaptureState();
+class VoiceNote {
+  const VoiceNote({required this.id, required this.seconds, this.transcript, this.sttReason});
+  final String id;
+  final int seconds;
 
-  void increment(String jobId) {
-    final current = stateFor(jobId);
-    state = {
-      ...state,
-      jobId: current.copyWith(count: current.count + 1),
-    };
-  }
+  /// Gemini transcript (Tamil/English) once the backend has answered.
+  final String? transcript;
 
-  void addManual(String jobId, InspectionIssue issue) {
-    final current = stateFor(jobId);
-    state = {
-      ...state,
-      jobId: current.copyWith(issues: [...current.issues, issue]),
-    };
-  }
+  /// Why there is no transcript (server off, STT disabled, unclear audio…).
+  final String? sttReason;
 
-  void removeIssue(String jobId, String issueId) {
-    final current = stateFor(jobId);
-    state = {
-      ...state,
-      jobId: current.copyWith(
-        issues: current.issues.where((i) => i.id != issueId).toList(),
-      ),
-    };
-  }
-
-  void setAiDraft(String jobId, String draft) {
-    final current = stateFor(jobId);
-    state = {...state, jobId: current.copyWith(aiDraft: draft)};
-  }
-
-  void generateAiDraft(String jobId) {
-    final current = stateFor(jobId);
-    if (current.issues.isEmpty) {
-      state = {
-        ...state,
-        jobId: current.copyWith(
-          aiDraft: 'No issues logged yet. Add inspection findings to draft a report.',
-        ),
-      };
-      return;
-    }
-    final buffer = StringBuffer('Inspection summary\n\n');
-    for (final issue in current.issues) {
-      buffer.writeln(
-        '• ${componentLabel(issue.component)} — ${issue.title} '
-        '(${issue.severity.label})',
-      );
-      if (issue.description.isNotEmpty) {
-        buffer.writeln('  ${issue.description}');
-      }
-    }
-    buffer.writeln('\nRecommended: review with customer before repair.');
-    state = {...state, jobId: current.copyWith(aiDraft: buffer.toString())};
-  }
-
-  void clear(String jobId) {
-    state = {...state, jobId: const CaptureState()};
+  String get duration {
+    final m = (seconds ~/ 60).toString();
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 }
 
-final captureProvider =
-    NotifierProvider<CaptureNotifier, Map<String, CaptureState>>(
-  CaptureNotifier.new,
-);
+class CaptureNotifier extends Notifier<CaptureState> {
+  int _counter = 3;
+
+  @override
+  CaptureState build() => const CaptureState(
+        media: [
+          CapturedMedia(id: 'm1', label: 'Front-left pad', isVideo: false),
+          CapturedMedia(id: 'm2', label: 'Disc surface', isVideo: false),
+          CapturedMedia(id: 'm3', label: 'Brake test', isVideo: true),
+        ],
+        voiceNotes: [],
+        areas: {'Brakes'},
+      );
+
+  void addMedia({required bool isVideo}) {
+    _counter++;
+    final label = isVideo ? 'Video $_counter' : 'Photo $_counter';
+    state = state.copyWith(
+      media: [...state.media, CapturedMedia(id: 'm$_counter', label: label, isVideo: isVideo)],
+    );
+  }
+
+  void removeMedia(String id) {
+    state = state.copyWith(media: state.media.where((m) => m.id != id).toList());
+  }
+
+  void addVoiceNote(int seconds) {
+    _counter++;
+    state = state.copyWith(
+      voiceNotes: [...state.voiceNotes, VoiceNote(id: 'v$_counter', seconds: seconds)],
+    );
+  }
+
+  /// Stores the speech-to-text result for one voice note (text or the reason it failed).
+  void setVoiceTranscript(String id, {String? text, String? reason}) {
+    state = state.copyWith(
+      voiceNotes: [
+        for (final v in state.voiceNotes)
+          v.id == id ? VoiceNote(id: v.id, seconds: v.seconds, transcript: text, sttReason: reason) : v,
+      ],
+    );
+  }
+
+  void removeVoiceNote(String id) {
+    state = state.copyWith(voiceNotes: state.voiceNotes.where((v) => v.id != id).toList());
+  }
+
+  void toggleArea(String area) {
+    final next = Set<String>.from(state.areas);
+    if (!next.remove(area)) next.add(area);
+    state = state.copyWith(areas: next);
+  }
+
+  void reset() => state = build();
+}
+
+final captureProvider = NotifierProvider<CaptureNotifier, CaptureState>(CaptureNotifier.new);
+
+/// AI-drafted issues the mechanic reviews, edits and verifies.
+class ReportDraftNotifier extends Notifier<List<InspectionIssue>> {
+  @override
+  List<InspectionIssue> build() => List<InspectionIssue>.from(MockData.issues);
+
+  void toggleVerified(String id) {
+    state = [
+      for (final i in state) i.id == id ? i.copyWith(verified: !i.verified) : i,
+    ];
+  }
+
+  void updateDetail(String id, {required bool tamil, required String text}) {
+    state = [
+      for (final i in state)
+        i.id == id
+            ? (tamil
+                ? i.copyWith(detailTa: text, verified: false)
+                : i.copyWith(detail: text, verified: false))
+            : i,
+    ];
+  }
+
+  void remove(String id) {
+    state = state.where((i) => i.id != id).toList();
+  }
+
+  /// Manual fallback when AI draft is empty or the mechanic adds an extra finding.
+  void addManual({
+    required String area,
+    required String title,
+    required String detail,
+    required IssueSeverity severity,
+  }) {
+    final id = 'manual-${DateTime.now().millisecondsSinceEpoch}';
+    state = [
+      ...state,
+      InspectionIssue(
+        id: id,
+        area: area,
+        title: title,
+        titleTa: title,
+        detail: detail,
+        detailTa: detail,
+        severity: severity,
+        evidenceLabels: const [],
+        verified: false,
+      ),
+    ];
+  }
+}
+
+final reportDraftProvider =
+    NotifierProvider<ReportDraftNotifier, List<InspectionIssue>>(ReportDraftNotifier.new);
+
+/// true = show report in Tamil.
+final reportTamilProvider = StateProvider<bool>((ref) => true);
+
+/// FixProof report state per job id.
+class ReportStateNotifier extends Notifier<Map<String, ReportState>> {
+  @override
+  Map<String, ReportState> build() => {
+        for (final e in MockData.reportStates.entries)
+          e.key: ReportState.values.firstWhere((s) => s.name == e.value),
+      };
+
+  ReportState of(String jobId) => state[jobId] ?? ReportState.notStarted;
+
+  void set(String jobId, ReportState value) => state = {...state, jobId: value};
+}
+
+final reportStateProvider =
+    NotifierProvider<ReportStateNotifier, Map<String, ReportState>>(ReportStateNotifier.new);

@@ -1,87 +1,45 @@
 import 'package:flutter/foundation.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../app/router/app_router.dart';
 import '../../app/router/route_names.dart';
-import '../../features/notifications/presentation/notifications_controller.dart';
-import '../di/app_services.dart';
 
-/// Local FCM payload router (no firebase_messaging dependency).
+/// FCM-ready push handler.
+/// Wire `firebase_messaging` here for production; demo routes by payload type.
 class FcmNotificationService {
   FcmNotificationService._();
+  static final instance = FcmNotificationService._();
 
-  static final FcmNotificationService instance = FcmNotificationService._();
+  bool _initialized = false;
+  int badgeCount = 0;
+  final ValueNotifier<int> badge = ValueNotifier(0);
 
-  bool _inited = false;
-
-  Future<void> init() async {
-    if (_inited) return;
-    _inited = true;
-    AppServices.notifications.addListener(_onBadgeRefresh);
-    _onBadgeRefresh();
+  Future<void> initialize() async {
+    if (_initialized) return;
+    _initialized = true;
+    // Production: FirebaseMessaging.instance.requestPermission / onMessage / onMessageOpenedApp
+    debugPrint('FcmNotificationService ready (demo routing enabled)');
   }
 
-  void _onBadgeRefresh() {
-    debugPrint(
-      'FCM badge sync: ${AppServices.notifications.unread} unread',
-    );
-  }
+  void handlePayload(Map<String, dynamic> data) {
+    final type = (data['type'] as String?) ?? '';
+    badgeCount++;
+    badge.value = badgeCount;
 
-  /// Route push data / tap targets from a simulated FCM payload map.
-  void handlePayload(Map<String, String> data) {
-    final type = data['type'] ?? data['event'] ?? '';
-    final jobId = data['job_id'] ?? data['jobId'];
-    final requestId = data['request_id'] ?? data['requestId'] ?? data['sos_id'];
-    final title = data['title'] ?? _titleFor(type);
-    final body = data['body'] ?? data['message'] ?? '';
-
-    AppServices.notifications.push(
-      AppNotification(
-        id: data['id'] ?? 'fcm-${DateTime.now().millisecondsSinceEpoch}',
-        title: title,
-        body: body.isNotEmpty ? body : 'Tap to open',
-        type: type.isEmpty ? null : type,
-        route: _routeFor(type, jobId: jobId, requestId: requestId),
-      ),
-    );
-
-    final ctx = AppRouter.rootNavigatorKey.currentContext;
-    if (ctx == null || !ctx.mounted) return;
-    final route = _routeFor(type, jobId: jobId, requestId: requestId);
-    if (route != null) ctx.push(route);
-  }
-
-  String? _routeFor(
-    String type, {
-    String? jobId,
-    String? requestId,
-  }) {
-    final t = type.toLowerCase();
-    if (t.contains('approval') || t.contains('proposal')) {
-      if (jobId != null && jobId.isNotEmpty) {
-        return RouteNames.repairProposalPath(jobId);
-      }
+    if (type.contains('approval') || type.contains('proposal')) {
+      final jobId = data['jobId'] as String? ?? '';
+      AppRouter.router.push(RouteNames.repairProposal, extra: jobId);
+      return;
     }
-    if (t.contains('sos') && requestId != null && requestId.isNotEmpty) {
-      return RouteNames.sosDetailPath(requestId);
+    if (type.contains('sos')) {
+      final id = data['sosId'] as String? ?? data['id'] as String? ?? '';
+      AppRouter.router.push(RouteNames.sosDetail, extra: id);
+      return;
     }
-    if (t.contains('job') && jobId != null && jobId.isNotEmpty) {
-      return RouteNames.jobDetailsPath(jobId);
-    }
-    return null;
+    AppRouter.router.push(RouteNames.notifications);
   }
 
-  String _titleFor(String type) {
-    final t = type.toLowerCase();
-    if (t.contains('approval')) return 'Customer approved';
-    if (t.contains('proposal')) return 'Proposal update';
-    if (t.contains('sos')) return 'SOS alert';
-    if (t.contains('job')) return 'Job update';
-    return 'Fixora alert';
-  }
-
-  void dispose() {
-    AppServices.notifications.removeListener(_onBadgeRefresh);
-    _inited = false;
+  void clearBadge() {
+    badgeCount = 0;
+    badge.value = 0;
   }
 }

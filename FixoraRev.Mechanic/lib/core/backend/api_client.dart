@@ -1,54 +1,99 @@
-import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../storage/secure_storage.dart';
 import 'fixora_config.dart';
-import 'session.dart';
 
-/// JSON client for /api/v1 using Dio.
-/// Short-lived JWT + rotating refresh token, refreshed once on 401.
-/// Tokens are stored with [FlutterSecureStorage] (Keychain / Keystore).
+/// Error from the shared ApiErrorResponse contract (status, code, message, correlationId).
+class ApiException implements Exception {
+  ApiException(this.status, this.code, this.message);
+
+  /// 0 = the server could not be reached (no network, wrong address, server down).
+  final int status;
+  final String code;
+  final String message;
+
+  bool get isNetwork => status == 0;
+  bool get isConflict => status == 409;
+
+  @override
+  String toString() => message;
+}
+
+/// Tokens returned by every login endpoint (AuthTokens on the backend).
+class Session {
+  Session({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.accessTokenExpiresAt,
+    required this.userId,
+    required this.role,
+    required this.name,
+  });
+
+  final String accessToken;
+  final String refreshToken;
+  final DateTime accessTokenExpiresAt;
+  final String userId;
+  final String role;
+  final String name;
+
+  factory Session.fromJson(Map<String, dynamic> j) => Session(
+        accessToken: j['accessToken'] as String,
+        refreshToken: j['refreshToken'] as String,
+        accessTokenExpiresAt: DateTime.parse(j['accessTokenExpiresAt'] as String),
+        userId: j['userId'] as String,
+        role: j['role'] as String,
+        name: (j['name'] as String?) ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'accessToken': accessToken,
+        'refreshToken': refreshToken,
+        'accessTokenExpiresAt': accessTokenExpiresAt.toIso8601String(),
+        'userId': userId,
+        'role': role,
+        'name': name,
+      };
+}
+
+/// JSON client for /api/v1 using Dio + flutter_secure_storage for JWT session.
 class ApiClient {
-  ApiClient(this._storageKey, {FlutterSecureStorage? secureStorage, Dio? dio})
-      : _secure = secureStorage ?? const FlutterSecureStorage(),
+  ApiClient(this._storageKey, {SecureStorage? storage, Dio? dio})
+      : _storage = storage ?? SecureStorage(),
         _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: FixoraConfig.apiBase,
-                connectTimeout: _timeout,
-                receiveTimeout: _timeout,
+                baseUrl: '${FixoraConfig.apiBase}/api/v1',
+                connectTimeout: const Duration(seconds: 15),
+                receiveTimeout: const Duration(seconds: 15),
                 headers: {'Accept': 'application/json'},
               ),
             );
 
   final String _storageKey;
-  final FlutterSecureStorage _secure;
+  final SecureStorage _storage;
   final Dio _dio;
-
   Session? session;
   Future<String?>? _refreshing;
 
-  bool get signedIn => session != null;
   Dio get dio => _dio;
+  bool get signedIn => session != null;
 
-  static const _timeout = Duration(seconds: 20);
+  static final Random _rnd = Random.secure();
+
+  /// Client-generated key that makes a repeated write safe (approvals, SOS, bookings).
+  static String newIdempotencyKey() {
+    String hex(int n) => List.generate(n, (_) => _rnd.nextInt(16).toRadixString(16)).join();
+    return '${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}';
+  }
 
   Future<void> restore() async {
+    final raw = await _storage.readMigratingFromPrefs(_storageKey);
+    if (raw == null) return;
     try {
-      var raw = await _secure.read(key: _storageKey);
-      // One-time migrate from older SharedPreferences demo storage.
-      if (raw == null) {
-        final prefs = await SharedPreferences.getInstance();
-        raw = prefs.getString(_storageKey);
-        if (raw != null) {
-          await _secure.write(key: _storageKey, value: raw);
-          await prefs.remove(_storageKey);
-        }
-      }
-      if (raw == null) return;
       session = Session.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       session = null;
@@ -57,38 +102,96 @@ class ApiClient {
 
   Future<void> saveSession(Map<String, dynamic> tokens) async {
     session = Session.fromJson(tokens);
-    await _secure.write(
-      key: _storageKey,
-      value: jsonEncode(session!.toJson()),
-    );
+    await _storage.write(_storageKey, jsonEncode(session!.toJson()));
   }
 
   Future<void> clear() async {
     session = null;
-    await _secure.delete(key: _storageKey);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_storageKey);
+    await _storage.delete(_storageKey);
   }
 
-  Future<dynamic> get(String path, {Map<String, String?>? query}) =>
-      _send('GET', path, query: query);
+  /// A token that is valid for at least another minute (refreshing first when needed).
+  Future<String?> freshToken() async {
+    final s = session;
+    if (s == null) return null;
+    if (s.accessTokenExpiresAt.difference(DateTime.now().toUtc()).inSeconds > 60) return s.accessToken;
+    return refresh();
+  }
 
-  Future<dynamic> post(
-    String path, {
-    Object? body,
-    Map<String, String>? headers,
-  }) =>
-      _send(
+  Future<String?> refresh() {
+    final s = session;
+    if (s == null) return Future<String?>.value(null);
+    return _refreshing ??= _doRefresh(s.refreshToken);
+  }
+
+  Future<String?> _doRefresh(String refreshToken) async {
+    try {
+      final j = await _send(
         'POST',
-        path,
-        body: body ?? const <String, dynamic>{},
-        headers: headers,
+        '/auth/refresh',
+        body: {'refreshToken': refreshToken},
+        retry: false,
+        auth: false,
       );
+      await saveSession(j as Map<String, dynamic>);
+      return session!.accessToken;
+    } catch (_) {
+      await clear();
+      return null;
+    } finally {
+      _refreshing = null;
+    }
+  }
 
-  Future<dynamic> put(String path, {Object? body}) =>
-      _send('PUT', path, body: body ?? const <String, dynamic>{});
+  Future<void> logout() async {
+    final s = session;
+    if (s != null) {
+      try {
+        await _send(
+          'POST',
+          '/auth/logout',
+          body: {'refreshToken': s.refreshToken},
+          retry: false,
+          auth: false,
+        );
+      } catch (_) {}
+    }
+    await clear();
+  }
+
+  Future<dynamic> get(String path, {Map<String, String?>? query}) => _send('GET', path, query: query);
+
+  Future<dynamic> post(String path, {Object? body, Map<String, String>? headers}) =>
+      _send('POST', path, body: body ?? const <String, dynamic>{}, headers: headers);
+
+  /// Multipart upload (one binary file + text fields), e.g. a voice note for speech-to-text.
+  Future<dynamic> postFile(
+    String path, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+    Map<String, String> fields = const {},
+  }) {
+    final form = FormData.fromMap({
+      ...fields,
+      field: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType)),
+    });
+    return _send('POST', path, body: form);
+  }
+
+  Future<dynamic> put(String path, {Object? body}) => _send('PUT', path, body: body ?? const <String, dynamic>{});
 
   Future<dynamic> delete(String path) => _send('DELETE', path);
+
+  Map<String, dynamic>? _query(Map<String, String?>? query) {
+    if (query == null) return null;
+    final q = <String, dynamic>{};
+    query.forEach((k, v) {
+      if (v != null && v.isNotEmpty) q[k] = v;
+    });
+    return q.isEmpty ? null : q;
+  }
 
   Future<dynamic> _send(
     String method,
@@ -99,160 +202,72 @@ class ApiClient {
     bool retry = true,
     bool auth = true,
   }) async {
-    final normalized = path.startsWith('/') ? path : '/$path';
-    final options = Options(
+    final opts = Options(
       method: method,
-      headers: {
-        ...?headers,
-        if (body != null) 'Content-Type': 'application/json',
+      headers: <String, dynamic>{
+        if (headers != null) ...headers,
+        if (auth && session?.accessToken != null) 'Authorization': 'Bearer ${session!.accessToken}',
       },
     );
 
-    final token = session?.accessToken;
-    if (auth && token != null && token.isNotEmpty) {
-      options.headers = {
-        ...?options.headers,
-        'Authorization': 'Bearer $token',
-      };
-    }
-
-    final queryParameters = query == null
-        ? null
-        : <String, dynamic>{
-            for (final e in query.entries)
-              if (e.value != null) e.key: e.value!,
-          };
-
     try {
-      final response = await _dio.request<dynamic>(
-        normalized,
+      final res = await _dio.request<dynamic>(
+        path,
         data: body,
-        queryParameters: queryParameters,
-        options: options,
+        queryParameters: _query(query),
+        options: opts,
       );
-      return response.data;
+
+      if (res.statusCode == 401 && retry && auth && session != null) {
+        final fresh = await refresh();
+        if (fresh != null) {
+          return await _send(method, path, body: body, query: query, headers: headers, retry: false);
+        }
+      }
+
+      final status = res.statusCode ?? 0;
+      if (status >= 400) {
+        throw _fromBody(status, res.data);
+      }
+      return res.data;
+    } on ApiException {
+      rethrow;
     } on DioException catch (e) {
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.sendTimeout ||
-          e.type == DioExceptionType.receiveTimeout) {
-        throw ApiException('Request timed out', code: 'timeout', cause: e);
-      }
-      if (e.type == DioExceptionType.connectionError) {
-        throw ApiException(
-          e.message ?? 'Connection error',
-          code: 'connection_error',
-          cause: e,
-        );
-      }
-
-      final status = e.response?.statusCode;
-      if (status == 401 && auth && retry) {
-        final refreshed = await _refreshAccessToken();
-        if (refreshed) {
-          return _send(
-            method,
-            path,
-            body: body,
-            query: query,
-            headers: headers,
-            retry: false,
-            auth: auth,
-          );
+      if (e.response?.statusCode == 401 && retry && auth && session != null) {
+        final fresh = await refresh();
+        if (fresh != null) {
+          return await _send(method, path, body: body, query: query, headers: headers, retry: false);
         }
-        await clear();
-        throw ApiException(
-          'Session expired. Please sign in again.',
-          code: 'unauthorized',
-          statusCode: 401,
-        );
       }
-
-      throw _fromDio(e);
+      throw _mapDio(e);
     }
   }
 
-  /// Refresh access token; returns new access token or null.
-  Future<String?> refresh() async {
-    if (session?.refreshToken == null || session!.refreshToken.isEmpty) {
-      return session?.accessToken;
+  ApiException _mapDio(DioException e) {
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
+      return ApiException(0, 'timeout', 'The garage server did not answer in time. Check your connection.');
     }
-    final ok = await _refreshAccessToken();
-    return ok ? session?.accessToken : null;
+    if (e.type == DioExceptionType.connectionError) {
+      return ApiException(0, 'network', 'Cannot reach the Fixora server. Check your connection.');
+    }
+    final status = e.response?.statusCode ?? 0;
+    if (status >= 400) return _fromBody(status, e.response?.data);
+    return ApiException(0, 'network', 'Cannot reach the Fixora server. Check your connection.');
   }
 
-  Future<bool> _refreshAccessToken() async {
-    final existing = _refreshing;
-    if (existing != null) {
-      final token = await existing;
-      return token != null && token.isNotEmpty;
-    }
-
-    final refresh = session?.refreshToken;
-    if (refresh == null || refresh.isEmpty) return false;
-
-    _refreshing = () async {
-      try {
-        final raw = await _send(
-          'POST',
-          '/auth/refresh',
-          body: {'refreshToken': refresh},
-          retry: false,
-          auth: false,
-        );
-        if (raw is Map<String, dynamic>) {
-          await saveSession(raw);
-          return session?.accessToken;
-        }
-      } catch (_) {
-        return null;
-      } finally {
-        _refreshing = null;
+  ApiException _fromBody(int status, dynamic data) {
+    var code = 'error';
+    var message = 'Something went wrong ($status).';
+    if (data is Map) {
+      code = (data['code'] ?? code).toString();
+      message = (data['message'] ?? message).toString();
+      final errors = data['errors'];
+      if (errors is Map && errors.isNotEmpty) {
+        message = errors.values.expand((v) => v is List ? v : [v]).map((e) => e.toString()).join(' ');
       }
-      return null;
-    }();
-
-    final token = await _refreshing;
-    return token != null && token.isNotEmpty;
+    }
+    return ApiException(status, code, message);
   }
-
-  ApiException _fromDio(DioException e) {
-    final status = e.response?.statusCode;
-    final data = e.response?.data;
-    final message = data is Map && data['message'] is String
-        ? data['message'] as String
-        : e.message ?? 'Request failed (${status ?? 'network'})';
-    return ApiException(
-      message,
-      statusCode: status,
-      code: status != null ? 'http_$status' : 'dio_error',
-      cause: data ?? e,
-    );
-  }
-
-  void close() => _dio.close(force: true);
-}
-
-class ApiException implements Exception {
-  ApiException(
-    this.message, {
-    this.statusCode,
-    this.code,
-    this.cause,
-  });
-
-  final String message;
-  final int? statusCode;
-  final String? code;
-  final Object? cause;
-
-  int? get status => statusCode;
-
-  bool get isNetwork =>
-      code == 'timeout' ||
-      code == 'connection_error' ||
-      (code == 'dio_error' && statusCode == null);
-
-  @override
-  String toString() =>
-      'ApiException(code: $code, statusCode: $statusCode, message: $message)';
 }

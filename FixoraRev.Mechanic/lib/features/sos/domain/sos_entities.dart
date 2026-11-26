@@ -1,134 +1,81 @@
-/// Roadside / breakdown severity.
-enum SosSeverity {
-  low,
-  medium,
-  high,
-  critical;
+import '../../jobs/domain/job_entities.dart';
 
-  String get label => switch (this) {
-        SosSeverity.low => 'Low',
-        SosSeverity.medium => 'Medium',
-        SosSeverity.high => 'High',
-        SosSeverity.critical => 'Critical',
-      };
-}
-
-/// Lifecycle of an SOS request.
 enum SosStatus {
   pending,
-  assigned,
   accepted,
   enRoute,
-  onScene,
-  resolved,
-  cancelled;
+  arrived,
+  converted,
+  resolvedOnSite,
+  declined
+}
 
+extension SosStatusX on SosStatus {
   String get label => switch (this) {
-        SosStatus.pending => 'Pending',
-        SosStatus.assigned => 'Assigned',
+        SosStatus.pending => 'New request',
         SosStatus.accepted => 'Accepted',
-        SosStatus.enRoute => 'En route',
-        SosStatus.onScene => 'On scene',
-        SosStatus.resolved => 'Resolved',
-        SosStatus.cancelled => 'Cancelled',
+        SosStatus.enRoute => 'On the way',
+        SosStatus.arrived => 'Arrived',
+        SosStatus.converted => 'Added to queue',
+        SosStatus.resolvedOnSite => 'Fixed on the spot',
+        SosStatus.declined => 'Declined',
       };
-
-  bool get isOpen =>
-      this != SosStatus.resolved && this != SosStatus.cancelled;
 }
 
-class SosPermissionDenied implements Exception {
-  SosPermissionDenied(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
-}
+/// How the request reached the garage (BRD USP 2).
+enum SosChannel { online, bleRelay }
 
 class SosRequest {
-  const SosRequest({
+  SosRequest({
     required this.id,
-    required this.customerName,
-    required this.vehicleReg,
-    required this.location,
-    required this.severity,
-    required this.status,
-    this.assignedMechanicId,
-    this.summary = '',
-    this.createdAt,
+    required this.customer,
+    required this.vehicle,
+    required this.issue,
+    required this.locationLabel,
+    required this.distanceKm,
+    required this.channel,
+    required this.receivedAt,
+    this.hops = 0,
+    this.status = SosStatus.pending,
+    this.etaMinutes = 14,
+    this.jobId,
+    this.lat,
+    this.lng,
   });
 
   final String id;
-  final String customerName;
-  final String vehicleReg;
-  final String location;
-  final SosSeverity severity;
-  final SosStatus status;
-  final String? assignedMechanicId;
-  final String summary;
-  final DateTime? createdAt;
+  final Customer customer;
+  final Vehicle vehicle;
+  final String issue;
+  final String locationLabel;
+  final double distanceKm;
+  final SosChannel channel;
+  final DateTime receivedAt;
+  final int hops;
+  SosStatus status;
+  int etaMinutes;
+  String? jobId;
+  final double? lat;
+  final double? lng;
 
-  SosRequest copyWith({
-    SosStatus? status,
-    String? assignedMechanicId,
-  }) {
-    return SosRequest(
-      id: id,
-      customerName: customerName,
-      vehicleReg: vehicleReg,
-      location: location,
-      severity: severity,
-      status: status ?? this.status,
-      assignedMechanicId: assignedMechanicId ?? this.assignedMechanicId,
-      summary: summary,
-      createdAt: createdAt,
-    );
+  bool get hasLocation => lat != null && lng != null;
+
+  /// Assigned mechanic id from backend (null = open pool).
+  String? assignedMechanicId;
+
+  bool get isOpen =>
+      status != SosStatus.converted &&
+      status != SosStatus.declined &&
+      status != SosStatus.resolvedOnSite;
+
+  /// Only the assigned mechanic (or unassigned pool) may act.
+  bool canMechanicAct(String? mechanicId) {
+    if (assignedMechanicId == null || assignedMechanicId!.isEmpty) return true;
+    if (mechanicId == null || mechanicId.isEmpty) return false;
+    return assignedMechanicId == mechanicId;
   }
 
-  factory SosRequest.fromJson(Map<String, dynamic> json) {
-    return SosRequest(
-      id: (json['id'] ?? '').toString(),
-      customerName: (json['customer_name'] ?? json['customerName'] ?? '')
-          .toString(),
-      vehicleReg: (json['vehicle_reg'] ?? json['vehicleReg'] ?? '').toString(),
-      location: (json['location'] ?? '').toString(),
-      severity: _severityFrom(json['severity']),
-      status: _statusFrom(json['status']),
-      assignedMechanicId:
-          (json['assigned_mechanic_id'] ?? json['assignedMechanicId'])
-              ?.toString(),
-      summary: (json['summary'] ?? '').toString(),
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
-          : null,
-    );
-  }
-
-  static SosSeverity _severityFrom(Object? raw) {
-    final s = raw?.toString().toLowerCase() ?? '';
-    return SosSeverity.values.firstWhere(
-      (e) => e.name == s,
-      orElse: () => SosSeverity.medium,
-    );
-  }
-
-  static SosStatus _statusFrom(Object? raw) {
-    final s = raw?.toString().toLowerCase() ?? '';
-    return SosStatus.values.firstWhere(
-      (e) => e.name == s.replaceAll(' ', ''),
-      orElse: () => SosStatus.pending,
-    );
-  }
-}
-
-/// Whether the signed-in mechanic may act on this request.
-bool canMechanicAct(SosRequest request, String? mechanicId) {
-  if (mechanicId == null || mechanicId.isEmpty) return false;
-  if (!request.status.isOpen) return false;
-  if (request.assignedMechanicId == null ||
-      request.assignedMechanicId!.isEmpty) {
-    return false;
-  }
-  return request.assignedMechanicId == mechanicId;
+  String get channelLabel => channel == SosChannel.online
+      ? 'Online (mobile data)'
+      : 'Offline BLE relay · $hops hop${hops == 1 ? '' : 's'}';
 }

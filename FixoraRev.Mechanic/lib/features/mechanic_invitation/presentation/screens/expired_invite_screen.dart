@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../app/theme/bronze_buttons.dart';
-import '../../../../app/theme/bronze_colors.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_typography.dart';
+import '../../../../core/utils/nav.dart';
+import '../../../../core/widgets/buttons.dart';
 import '../../../auth/presentation/widgets/auth_scaffold.dart';
 
 /// Shown when a manager's 7-day invitation link is expired or already used.
@@ -20,39 +21,47 @@ class ExpiredInviteScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AuthScaffold(
       showBack: true,
-      onBack: () => context.go(RouteNames.login),
+      onBack: () => context.goRoute(RouteNames.login),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 24),
-          const Icon(
-            Icons.link_off_rounded,
-            size: 64,
-            color: BronzeColors.warning,
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.dangerSoft,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Icon(Icons.link_off_rounded, color: AppColors.danger, size: 32),
+            ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
+          Text('Invitation expired', style: AppText.title),
+          const SizedBox(height: 8),
+          Text(message, style: AppText.body),
+          const SizedBox(height: 10),
           Text(
-            'Invitation expired',
-            style: Theme.of(context).textTheme.headlineMedium,
+            'Manager invitations stay valid for 7 days. After that you need a fresh link.',
+            style: AppText.caption,
+          ),
+          const SizedBox(height: 28),
+          PrimaryButton(
+            label: 'Back to sign in',
+            icon: Icons.login_rounded,
+            onPressed: () => context.goRoute(RouteNames.login),
           ),
           const SizedBox(height: 12),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: BronzeColors.creamMuted,
-                ),
-          ),
-          const Spacer(),
-          ElevatedButton(
-            style: BronzeButtons.elevated,
-            onPressed: () => context.go(RouteNames.login),
-            child: const Text('Back to sign in'),
-          ),
-          const SizedBox(height: 10),
           OutlinedButton(
-            style: BronzeButtons.outlined,
-            onPressed: () => context.push(RouteNames.register),
-            child: const Text('Create account'),
+            onPressed: () => context.pushRoute(RouteNames.register),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              foregroundColor: AppColors.primaryStrong,
+              side: BorderSide(color: AppColors.primaryBorder),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Create account instead'),
           ),
         ],
       ),

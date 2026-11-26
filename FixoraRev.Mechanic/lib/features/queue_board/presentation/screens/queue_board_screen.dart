@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/backend/mechanic_backend.dart';
 import '../../../../core/di/app_services.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/nav.dart';
+import '../../../../core/widgets/rev_common.dart' show EmptyState;
+import '../../../../core/widgets/rev_ui.dart';
+import '../../../home/presentation/screens/home_screen.dart' show showJobQuickActions;
+import '../../../inventory/domain/part.dart';
 import '../../../jobs/domain/job_entities.dart';
-import '../../data/queue_refresh.dart';
-import '../widgets/bay_job_card.dart';
+import '../../../jobs/presentation/screens/job_detail_screen.dart';
+import '../../../shell/presentation/main_shell.dart';
 
 /// Today queue board — search, status chips, bay cards.
 /// Pull-to-refresh + SignalR (`job*` / `queue*`) reload assignments after manager reassignment.
@@ -22,170 +27,321 @@ class QueueBoardScreen extends StatefulWidget {
 /// Alias so Jobs tab / older imports keep working.
 typedef QueueScreen = QueueBoardScreen;
 
+enum _Group { inProgress, upNext, completed }
+
 class _QueueBoardScreenState extends State<QueueBoardScreen> {
   final _search = TextEditingController();
-  JobStatus? _filter;
-
-  @override
-  void initState() {
-    super.initState();
-    AppServices.jobs.addListener(_onJobs);
-  }
+  int _chip = 0; // All · Pending · In progress · Review · Done
+  bool _sortByPriority = true;
 
   @override
   void dispose() {
-    AppServices.jobs.removeListener(_onJobs);
     _search.dispose();
     super.dispose();
   }
 
-  void _onJobs() {
-    if (mounted) setState(() {});
+  static bool _isPending(Job j) => j.status == JobStatus.waiting || j.status == JobStatus.approved;
+  static bool _isWorking(Job j) => j.status == JobStatus.diagnosing || j.status == JobStatus.inProgress;
+  static bool _isReview(Job j) => j.status == JobStatus.awaitingApproval || j.status == JobStatus.qualityCheck;
+
+  static _Group _groupOf(Job j) {
+    if (!j.status.isActive) return _Group.completed;
+    if (_isWorking(j)) return _Group.inProgress;
+    return _Group.upNext;
   }
 
-  bool _matches(Job j) {
+  bool _matchesChip(Job j) => switch (_chip) {
+        1 => _isPending(j),
+        2 => _isWorking(j),
+        3 => _isReview(j),
+        4 => !j.status.isActive,
+        _ => true,
+      };
+
+  bool _matchesSearch(Job j) {
     final q = _search.text.trim().toLowerCase();
-    if (_filter != null && j.status != _filter) return false;
     if (q.isEmpty) return true;
-    return j.vehicleReg.toLowerCase().contains(q) ||
-        j.summary.toLowerCase().contains(q) ||
-        j.token.toLowerCase().contains(q) ||
-        j.customerName.toLowerCase().contains(q) ||
-        (j.bay?.toLowerCase().contains(q) ?? false);
+    return j.id.toLowerCase().contains(q) ||
+        j.vehicle.plate.toLowerCase().contains(q) ||
+        j.vehicle.title.toLowerCase().contains(q) ||
+        j.customer.name.toLowerCase().contains(q) ||
+        j.serviceType.toLowerCase().contains(q);
   }
-
-  Future<void> _onRefresh() => QueueRefresh.pull();
 
   @override
   Widget build(BuildContext context) {
-    final ctrl = AppServices.jobs;
-    final all = [...ctrl.queue, ...ctrl.finished].where(_matches).toList();
-    final bayList =
-        all.where((j) => j.bay != null && j.bay!.isNotEmpty).toList()
-          ..sort((a, b) => (a.bay ?? '').compareTo(b.bay ?? ''));
-    final noBay = all.where((j) => j.bay == null || j.bay!.isEmpty).toList();
+    return ListenableBuilder(
+      listenable: Listenable.merge([AppServices.jobs, AppServices.notifications, MechanicBackend.instance]),
+      builder: (context, _) {
+        final ctrl = AppServices.jobs;
+        final all = [...ctrl.queue, ...ctrl.finished];
+        final counts = [
+          all.length,
+          all.where(_isPending).length,
+          all.where(_isWorking).length,
+          all.where(_isReview).length,
+          all.where((j) => !j.status.isActive).length,
+        ];
+        final visible = all.where((j) => _matchesChip(j) && _matchesSearch(j)).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        title: Text(widget.asTab ? 'Jobs' : 'Today queue'),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.ink,
-        automaticallyImplyLeading: !widget.asTab,
-      ),
-      body: RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _onRefresh,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        final upNext = visible.where((j) => _groupOf(j) == _Group.upNext).toList();
+        if (!_sortByPriority) {
+          upNext.sort((a, b) => a.slotTime.compareTo(b.slotTime));
+        }
+        final groups = <(_Group, String, List<Job>)>[
+          (_Group.inProgress, 'In progress', visible.where((j) => _groupOf(j) == _Group.inProgress).toList()),
+          (_Group.upNext, 'Up next', upNext),
+          (_Group.completed, 'Completed', visible.where((j) => _groupOf(j) == _Group.completed).toList()),
+        ];
+
+        final page = RevTabPage(
+          title: 'My jobs',
+          subtitle: '${all.length} jobs today · live queue',
+          action: widget.asTab
+              ? RevBell(
+                  unread: AppServices.notifications.unread,
+                  onTap: () => MainShell.openAlerts(context),
+                )
+              : null,
           children: [
+            const SizedBox(height: 16),
             TextField(
               controller: _search,
               onChanged: (_) => setState(() {}),
+              textInputAction: TextInputAction.search,
+              style: TextStyle(fontSize: 15, color: AppColors.ink),
               decoration: InputDecoration(
-                hintText: 'Search bay, reg, customer…',
-                prefixIcon: Icon(Icons.search, color: AppColors.body),
-                filled: true,
-                fillColor: AppColors.surfaceElevated,
-                border: OutlineInputBorder(
+                hintText: 'Search plate, vehicle or job no.',
+                prefixIcon: const Icon(Icons.search_rounded),
+                suffixIcon: _search.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.close_rounded),
+                        onPressed: () => setState(_search.clear),
+                      ),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide(color: AppColors.outline),
+                  borderSide: BorderSide(color: AppColors.border, width: 1.5),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: 'All',
-                    selected: _filter == null,
-                    onTap: () => setState(() => _filter = null),
-                  ),
-                  _FilterChip(
-                    label: 'Working',
-                    selected: _filter == JobStatus.inProgress,
-                    onTap: () =>
-                        setState(() => _filter = JobStatus.inProgress),
-                  ),
-                  _FilterChip(
-                    label: 'Waiting',
-                    selected: _filter == JobStatus.waiting,
-                    onTap: () => setState(() => _filter = JobStatus.waiting),
-                  ),
-                  _FilterChip(
-                    label: 'Review',
-                    selected: _filter == JobStatus.awaitingApproval,
-                    onTap: () => setState(
-                      () => _filter = JobStatus.awaitingApproval,
+            RevChipRow(
+              labels: [
+                'All ${counts[0]}',
+                'Pending ${counts[1]}',
+                'In progress ${counts[2]}',
+                'Review ${counts[3]}',
+                'Done ${counts[4]}',
+              ],
+              selected: _chip,
+              onSelected: (i) => setState(() => _chip = i),
+            ),
+            if (visible.isEmpty)
+              all.isEmpty
+                  ? EmptyState(
+                      icon: Icons.car_repair_outlined,
+                      title: 'No jobs in your queue',
+                      message: 'When the manager assigns you a car it shows up here straight away.',
+                      actionLabel: 'Refresh',
+                      actionIcon: Icons.refresh_rounded,
+                      onAction: MechanicBackend.instance.pullRefresh,
+                    )
+                  : EmptyState(
+                      icon: Icons.search_off_rounded,
+                      title: 'No jobs found',
+                      message: _search.text.isEmpty
+                          ? 'Nothing in this group right now.'
+                          : 'No job matches "${_search.text.trim()}".',
+                      actionLabel: 'Clear filters',
+                      actionIcon: Icons.filter_alt_off_rounded,
+                      onAction: () => setState(() {
+                        _search.clear();
+                        _chip = 0;
+                      }),
                     ),
-                  ),
-                  _FilterChip(
-                    label: 'Done',
-                    selected: _filter == JobStatus.completed,
-                    onTap: () =>
-                        setState(() => _filter = JobStatus.completed),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '${all.length} jobs · ${bayList.length} on bay',
-              style: TextStyle(color: AppColors.body, fontSize: 12),
-            ),
-            if (bayList.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              Text(
-                'Bay cards',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
+            for (final (group, title, jobs) in groups)
+              if (jobs.isNotEmpty) ...[
+                RevSection(
+                  title,
+                  top: 18,
+                  action: group == _Group.upNext && jobs.length > 1
+                      ? (_sortByPriority ? 'Sort: priority' : 'Sort: time')
+                      : null,
+                  onAction: () => setState(() => _sortByPriority = !_sortByPriority),
                 ),
-              ),
-              const SizedBox(height: 10),
-              for (final job in bayList) ...[
-                BayJobCard(
-                  job: job,
-                  onTap: () =>
-                      context.push(RouteNames.jobDetailsPath(job.id)),
-                ),
-                const SizedBox(height: 10),
+                for (final j in jobs) BayJobRowCard(job: j),
               ],
-            ],
-            if (noBay.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text('Press and hold a job for quick actions · pull down to refresh.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+            const SizedBox(height: 2),
+            Text('Times are estimates from the workshop queue and can change.',
+                textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
+          ],
+        );
+
+        final refreshable = RefreshIndicator(
+          color: AppColors.primaryStrong,
+          edgeOffset: MediaQuery.paddingOf(context).top,
+          onRefresh: MechanicBackend.instance.pullRefresh,
+          child: page,
+        );
+        if (widget.asTab) return refreshable;
+        return Scaffold(
+          body: refreshable,
+          floatingActionButton: FloatingActionButton.small(
+            tooltip: 'Back',
+            onPressed: () => Navigator.of(context).maybePop(),
+            child: const Icon(Icons.arrow_back_rounded),
+          ),
+          floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
+        );
+      },
+    );
+  }
+}
+
+/// Bay card used on the today queue board.
+class BayJobRowCard extends StatelessWidget {
+  const BayJobRowCard({super.key, required this.job});
+  final Job job;
+
+  static RevTone toneFor(JobStatus s) => switch (s) {
+        JobStatus.waiting || JobStatus.approved => RevTone.blue,
+        JobStatus.diagnosing || JobStatus.inProgress => RevTone.orange,
+        JobStatus.awaitingApproval || JobStatus.qualityCheck => RevTone.amber,
+        JobStatus.completed || JobStatus.parked => RevTone.green,
+      };
+
+  static String shortStatus(JobStatus s) => switch (s) {
+        JobStatus.waiting || JobStatus.approved => 'Pending',
+        JobStatus.diagnosing || JobStatus.inProgress => 'In progress',
+        JobStatus.awaitingApproval || JobStatus.qualityCheck => 'Review',
+        JobStatus.completed => 'Done',
+        JobStatus.parked => 'Parked',
+      };
+
+  String _timeLine(DateTime? eta) {
+    switch (job.status) {
+      case JobStatus.inProgress:
+        final pct = ((job.tasks.isEmpty ? job.status.progress : 0.5 + job.taskProgress * 0.4) * 100).round();
+        return job.startedAt != null ? 'Started ${Fmt.time(job.startedAt!)} · $pct%' : 'In progress · $pct%';
+      case JobStatus.diagnosing:
+        return 'Diagnosing now';
+      case JobStatus.awaitingApproval:
+        return 'Waiting for customer';
+      case JobStatus.qualityCheck:
+        return 'Quality check';
+      case JobStatus.completed:
+        return job.completedAt != null ? 'Finished ${Fmt.time(job.completedAt!)}' : 'Finished';
+      case JobStatus.parked:
+        return 'Parked in Evidence Passport';
+      case JobStatus.waiting:
+      case JobStatus.approved:
+        return eta != null ? 'ETA ${Fmt.time(eta)}' : 'Slot ${Fmt.time(job.slotTime)}';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final eta = AppServices.jobs.etaFor(job);
+    final hasPassport = AppServices.passport.openFor(job.vehicle).isNotEmpty;
+    final availability =
+        job.estimate == null || !job.status.isActive ? null : AppServices.inventory.jobAvailability(job);
+
+    final tags = <Widget>[
+      if (job.priority == JobPriority.sos) const RevPill(label: 'SOS', tone: RevTone.red, icon: Icons.sos_rounded),
+      if (job.priority == JobPriority.safety)
+        const RevPill(label: 'Safety critical', tone: RevTone.red, icon: Icons.warning_amber_rounded),
+      if (job.priority == JobPriority.returning)
+        const RevPill(label: 'Returning issue', tone: RevTone.purple, icon: Icons.history_rounded),
+      if (hasPassport) const RevPill(label: 'Passport', tone: RevTone.grey, icon: Icons.menu_book_outlined),
+      if (availability == PartAvailability.blocked)
+        const RevPill(label: 'Parts blocked', tone: RevTone.red, icon: Icons.inventory_2_outlined)
+      else if (availability == PartAvailability.partial)
+        const RevPill(label: 'Parts partly in', tone: RevTone.amber, icon: Icons.inventory_2_outlined),
+    ];
+
+    return GestureDetector(
+      onLongPress: () => showJobQuickActions(context, job),
+      child: RevCard(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.fromLTRB(12, 12, 10, 10),
+        borderColor: job.priority == JobPriority.sos ? AppColors.danger.withValues(alpha: 0.6) : null,
+        onTap: () => context.push(JobDetailScreen(jobId: job.id)),
+        semanticLabel: '${job.vehicle.title}, ${job.id}, ${job.serviceType}, ${shortStatus(job.status)}, ${job.bay}',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CarCutout(job.vehicle.cutoutAsset, width: 82, height: 44),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              job.vehicle.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          RevPill(label: shortStatus(job.status), tone: toneFor(job.status)),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${job.id} · ${job.serviceType}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 13.5, color: AppColors.body),
+                      ),
+                      Text(
+                        '${job.vehicle.plate} · ${job.customer.name}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.5, color: AppColors.muted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (tags.isNotEmpty) ...[
               const SizedBox(height: 8),
-              Text(
-                'Unassigned bay',
-                style: TextStyle(
-                  color: AppColors.ink,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 10),
-              for (final job in noBay) ...[
-                BayJobRowCard(
-                  job: job,
-                  onTap: () =>
-                      context.push(RouteNames.jobDetailsPath(job.id)),
-                ),
-                const SizedBox(height: 10),
-              ],
+              Wrap(spacing: 6, runSpacing: 6, children: tags),
             ],
-            if (all.isEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 48),
-                child: Center(
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Divider(height: 1, color: AppColors.border),
+            ),
+            Row(
+              children: [
+                Icon(Icons.schedule_rounded, size: 19, color: AppColors.muted),
+                const SizedBox(width: 6),
+                Expanded(
                   child: Text(
-                    'No jobs match your filters.',
-                    style: TextStyle(color: AppColors.body),
+                    _timeLine(eta),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.body),
                   ),
                 ),
-              ),
+                Icon(Icons.garage_outlined, size: 19, color: AppColors.muted),
+                const SizedBox(width: 4),
+                Text(job.bay, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.body)),
+                Icon(Icons.chevron_right_rounded, color: AppColors.body),
+              ],
+            ),
           ],
         ),
       ),
@@ -193,84 +349,5 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
   }
 }
 
-/// Compact bay row used under / beside bay cards.
-class BayJobRowCard extends StatelessWidget {
-  const BayJobRowCard({
-    super.key,
-    required this.job,
-    required this.onTap,
-  });
-
-  final Job job;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.outline),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.garage_outlined, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  job.bay ?? 'No bay',
-                  style: TextStyle(
-                    color: AppColors.ink,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              Text(
-                job.status.label,
-                style: TextStyle(color: AppColors.body, fontSize: 12),
-              ),
-              const SizedBox(width: 4),
-              Icon(Icons.chevron_right, color: AppColors.body, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: ChoiceChip(
-        label: Text(label),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        selectedColor: AppColors.primary.withValues(alpha: 0.2),
-        labelStyle: TextStyle(
-          color: selected ? AppColors.primary : AppColors.body,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
+/// Compatibility name used by older Jobs-tab code.
+typedef JobRowCard = BayJobRowCard;

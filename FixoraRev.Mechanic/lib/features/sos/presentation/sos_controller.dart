@@ -3,102 +3,76 @@ import 'package:flutter/foundation.dart';
 import '../../../core/di/app_services.dart';
 import '../domain/sos_entities.dart';
 
+/// Roadside SOS requests routed to this mechanic (BRD USP 2).
 class SosController extends ChangeNotifier {
-  final List<SosRequest> _requests = [];
+  SosController(this._requests);
 
+  final List<SosRequest> _requests;
+
+  List<SosRequest> get open => _requests.where((r) => r.isOpen).toList();
   List<SosRequest> get all => List.unmodifiable(_requests);
 
-  List<String> get open => _requests
-      .where((r) => r.status.isOpen)
-      .map((r) => r.id)
-      .toList(growable: false);
-
-  SosRequest? byId(String id) {
-    for (final r in _requests) {
-      if (r.id == id) return r;
-    }
-    return null;
-  }
-
-  void seedDemo() {
-    if (_requests.isNotEmpty) return;
-    final mech = AppServices.auth.user?.id ?? 'mech-demo';
-    _requests.addAll([
-      SosRequest(
-        id: 'sos-1',
-        customerName: 'Priya N.',
-        vehicleReg: 'TN09 AB 1234',
-        location: 'OMR, Chennai',
-        severity: SosSeverity.high,
-        status: SosStatus.assigned,
-        assignedMechanicId: mech,
-        summary: 'Engine stall, customer stranded.',
-        createdAt: DateTime.now().subtract(const Duration(minutes: 12)),
-      ),
-      SosRequest(
-        id: 'sos-2',
-        customerName: 'Raj K.',
-        vehicleReg: 'KA05 CD 9988',
-        location: 'Whitefield, Bengaluru',
-        severity: SosSeverity.medium,
-        status: SosStatus.pending,
-        summary: 'Flat tyre, needs mobile assist.',
-        createdAt: DateTime.now().subtract(const Duration(hours: 1)),
-      ),
-    ]);
-    notifyListeners();
-  }
-
-  String? get _mechanicId => AppServices.auth.user?.id;
-
-  void _ensureAllowed(SosRequest request) {
-    if (!canMechanicAct(request, _mechanicId)) {
-      throw SosPermissionDenied(
-        'You are not assigned to this SOS request.',
-      );
-    }
-  }
-
-  void assignToMe(String requestId) {
-    final req = byId(requestId);
-    if (req == null) return;
-    final mech = _mechanicId;
-    if (mech == null || mech.isEmpty) {
-      throw SosPermissionDenied('Sign in to accept SOS assignments.');
-    }
-  final i = _requests.indexWhere((r) => r.id == requestId);
-    if (i < 0) return;
-    _requests[i] = req.copyWith(
-      status: SosStatus.assigned,
-      assignedMechanicId: mech,
-    );
-    notifyListeners();
-  }
-
-  void accept(String requestId) {
-    final req = byId(requestId);
-    if (req == null) return;
-    _ensureAllowed(req);
-    final i = _requests.indexWhere((r) => r.id == requestId);
-    if (i < 0) return;
-    _requests[i] = req.copyWith(status: SosStatus.accepted);
-    notifyListeners();
-  }
-
-  void updateStatus(String requestId, SosStatus status) {
-    final req = byId(requestId);
-    if (req == null) return;
-    _ensureAllowed(req);
-    final i = _requests.indexWhere((r) => r.id == requestId);
-    if (i < 0) return;
-    _requests[i] = req.copyWith(status: status);
-    notifyListeners();
-  }
-
+  /// Replaces the demo requests with the SOS alerts the backend routed to this mechanic.
   void replaceAll(List<SosRequest> list) {
     _requests
       ..clear()
       ..addAll(list);
     notifyListeners();
+  }
+
+  SosRequest? get latestPending {
+    for (final r in _requests) {
+      if (r.status == SosStatus.pending) return r;
+    }
+    return null;
+  }
+
+  void _ensureAllowed(SosRequest r) {
+    final me = AppServices.auth.user?.id;
+    if (!r.canMechanicAct(me)) {
+      throw StateError('Only the assigned mechanic can update this SOS.');
+    }
+  }
+
+  void accept(SosRequest r) {
+    _ensureAllowed(r);
+    r.status = SosStatus.accepted;
+    r.assignedMechanicId ??= AppServices.auth.user?.id;
+    notifyListeners();
+  }
+
+  void startNavigation(SosRequest r) {
+    _ensureAllowed(r);
+    r.status = SosStatus.enRoute;
+    notifyListeners();
+  }
+
+  void arrived(SosRequest r) {
+    _ensureAllowed(r);
+    r.status = SosStatus.arrived;
+    r.etaMinutes = 0;
+    notifyListeners();
+  }
+
+  void resolveOnSite(SosRequest r) {
+    _ensureAllowed(r);
+    r.status = SosStatus.resolvedOnSite;
+    notifyListeners();
+  }
+
+  void decline(SosRequest r) {
+    _ensureAllowed(r);
+    r.status = SosStatus.declined;
+    notifyListeners();
+  }
+
+  /// Vehicle needs the workshop: create a priority job in the queue.
+  String convertToJob(SosRequest r) {
+    _ensureAllowed(r);
+    final job = AppServices.jobs.addSosJob(r);
+    r.status = SosStatus.converted;
+    r.jobId = job.id;
+    notifyListeners();
+    return job.id;
   }
 }

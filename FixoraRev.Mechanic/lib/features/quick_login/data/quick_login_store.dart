@@ -1,55 +1,63 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Result of checking a Mechanic PIN.
 enum PinCheck { ok, wrong, locked }
 
-/// Local quick-login prefs for the mechanic app.
+/// Device-level "quick login" with a 4-digit Mechanic PIN. The PIN itself is never stored: only a random salt
+/// and SHA-256(salt + PIN). After [maxAttempts] wrong tries quick login is
+/// switched off and the mechanic must sign in with email + password again.
 ///
-/// Non-sensitive profile flags stay in SharedPreferences.
-/// PIN unlocks a device session; the PIN itself is kept in secure storage
-/// (flutter_secure_storage / Keychain). Production builds should also keep
-/// the refresh token there so the server can revoke the device.
+/// Real backend note: on a production build this should unlock a refresh
+/// token kept in secure storage (flutter_secure_storage / Keychain), and the
+/// server should be able to revoke the device.
 class QuickLoginStore extends ChangeNotifier {
-  QuickLoginStore({FlutterSecureStorage? secureStorage})
-      : _secure = secureStorage ?? const FlutterSecureStorage();
+  QuickLoginStore._();
+  static final QuickLoginStore instance = QuickLoginStore._();
 
-  static const _kEnabled = 'fixora.mechanic.ql.enabled';
-  static const _kEmail = 'fixora.mechanic.ql.email';
-  static const _kName = 'fixora.mechanic.ql.name';
-  static const _kFailed = 'fixora.mechanic.ql.failed';
-  static const _kPin = 'fixora.mechanic.ql.pin';
-  static const int maxAttempts = 5;
+  static const pinLength = 4;
+  static const maxAttempts = 5;
 
-  final FlutterSecureStorage _secure;
+  static const _kEnabled = 'ql_enabled';
+  static const _kEmail = 'ql_email';
+  static const _kName = 'ql_name';
+  static const _kSalt = 'ql_salt';
+  static const _kHash = 'ql_hash';
+  static const _kFailed = 'ql_failed';
+
   SharedPreferences? _prefs;
 
   bool enabled = false;
   String? email;
   String? name;
-  String? login;
   int failed = 0;
 
+  int get attemptsLeft => maxAttempts - failed;
+
+  /// Call once at start-up (Splash does this).
   Future<void> load() async {
     try {
       _prefs ??= await SharedPreferences.getInstance();
     } catch (_) {
-      return;
+      return; // storage unavailable (e.g. some test setups) → feature off
     }
     final p = _prefs!;
     enabled = p.getBool(_kEnabled) ?? false;
     email = p.getString(_kEmail);
     name = p.getString(_kName);
     failed = p.getInt(_kFailed) ?? 0;
-
-    // Migrate legacy PIN out of SharedPreferences if present.
-    final legacyPin = p.getString(_kPin);
-    if (legacyPin != null && legacyPin.isNotEmpty) {
-      await _secure.write(key: _kPin, value: legacyPin);
-      await p.remove(_kPin);
-    }
-
     notifyListeners();
+  }
+
+  String _hash(String salt, String pin) => sha256.convert(utf8.encode('$salt:$pin')).toString();
+
+  String _newSalt() {
+    final r = Random.secure();
+    return base64UrlEncode(List<int>.generate(16, (_) => r.nextInt(256)));
   }
 
   Future<void> enable({
@@ -57,64 +65,52 @@ class QuickLoginStore extends ChangeNotifier {
     required String name,
     required String pin,
   }) async {
-    final p = await _prefsInstance();
-    enabled = true;
-    this.email = email;
-    this.name = name;
-    failed = 0;
-    await p.setBool(_kEnabled, true);
+    await load();
+    final p = _prefs;
+    if (p == null) return;
+    final salt = _newSalt();
+    await p.setString(_kSalt, salt);
+    await p.setString(_kHash, _hash(salt, pin));
     await p.setString(_kEmail, email);
     await p.setString(_kName, name);
     await p.setInt(_kFailed, 0);
-    await p.remove(_kPin);
-    await _secure.write(key: _kPin, value: pin);
-    notifyListeners();
-  }
-
-  Future<bool> unlock(String pin) async {
-    final result = await verify(pin);
-    return result == PinCheck.ok;
+    await p.setBool(_kEnabled, true);
+    await load();
   }
 
   Future<PinCheck> verify(String pin) async {
-    if (!enabled) return PinCheck.locked;
-    final p = await _prefsInstance();
-    final saved = await _secure.read(key: _kPin);
-    if (saved != null && saved == pin) {
+    final p = _prefs;
+    if (p == null || !enabled) return PinCheck.locked;
+    final salt = p.getString(_kSalt) ?? '';
+    final ok = _hash(salt, pin) == p.getString(_kHash);
+    if (ok) {
       failed = 0;
       await p.setInt(_kFailed, 0);
       notifyListeners();
       return PinCheck.ok;
     }
-    failed += 1;
+    failed++;
     await p.setInt(_kFailed, failed);
     if (failed >= maxAttempts) {
-      await clear();
+      await disable();
       return PinCheck.locked;
     }
     notifyListeners();
     return PinCheck.wrong;
   }
 
-  Future<void> clear() async {
-    final p = await _prefsInstance();
+  /// Turns quick login off on this device (keeps nothing behind).
+  Future<void> disable() async {
+    final p = _prefs;
+    if (p != null) {
+      for (final k in [_kEnabled, _kEmail, _kName, _kSalt, _kHash, _kFailed, 'ql_biometric']) {
+        await p.remove(k);
+      }
+    }
     enabled = false;
     email = null;
     name = null;
-    login = null;
     failed = 0;
-    await p.remove(_kEnabled);
-    await p.remove(_kEmail);
-    await p.remove(_kName);
-    await p.remove(_kFailed);
-    await p.remove(_kPin);
-    await _secure.delete(key: _kPin);
     notifyListeners();
-  }
-
-  Future<void> disable() => clear();
-
-  Future<SharedPreferences> _prefsInstance() async {
-    return _prefs ??= await SharedPreferences.getInstance();
   }
 }

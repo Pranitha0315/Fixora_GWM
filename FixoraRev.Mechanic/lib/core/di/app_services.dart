@@ -1,41 +1,25 @@
-import '../../features/authentication/presentation/auth_controller.dart';
-import '../../features/fixproof/data/media_upload_service.dart';
-import '../../features/fixproof/data/voice_recording_service.dart';
+import '../../features/auth/data/mock_auth_repository.dart';
+import '../../features/auth/presentation/auth_controller.dart';
+import '../../features/diagnosis/data/mock_diagnosis_service.dart';
+import '../../features/inventory/presentation/inventory_controller.dart';
 import '../../features/jobs/presentation/job_controller.dart';
-import '../../features/notifications/presentation/notifications_controller.dart';
-import '../../features/quick_login/data/quick_login_store.dart';
+import '../../features/notifications/presentation/notification_controller.dart';
+import '../../features/passport/presentation/passport_controller.dart';
+import '../../features/profile/presentation/profile_photo_controller.dart';
 import '../../features/sos/presentation/sos_controller.dart';
-import '../backend/api_client.dart';
-import '../backend/mechanic_backend.dart';
 
-/// App-level service accessors / controllers.
+/// Service locator. Controllers start empty; MechanicBackend fills them
+/// from /api/v1/mechanic/* after PIN login.
 class AppServices {
   AppServices._();
 
-  static final AuthController auth = AuthController();
-  static final QuickLoginStore quickLogin = QuickLoginStore();
-  static final JobController jobs = JobController();
-  static final MediaUploadService media = MediaUploadService();
-  static final VoiceRecordingService voice = VoiceRecordingService();
-  static final NotificationsController notifications =
-      NotificationsController();
-  static final SosController sos = SosController();
+  static final AuthController auth = AuthController(MockAuthRepository());
+  static final ProfilePhotoController profilePhoto = ProfilePhotoController();
+  static final MockDiagnosisService diagnosis = MockDiagnosisService();
 
-  static ApiClient get api => MechanicBackend.instance.api;
-
-  static Future<void> bootstrap() async {
-    await MechanicBackend.instance.bootstrap();
-    await auth.restore();
-    await quickLogin.load();
-    sos.seedDemo();
-
-    if (api.signedIn && !auth.isLoggedIn) {
-      final session = api.session;
-      await auth.signInRemote(
-        login: session?.userId.isNotEmpty == true
-            ? session!.userId
-            : (session?.name.isNotEmpty == true ? session!.name : 'session'),
-      );
-    }
-  }
+  static final InventoryController inventory = InventoryController([]);
+  static final JobController jobs = JobController([]);
+  static final PassportController passport = PassportController([]);
+  static final SosController sos = SosController([]);
+  static final NotificationController notifications = NotificationController([]);
 }
