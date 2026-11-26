@@ -39,6 +39,8 @@ class SosRequest {
     this.status = SosStatus.pending,
     this.etaMinutes = 14,
     this.jobId,
+    this.lat,
+    this.lng,
   });
 
   final String id;
@@ -53,6 +55,10 @@ class SosRequest {
   SosStatus status;
   int etaMinutes;
   String? jobId;
+  final double? lat;
+  final double? lng;
+
+  bool get hasLocation => lat != null && lng != null;
 
   /// Assigned mechanic id from backend (null = open pool).
   String? assignedMechanicId;
