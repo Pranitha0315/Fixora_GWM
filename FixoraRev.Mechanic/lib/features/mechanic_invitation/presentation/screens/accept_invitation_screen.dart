@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
-import '../../../../app/theme/bronze_buttons.dart';
-import '../../../../app/theme/bronze_colors.dart';
-import '../../../../app/theme/bronze_inputs.dart';
+import '../../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_typography.dart';
 import '../../../../core/backend/api_client.dart';
 import '../../../../core/backend/mechanic_backend.dart';
-import '../../../../core/di/app_services.dart';
 import '../../../../core/utils/nav.dart';
+import '../../../../core/widgets/buttons.dart';
+import '../../../auth/presentation/screens/status_screens.dart';
 import '../../../auth/presentation/widgets/auth_scaffold.dart';
+import '../../../shell/presentation/main_shell.dart';
+import 'expired_invite_screen.dart';
 
 /// Opens from a manager's 7-day invitation link: name + 4-digit PIN → session.
 class AcceptInvitationScreen extends StatefulWidget {
@@ -35,23 +36,32 @@ class _AcceptInvitationScreenState extends State<AcceptInvitationScreen> {
     super.dispose();
   }
 
-  bool get _tokenMissing => widget.token.trim().isEmpty;
+  bool _isExpired(ApiException e) {
+    final code = e.code.toLowerCase();
+    final msg = e.message.toLowerCase();
+    return e.status == 410 ||
+        e.status == 404 ||
+        code.contains('expir') ||
+        (code.contains('invite') && (code.contains('invalid') || code.contains('used'))) ||
+        msg.contains('expir') ||
+        msg.contains('already used') ||
+        msg.contains('invite expired') ||
+        msg.contains('invitation expired');
+  }
 
-  Future<void> _submit() async {
+  Future<void> _accept() async {
     FocusScope.of(context).unfocus();
-    if (_tokenMissing) {
-      context.go(
-        RouteNames.expiredInvitation,
-        extra:
-            'This invitation link is missing a token. Ask your workshop manager for a new 7-day invite.',
-      );
-      return;
-    }
-
     final name = _name.text.trim();
     final pin = _pin.text.trim();
-    if (name.isEmpty || pin.length != 4) {
+    if (name.length < 2 || pin.length != 4) {
       setState(() => _error = 'Enter your name and a 4-digit PIN');
+      return;
+    }
+    if (widget.token.isEmpty) {
+      if (!mounted) return;
+      context.resetTo(const ExpiredInviteScreen(
+        message: 'This invitation link is missing or invalid. Ask your manager for a new 7-day invite.',
+      ));
       return;
     }
 
@@ -59,152 +69,73 @@ class _AcceptInvitationScreenState extends State<AcceptInvitationScreen> {
       _loading = true;
       _error = null;
     });
-
     try {
-      await MechanicBackend.instance.acceptInvitation(
-        token: widget.token.trim(),
-        name: name,
-        pin: pin,
-      );
-      await AppServices.auth.signInRemote(
-        login: name,
-        profile: {'name': name, 'employee_code': name},
-      );
+      await MechanicBackend.instance.acceptInvitation(widget.token, name, pin);
       if (!mounted) return;
-      context.go(RouteNames.shell);
+      context.resetTo(const LoadingScreen(
+        title: 'Welcome to the garage…',
+        subtitle: 'Setting up your mechanic session',
+        next: MainShell(),
+      ));
     } on ApiException catch (e) {
       if (!mounted) return;
       if (_isExpired(e)) {
-        context.go(
-          RouteNames.expiredInvitation,
-          extra: e.message.isNotEmpty
-              ? e.message
-              : 'This invitation link has expired or was already used. Ask your workshop manager to send a new 7-day invite.',
-        );
+        context.resetTo(ExpiredInviteScreen(message: e.message));
         return;
       }
-      setState(() {
-        _error = e.code == 'connection_error' || e.code == 'timeout'
-            ? 'Cannot reach the garage server. Check your connection and try again.'
-            : e.message;
-      });
+      setState(() => _error = e.isNetwork
+          ? 'Cannot reach the garage server. Check your connection and try again.'
+          : e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  bool _isExpired(ApiException e) {
-    final code = (e.code ?? '').toLowerCase();
-    final msg = e.message.toLowerCase();
-    return e.statusCode == 410 ||
-        e.statusCode == 404 ||
-        code.contains('expired') ||
-        (code.contains('invite') && code.contains('used')) ||
-        msg.contains('expired') ||
-        msg.contains('already used');
-  }
-
   @override
   Widget build(BuildContext context) {
-    if (_tokenMissing) {
-      return AuthScaffold(
-        showBack: true,
-        onBack: () => context.go(RouteNames.login),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const SizedBox(height: 24),
-            Text(
-              'Invalid invite',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'This invitation link is incomplete. Ask your manager for a new one.',
-              style: TextStyle(color: BronzeColors.creamMuted),
-            ),
-            const Spacer(),
-            ElevatedButton(
-              style: BronzeButtons.elevated,
-              onPressed: () => context.go(RouteNames.expiredInvitation),
-              child: const Text('Continue'),
-            ),
-          ],
-        ),
-      );
-    }
-
     return AuthScaffold(
       showBack: true,
-      onBack: () => context.go(RouteNames.login),
+      onBack: () => context.goRoute(RouteNames.login),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 12),
-          Text(
-            'Accept invitation',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
+          Text('Accept invitation', style: AppText.title),
           const SizedBox(height: 8),
-          const Text(
-            'Set your display name and a 4-digit garage PIN to join this workshop.',
-            style: TextStyle(color: BronzeColors.creamMuted),
+          Text(
+            'This manager invite is valid for 7 days. Set your name and a 4-digit garage PIN to join.',
+            style: AppText.body,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 20),
+          Text('Full name', style: AppText.label),
+          const SizedBox(height: 6),
           TextField(
             controller: _name,
-            textInputAction: TextInputAction.next,
             textCapitalization: TextCapitalization.words,
-            decoration: BronzeInputs.decoration(
-              labelText: 'Full name',
-              hintText: 'Your name',
-              prefixIcon: const Icon(Icons.person_outline),
-            ),
+            decoration: const InputDecoration(hintText: 'Your name'),
           ),
           const SizedBox(height: 14),
+          Text('Garage PIN', style: AppText.label),
+          const SizedBox(height: 6),
           TextField(
             controller: _pin,
             obscureText: true,
             keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(4),
-            ],
-            decoration: BronzeInputs.decoration(
-              labelText: '4-digit PIN',
-              hintText: '••••',
-              prefixIcon: const Icon(Icons.pin_outlined),
-            ),
+            maxLength: 4,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            decoration: const InputDecoration(hintText: '4 digits', counterText: ''),
+            onSubmitted: (_) => _accept(),
           ),
           if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              _error!,
-              style: const TextStyle(color: BronzeColors.danger),
-            ),
+            const SizedBox(height: 10),
+            Text(_error!, style: AppText.caption.copyWith(color: AppColors.danger)),
           ],
-          const Spacer(),
-          ElevatedButton(
-            style: BronzeButtons.elevated,
-            onPressed: _loading ? null : _submit,
-            child: _loading
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.4),
-                  )
-                : const Text('Join workshop'),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            style: BronzeButtons.text,
-            onPressed: () => context.toast(
-              'Ask your manager if you need a fresh 7-day invite link.',
-              icon: Icons.info_outline,
-            ),
-            child: const Text('Need a new invite?'),
+          const SizedBox(height: 22),
+          PrimaryButton(
+            label: 'Join garage',
+            loadingLabel: 'Joining…',
+            icon: Icons.garage_outlined,
+            loading: _loading,
+            onPressed: _loading ? null : _accept,
           ),
         ],
       ),
