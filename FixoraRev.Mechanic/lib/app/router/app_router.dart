@@ -37,6 +37,10 @@ class AppRouter {
         builder: (_, __) => const SplashScreen(),
       ),
       GoRoute(
+        path: RouteNames.quickLogin,
+        builder: (_, __) => const QuickLoginScreen(),
+      ),
+      GoRoute(
         path: RouteNames.login,
         builder: (_, __) => const LoginScreen(),
       ),
