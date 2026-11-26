@@ -42,7 +42,9 @@ class AppRouter {
       ),
       GoRoute(
         path: RouteNames.login,
-        builder: (_, __) => const LoginScreen(),
+        builder: (_, state) => LoginScreen(
+          initialEmail: state.extra is String ? state.extra as String : '',
+        ),
       ),
       GoRoute(
         path: RouteNames.forgotPassword,
