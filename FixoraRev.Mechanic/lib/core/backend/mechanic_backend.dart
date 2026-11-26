@@ -196,6 +196,9 @@ class MechanicBackend extends ChangeNotifier {
       startedAt: DateTime.tryParse((j['startedAt'] as String?) ?? '')?.toLocal(),
       completedAt: DateTime.tryParse((j['completedAt'] as String?) ?? '')?.toLocal(),
       customerNote: complaint,
+      managerNote: ((j['managerNote'] as String?) ?? '').trim().isEmpty
+          ? null
+          : ((j['managerNote'] as String?) ?? '').trim(),
     )..log('Job card $number', detail: (j['status'] as String?) ?? '', icon: Icons.assignment_outlined);
   }
 
