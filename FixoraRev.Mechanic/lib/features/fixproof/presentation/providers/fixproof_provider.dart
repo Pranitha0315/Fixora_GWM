@@ -41,9 +41,15 @@ class CapturedMedia {
 }
 
 class VoiceNote {
-  const VoiceNote({required this.id, required this.seconds});
+  const VoiceNote({required this.id, required this.seconds, this.transcript, this.sttReason});
   final String id;
   final int seconds;
+
+  /// Gemini transcript (Tamil/English) once the backend has answered.
+  final String? transcript;
+
+  /// Why there is no transcript (server off, STT disabled, unclear audio…).
+  final String? sttReason;
 
   String get duration {
     final m = (seconds ~/ 60).toString();
@@ -82,6 +88,16 @@ class CaptureNotifier extends Notifier<CaptureState> {
     _counter++;
     state = state.copyWith(
       voiceNotes: [...state.voiceNotes, VoiceNote(id: 'v$_counter', seconds: seconds)],
+    );
+  }
+
+  /// Stores the speech-to-text result for one voice note (text or the reason it failed).
+  void setVoiceTranscript(String id, {String? text, String? reason}) {
+    state = state.copyWith(
+      voiceNotes: [
+        for (final v in state.voiceNotes)
+          v.id == id ? VoiceNote(id: v.id, seconds: v.seconds, transcript: text, sttReason: reason) : v,
+      ],
     );
   }
 
