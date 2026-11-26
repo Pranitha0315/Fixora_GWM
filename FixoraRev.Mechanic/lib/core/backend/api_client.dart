@@ -164,6 +164,22 @@ class ApiClient {
   Future<dynamic> post(String path, {Object? body, Map<String, String>? headers}) =>
       _send('POST', path, body: body ?? const <String, dynamic>{}, headers: headers);
 
+  /// Multipart upload (one binary file + text fields), e.g. a voice note for speech-to-text.
+  Future<dynamic> postFile(
+    String path, {
+    required String field,
+    required List<int> bytes,
+    required String filename,
+    required String contentType,
+    Map<String, String> fields = const {},
+  }) {
+    final form = FormData.fromMap({
+      ...fields,
+      field: MultipartFile.fromBytes(bytes, filename: filename, contentType: DioMediaType.parse(contentType)),
+    });
+    return _send('POST', path, body: form);
+  }
+
   Future<dynamic> put(String path, {Object? body}) => _send('PUT', path, body: body ?? const <String, dynamic>{});
 
   Future<dynamic> delete(String path) => _send('DELETE', path);
