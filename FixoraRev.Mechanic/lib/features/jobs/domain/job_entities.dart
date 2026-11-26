@@ -1,7 +1,104 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../diagnosis/domain/diagnosis_entities.dart';
+
+class Vehicle {
+  const Vehicle({
+    required this.id,
+    required this.make,
+    required this.model,
+    required this.year,
+    required this.plate,
+    required this.mileageKm,
+    required this.fuel,
+    required this.color,
+  });
+
+  final String id;
+  final String make;
+  final String model;
+  final int year;
+  final String plate;
+  final int mileageKm;
+  final String fuel;
+  final String color;
+
+  String get title => '$make $model';
+  String get subtitle => '$year · $fuel · $color';
+
+  static const cutoutPool = <String>[
+    'assets/images/car_toyota_cut.png',
+    'assets/images/car_honda_cut.png',
+    'assets/images/car_hyundai_cut.png',
+  ];
+
+  static const imagePool = <String>[
+    'assets/images/car_toyota.jpg',
+    'assets/images/car_honda.jpg',
+    'assets/images/car_hyundai.jpg',
+  ];
+
+  /// Thumbnail asset for job cards / home previews.
+  String get imageAsset {
+    final key = '$make $model'.toLowerCase();
+    if (key.contains('honda')) return imagePool[1];
+    if (key.contains('hyundai')) return imagePool[2];
+    if (key.contains('toyota')) return imagePool[0];
+    return imagePool[id.hashCode.abs() % imagePool.length];
+  }
+
+  /// Make-based preferred cut-out (may collide when many Toyotas, etc.).
+  String get preferredCutout {
+    final key = '$make $model'.toLowerCase();
+    if (key.contains('honda') || key.contains('nissan')) return cutoutPool[1];
+    if (key.contains('hyundai') || key.contains('suzuki')) return cutoutPool[2];
+    if (key.contains('toyota')) return cutoutPool[0];
+    return cutoutPool[id.hashCode.abs() % cutoutPool.length];
+  }
+
+  /// Transparent cut-out used on Jobs / detail when no list uniqueness is needed.
+  String get cutoutAsset => preferredCutout;
+
+  /// One PNG per job on a list. Keeps make preference when free, otherwise
+  /// hands out unused cutouts so the same car image does not repeat.
+  static Map<String, String> uniqueCutoutsForJobs(
+    Iterable<({String id, String preferred})> jobs,
+  ) {
+    final list = jobs.toList();
+    final available = List<String>.from(cutoutPool);
+    final out = <String, String>{};
+
+    for (final j in list) {
+      if (available.contains(j.preferred)) {
+        out[j.id] = j.preferred;
+        available.remove(j.preferred);
+      }
+    }
+    var fallback = 0;
+    for (final j in list) {
+      if (out.containsKey(j.id)) continue;
+      if (available.isNotEmpty) {
+        out[j.id] = available.removeAt(0);
+      } else {
+        out[j.id] = cutoutPool[fallback++ % cutoutPool.length];
+      }
+    }
+    return out;
+  }
+}
+
+class Customer {
+  const Customer({required this.name, required this.phone});
+  final String name;
+  final String phone;
+}
+
+/// Mechanic's lifecycle of a job card.
+///
 /// waiting → diagnosing → awaitingApproval → approved → inProgress
-/// → qualityCheck → completed. parked = inconclusive.
+/// → qualityCheck → completed. An inconclusive diagnosis is `parked`
+/// in the Evidence Passport instead.
 enum JobStatus {
   waiting,
   diagnosing,
@@ -14,207 +111,200 @@ enum JobStatus {
 }
 
 extension JobStatusX on JobStatus {
-  bool get isActive =>
-      this != JobStatus.completed && this != JobStatus.parked;
-
+  /// Mechanic-facing status labels aligned to:
+  /// Pending → In Progress → Awaiting Review → Completed.
   String get label => switch (this) {
-        JobStatus.waiting => 'Waiting',
-        JobStatus.diagnosing => 'Diagnosing',
-        JobStatus.awaitingApproval => 'Awaiting approval',
-        JobStatus.approved => 'Approved',
-        JobStatus.inProgress => 'In progress',
-        JobStatus.qualityCheck => 'Quality check',
+        JobStatus.waiting => 'Pending',
+        JobStatus.diagnosing => 'In Progress',
+        JobStatus.awaitingApproval => 'Awaiting Review',
+        JobStatus.approved => 'Pending',
+        JobStatus.inProgress => 'In Progress',
+        JobStatus.qualityCheck => 'Awaiting Review',
         JobStatus.completed => 'Completed',
-        JobStatus.parked => 'Parked',
+        JobStatus.parked => 'Completed',
       };
 
-  /// API / SignalR status string → [JobStatus].
-  /// 'Paused' maps to [JobStatus.inProgress] (paused flag set separately).
-  static JobStatus fromApi(String? raw, {void Function()? onPaused}) {
-    final s = (raw ?? '').trim().toLowerCase();
-    if (s == 'paused') {
-      onPaused?.call();
-      return JobStatus.inProgress;
-    }
-    return switch (s) {
-      'waiting' || 'queued' || 'assigned' => JobStatus.waiting,
-      'diagnosing' || 'diagnosis' => JobStatus.diagnosing,
-      'awaitingapproval' || 'awaiting_approval' || 'pending_approval' =>
-        JobStatus.awaitingApproval,
-      'approved' => JobStatus.approved,
-      'inprogress' || 'in_progress' || 'repair' => JobStatus.inProgress,
-      'qualitycheck' || 'quality_check' || 'qc' => JobStatus.qualityCheck,
-      'completed' || 'done' => JobStatus.completed,
-      'parked' || 'onhold' || 'on_hold' => JobStatus.parked,
-      _ => JobStatus.waiting,
-    };
-  }
+  Color get color => switch (this) {
+        JobStatus.waiting => AppColors.info,
+        JobStatus.diagnosing => AppColors.primary,
+        JobStatus.awaitingApproval => AppColors.warning,
+        JobStatus.approved => AppColors.info,
+        JobStatus.inProgress => AppColors.primary,
+        JobStatus.qualityCheck => AppColors.warning,
+        JobStatus.completed => AppColors.success,
+        JobStatus.parked => AppColors.success,
+      };
+
+  IconData get icon => switch (this) {
+        JobStatus.waiting => Icons.schedule_rounded,
+        JobStatus.diagnosing => Icons.troubleshoot_rounded,
+        JobStatus.awaitingApproval => Icons.hourglass_top_rounded,
+        JobStatus.approved => Icons.thumb_up_alt_outlined,
+        JobStatus.inProgress => Icons.build_circle_outlined,
+        JobStatus.qualityCheck => Icons.fact_check_outlined,
+        JobStatus.completed => Icons.check_circle_outline_rounded,
+        JobStatus.parked => Icons.bookmark_added_outlined,
+      };
+
+  bool get isActive => this != JobStatus.completed && this != JobStatus.parked;
+
+  /// 0..1 progress used on cards.
+  double get progress => switch (this) {
+        JobStatus.waiting => 0.05,
+        JobStatus.diagnosing => 0.2,
+        JobStatus.awaitingApproval => 0.35,
+        JobStatus.approved => 0.45,
+        JobStatus.inProgress => 0.65,
+        JobStatus.qualityCheck => 0.9,
+        JobStatus.completed => 1,
+        JobStatus.parked => 1,
+      };
 }
 
-enum JobPriority {
-  low,
-  normal,
-  high,
-  urgent,
-}
+enum JobPriority { normal, sos, returning, safety }
 
 extension JobPriorityX on JobPriority {
-  int get rank => switch (this) {
-        JobPriority.urgent => 0,
-        JobPriority.high => 1,
-        JobPriority.normal => 2,
-        JobPriority.low => 3,
-      };
-
   String get label => switch (this) {
-        JobPriority.low => 'Low',
         JobPriority.normal => 'Normal',
-        JobPriority.high => 'High',
-        JobPriority.urgent => 'Urgent',
+        JobPriority.sos => 'SOS',
+        JobPriority.returning => 'Returning issue',
+        JobPriority.safety => 'Safety critical',
+      };
+
+  Color get color => switch (this) {
+        JobPriority.normal => AppColors.inkSoft,
+        JobPriority.sos => AppColors.danger,
+        JobPriority.returning => AppColors.purple,
+        JobPriority.safety => AppColors.warning,
+      };
+
+  IconData get icon => switch (this) {
+        JobPriority.normal => Icons.circle_outlined,
+        JobPriority.sos => Icons.sos_rounded,
+        JobPriority.returning => Icons.history_rounded,
+        JobPriority.safety => Icons.warning_amber_rounded,
+      };
+
+  /// Lower runs first in the queue.
+  int get rank => switch (this) {
+        JobPriority.sos => 0,
+        JobPriority.safety => 1,
+        JobPriority.returning => 2,
+        JobPriority.normal => 3,
       };
 }
 
-class JobCustomer {
-  const JobCustomer({required this.name, this.phone});
+class EstimateLine {
+  EstimateLine({
+    required this.partId,
+    required this.name,
+    required this.qty,
+    required this.unitPrice,
+    this.reservedQty = 0,
+  });
 
-  final String name;
-  final String? phone;
+  String partId;
+  String name;
+  int qty;
+  double unitPrice;
+
+  /// How many units are already held for this job in the stock room.
+  int reservedQty;
+
+  double get total => qty * unitPrice;
 }
 
-class JobLogEntry {
-  JobLogEntry({
-    required this.message,
-    this.detail,
-    this.icon,
-    DateTime? at,
-  }) : at = at ?? DateTime.now();
+class Estimate {
+  Estimate({
+    required this.lines,
+    required this.labourHours,
+    required this.recommendedRepair,
+    this.labourRate = 3500,
+  });
 
-  final String message;
+  final List<EstimateLine> lines;
+  double labourHours;
+  double labourRate;
+  String recommendedRepair;
+
+  double get partsTotal => lines.fold<double>(0, (sum, l) => sum + l.total);
+  double get labourTotal => labourHours * labourRate;
+  double get total => partsTotal + labourTotal;
+}
+
+class RepairTask {
+  RepairTask(this.title, {this.done = false});
+  final String title;
+  bool done;
+}
+
+class TimelineEvent {
+  TimelineEvent(this.title, this.time, {this.detail, this.icon = Icons.circle});
+  final String title;
+  final DateTime time;
   final String? detail;
-  final IconData? icon;
-  final DateTime at;
+  final IconData icon;
 }
 
-/// Mechanic-assigned job card (mutable lifecycle fields).
 class Job {
   Job({
     required this.id,
     required this.token,
-    required this.vehicleReg,
-    required this.vehicleModel,
-    required this.customerName,
-    required this.summary,
+    required this.vehicle,
+    required this.customer,
+    required this.serviceType,
+    required this.reportedSymptoms,
+    required this.slotTime,
+    required this.estimatedMinutes,
     required this.status,
+    required this.bay,
+    required this.scenario,
     this.priority = JobPriority.normal,
-    this.bay,
+    this.diagnosis,
+    this.estimate,
+    this.partsReserved = false,
+    List<RepairTask>? tasks,
+    List<TimelineEvent>? timeline,
+    this.progressPhotos = 0,
     this.startedAt,
-    this.paused = false,
-    this.progressPercent = 0,
-    List<JobLogEntry>? logs,
-  }) : logs = logs ?? <JobLogEntry>[];
+    this.completedAt,
+    this.passportEntryId,
+    this.customerNote,
+  })  : tasks = tasks ?? [],
+        timeline = timeline ?? [];
 
   final String id;
-  final String token;
-  final String vehicleReg;
-  final String vehicleModel;
-  final String customerName;
-  final String summary;
+  final int token;
+  final Vehicle vehicle;
+  final Customer customer;
+  final String serviceType;
+  final List<String> reportedSymptoms;
+  DateTime slotTime;
+  int estimatedMinutes;
   JobStatus status;
-  final JobPriority priority;
-  final String? bay;
+  String bay;
+
+  /// True while repair is paused (synced via jobAction pause/resume).
+  bool paused = false;
+
+  /// Key of the mock OBD / AI scenario used by the diagnosis service.
+  final String scenario;
+  JobPriority priority;
+  DiagnosisReport? diagnosis;
+  Estimate? estimate;
+  bool partsReserved;
+  List<RepairTask> tasks;
+  final List<TimelineEvent> timeline;
+  int progressPhotos;
   DateTime? startedAt;
-  bool paused;
-  int progressPercent;
-  final List<JobLogEntry> logs;
+  DateTime? completedAt;
+  String? passportEntryId;
+  String? customerNote;
 
-  JobCustomer get customer => JobCustomer(name: customerName);
+  double get taskProgress =>
+      tasks.isEmpty ? 0 : tasks.where((t) => t.done).length / tasks.length;
 
-  void log(String message, {String? detail, IconData? icon}) {
-    logs.insert(
-      0,
-      JobLogEntry(message: message, detail: detail, icon: icon),
-    );
-  }
-
-  Job copyWith({
-    JobStatus? status,
-    DateTime? startedAt,
-    bool? paused,
-  }) {
-    final j = Job(
-      id: id,
-      token: token,
-      vehicleReg: vehicleReg,
-      vehicleModel: vehicleModel,
-      customerName: customerName,
-      summary: summary,
-      status: status ?? this.status,
-      priority: priority,
-      bay: bay,
-      startedAt: startedAt ?? this.startedAt,
-      paused: paused ?? this.paused,
-      progressPercent: progressPercent,
-      logs: List<JobLogEntry>.from(logs),
-    );
-    return j;
-  }
-
-  /// Build from API JSON (`Paused` → inProgress + paused flag).
-  factory Job.fromJson(Map<String, dynamic> json) {
-    var paused = false;
-    final status = JobStatusX.fromApi(
-      (json['status'] ?? json['state'])?.toString(),
-      onPaused: () => paused = true,
-    );
-    final customer = json['customer'];
-    final customerName = customer is Map
-        ? (customer['name'] ?? '').toString()
-        : (json['customerName'] ?? json['customer_name'] ?? '').toString();
-    return Job(
-      id: (json['id'] ?? json['jobId'] ?? '').toString(),
-      token: (json['token'] ?? json['queueToken'] ?? '').toString(),
-      vehicleReg: (json['vehicleReg'] ??
-              json['vehicle_reg'] ??
-              json['registration'] ??
-              '')
-          .toString(),
-      vehicleModel:
-          (json['vehicleModel'] ?? json['vehicle_model'] ?? json['model'] ?? '')
-              .toString(),
-      customerName: customerName.isEmpty ? 'Customer' : customerName,
-      summary: (json['summary'] ?? json['title'] ?? json['issue'] ?? '')
-          .toString(),
-      status: status,
-      priority: _priorityFrom(json['priority']?.toString()),
-      bay: (json['bay'] ?? json['bayName'])?.toString(),
-      startedAt: DateTime.tryParse(
-        (json['startedAt'] ?? json['started_at'] ?? '').toString(),
-      ),
-      paused: paused || json['paused'] == true,
-      progressPercent: _progressFrom(json),
-    );
-  }
-
-  static int _progressFrom(Map<String, dynamic> json) {
-    final raw = json['progressPercent'] ?? json['progress_percent'];
-    return switch (raw) {
-      final int n => n.clamp(0, 100),
-      final num n => n.round().clamp(0, 100),
-      final String s => int.tryParse(s)?.clamp(0, 100) ?? 0,
-      _ => 0,
-    };
-  }
-
-  static JobPriority _priorityFrom(String? raw) {
-    switch ((raw ?? '').toLowerCase()) {
-      case 'urgent':
-        return JobPriority.urgent;
-      case 'high':
-        return JobPriority.high;
-      case 'low':
-        return JobPriority.low;
-      default:
-        return JobPriority.normal;
-    }
-  }
+  void log(String title, {String? detail, IconData icon = Icons.circle}) =>
+      timeline.insert(
+          0, TimelineEvent(title, DateTime.now(), detail: detail, icon: icon));
 }
