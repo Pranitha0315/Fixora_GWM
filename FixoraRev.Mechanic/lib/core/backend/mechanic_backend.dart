@@ -202,6 +202,25 @@ class MechanicBackend extends ChangeNotifier {
     )..log('Job card $number', detail: (j['status'] as String?) ?? '', icon: Icons.assignment_outlined);
   }
 
+  /// Gemini speech-to-text for a FixProof voice note (backend holds the Gemini key).
+  /// Returns (transcript, reason). transcript == null → show the reason and let the mechanic type.
+  Future<(String?, String?)> transcribe(String jobId, List<int> wav, {String language = 'ta'}) async {
+    if (!live) {
+      return (null, 'Speech-to-text needs the garage server. Type what you found below.');
+    }
+    final r = await api.postFile(
+      '/mechanic/jobs/$jobId/fixproof/transcribe',
+      field: 'audio',
+      bytes: wav,
+      filename: 'voice-note.wav',
+      contentType: 'audio/wav',
+      fields: {'language': language},
+    ) as Map<String, dynamic>;
+    return r['available'] == true
+        ? ((r['transcript'] as String?), null)
+        : (null, r['reason'] as String?);
+  }
+
   /// Start / pause / complete etc. (JobActionRequest). The manager and customer follow it live.
   Future<void> jobAction(String jobId, String action, {String? stage, String? message, int? percent}) async {
     if (!live) return;
@@ -320,6 +339,8 @@ class MechanicBackend extends ChangeNotifier {
       ),
       issue: [s['category'] as String? ?? 'SOS', if (s['driveSenseContext'] != null) s['driveSenseContext'] as String].join(' · '),
       locationLabel: '${(s['lat'] as num?)?.toStringAsFixed(4)}, ${(s['lng'] as num?)?.toStringAsFixed(4)}',
+      lat: (s['lat'] as num?)?.toDouble(),
+      lng: (s['lng'] as num?)?.toDouble(),
       distanceKm: 0,
       channel: SosChannel.online,
       receivedAt: DateTime.tryParse((s['receivedAt'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
