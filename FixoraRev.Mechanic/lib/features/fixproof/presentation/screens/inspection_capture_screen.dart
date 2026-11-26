@@ -199,7 +199,12 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
                       contentPadding: EdgeInsets.zero,
                       leading: const IconBox(icon: Icons.play_arrow_rounded, size: 40),
                       title: Text('Voice note · ${v.duration}', style: AppText.bodyStrong),
-                      subtitle: Text('Tamil · ready for AI', style: AppText.caption),
+                      subtitle: Text(
+                        v.transcript ?? v.sttReason ?? 'Tamil · ready for AI',
+                        style: AppText.caption,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                       trailing: IconButton(
                         tooltip: 'Delete voice note',
                         onPressed: () => notifier.removeVoiceNote(v.id),
