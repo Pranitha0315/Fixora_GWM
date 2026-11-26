@@ -189,4 +189,56 @@ public sealed class DemoSeedAndHostSmokeHttpTests
         Assert.Equal(HttpStatusCode.Unauthorized,
             (await client.GetAsync($"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}")).StatusCode);
     }
+
+    [Fact]
+    public async Task Seeded_demo_fallback_paths_answer_without_ai_keys()
+    {
+        // FX13-D13-NID-2 fallback hardening: test host has no Gemini key, so every AI-backed
+        // surface must answer via its deterministic fallback (template/manual) and never 500.
+        await using var factory = NewFactory();
+        var manager = await factory.Manager();
+        var ravi = await factory.Mechanic();
+
+        var advisor = await manager.PostAsJsonAsync(
+            "/api/v1/manager/advisor/chat", new ChatRequest("What is this week revenue?"));
+        Assert.Equal(HttpStatusCode.OK, advisor.StatusCode);
+        var revenue = (await advisor.Content.ReadFromJsonAsync<ChatAnswer>())!;
+        Assert.NotEqual("ai", revenue.Intent);
+        Assert.Equal("revenue", revenue.Intent);
+        Assert.False(string.IsNullOrWhiteSpace(revenue.Answer));
+
+        var unknown = await manager.PostAsJsonAsync(
+            "/api/v1/manager/advisor/chat", new ChatRequest("tell me a joke"));
+        Assert.Equal(HttpStatusCode.OK, unknown.StatusCode);
+        Assert.Equal("unknown", (await unknown.Content.ReadFromJsonAsync<ChatAnswer>())!.Intent);
+
+        var draftUrl = $"/api/v1/mechanic/jobs/{DemoIds.JobKavithaToday}/fixproof/drafts";
+        var templated = await ravi.PostAsJsonAsync(draftUrl, new
+        {
+            component = "Brake pads",
+            transcript = "pad thickness low, disc scored",
+            language = "en",
+            severity = "Urgent",
+            mediaRefs = Array.Empty<string>()
+        });
+        Assert.Equal(HttpStatusCode.OK, templated.StatusCode);
+        using (var doc = JsonDocument.Parse(await templated.Content.ReadAsStringAsync()))
+        {
+            Assert.Equal("template", doc.RootElement.GetProperty("source").GetString());
+            Assert.False(doc.RootElement.GetProperty("verified").GetBoolean());
+            Assert.Equal("Draft", doc.RootElement.GetProperty("status").GetString());
+        }
+
+        var manual = await ravi.PostAsJsonAsync(draftUrl, new
+        {
+            component = "Brake pads",
+            transcript = "",
+            language = "en",
+            severity = "Urgent",
+            mediaRefs = Array.Empty<string>()
+        });
+        Assert.Equal(HttpStatusCode.OK, manual.StatusCode);
+        using var manualDoc = JsonDocument.Parse(await manual.Content.ReadAsStringAsync());
+        Assert.Equal("manual", manualDoc.RootElement.GetProperty("source").GetString());
+    }
 }

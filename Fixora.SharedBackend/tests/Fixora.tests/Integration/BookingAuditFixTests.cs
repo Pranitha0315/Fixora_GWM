@@ -34,6 +34,15 @@ public class BookingAuditFixTests(FixoraFactory factory)
         return DateTime.SpecifyKind(localDate.AddHours(localHour).AddMinutes(-330), DateTimeKind.Utc); // Sri Lanka = UTC+5:30
     }
 
+    // Workshop is closed on Sundays; relative offsets can drift onto one, so skip forward to a working day.
+    private static DateTime WorkDay(int dayOffset, int localHour = 10)
+    {
+        var day = Day(dayOffset, localHour);
+        while (day.AddMinutes(330).DayOfWeek == DayOfWeek.Sunday)
+            day = day.AddDays(1);
+        return day;
+    }
+
     private async Task<Guid> SeedRequestedAsync(DateTime startUtc, int minutes = 60, string? customerNote = "Customer: brakes squeal")
     {
         using var scope = factory.Services.CreateScope();
@@ -148,9 +157,9 @@ public class BookingAuditFixTests(FixoraFactory factory)
     [Fact]
     public async Task BT12_staff_reschedule_confirmed_into_mechanic_overlap_is_409()
     {
-        var slotA = Day(20);
-        var slotB = Day(20).AddHours(3);
-        var intoBusy = Day(20).AddMinutes(30);
+        var slotA = WorkDay(20);
+        var slotB = WorkDay(20).AddHours(3);
+        var intoBusy = WorkDay(20).AddMinutes(30);
 
         var first = await SeedRequestedAsync(slotA);
         var second = await SeedRequestedAsync(slotB);
@@ -167,10 +176,10 @@ public class BookingAuditFixTests(FixoraFactory factory)
     [Fact]
     public async Task BT12b_staff_reschedule_confirmed_into_bay_overlap_is_409()
     {
-        // Day(21) can land on Sunday (workshop closed → 400); use a mid-week offset.
-        var slotA = Day(22);
-        var slotB = Day(22).AddHours(3);
-        var intoBusy = Day(22).AddMinutes(30);
+        // Day(21) can land on Sunday (workshop closed → 400); WorkDay skips Sundays.
+        var slotA = WorkDay(22);
+        var slotB = WorkDay(22).AddHours(3);
+        var intoBusy = WorkDay(22).AddMinutes(30);
 
         var first = await SeedRequestedAsync(slotA);
         var second = await SeedRequestedAsync(slotB);
