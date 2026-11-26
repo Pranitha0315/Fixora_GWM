@@ -1,0 +1,46 @@
+<div class="fx-field">
+  <label
+    class="fx-field-label"
+    [for]="controlId()"
+  >
+    {{ label() }}
+
+    @if (required()) {
+      <span class="fx-field-required" aria-hidden="true">*</span>
+    }
+  </label>
+
+  <input
+    class="fx-field-control"
+    [class.fx-field-invalid]="!!error()"
+    [id]="controlId()"
+    [type]="type()"
+    [value]="value()"
+    [placeholder]="placeholder()"
+    [attr.autocomplete]="autocomplete()"
+    [required]="required()"
+    [disabled]="isDisabled()"
+    [readOnly]="readonly()"
+    [attr.aria-invalid]="error() ? 'true' : null"
+    [attr.aria-describedby]="describedBy()"
+    (input)="handleInput($event)"
+    (blur)="handleBlur()"
+  />
+
+  @if (error()) {
+    <p
+      class="fx-field-error"
+      [id]="controlId() + '-error'"
+      role="alert"
+    >
+      {{ error() }}
+    </p>
+  } @else if (helperText()) {
+    <p
+      class="fx-field-helper"
+      [id]="controlId() + '-helper'"
+    >
+      {{ helperText() }}
+    </p>
+  }
+</div>

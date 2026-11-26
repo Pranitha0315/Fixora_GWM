@@ -1,0 +1,22 @@
+<span
+  [class]="badgeClasses()"
+  [attr.role]="
+    announceChanges()
+      ? 'status'
+      : accessibleLabel()
+        ? 'group'
+        : null
+  "
+  [attr.aria-label]="accessibleLabel()"
+>
+  @if (showDot()) {
+    <span
+      class="fx-status-badge-dot"
+      aria-hidden="true"
+    ></span>
+  }
+
+  <span class="fx-status-badge-label">
+    {{ label() }}
+  </span>
+</span>

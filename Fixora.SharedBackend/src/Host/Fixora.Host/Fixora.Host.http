@@ -1,0 +1,19 @@
+@host = http://localhost:5080
+
+### Manager login
+POST {{host}}/api/v1/manager/auth/login
+Content-Type: application/json
+
+{ "email": "manager@fixora.lk", "password": "Fixora@123" }
+
+### Mechanic PIN login (Ravi)
+POST {{host}}/api/v1/mechanic/auth/pin-login
+Content-Type: application/json
+
+{ "login": "EMP-001", "pin": "1234" }
+
+### Customer login (Kavitha)
+POST {{host}}/api/v1/customer/auth/login
+Content-Type: application/json
+
+{ "email": "kavitha@fixora.lk", "password": "Fixora@123" }

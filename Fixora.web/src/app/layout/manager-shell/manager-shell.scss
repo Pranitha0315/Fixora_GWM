@@ -1,0 +1,48 @@
+:host {
+  display: block;
+  min-height: 100dvh;
+}
+
+.manager-shell {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 100dvh;
+  background: var(--fx-color-background);
+}
+
+.manager-sidebar {
+  background: var(--fx-sidebar-background, #104e56);
+  color: var(--fx-sidebar-text, #ffffff);
+  min-width: 0;
+}
+
+.manager-workspace {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.manager-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  min-height: 64px;
+  background: var(--fx-color-surface);
+  border-bottom: 1px solid var(--fx-color-border);
+}
+
+.manager-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+}
+
+@media (max-width: 768px) {
+  .manager-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .manager-content {
+    padding: 16px;
+  }
+}

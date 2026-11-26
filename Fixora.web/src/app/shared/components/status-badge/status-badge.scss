@@ -1,0 +1,121 @@
+:host {
+  display: inline-flex;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.fx-status-badge {
+  --fx-badge-color: var(--fx-color-text-muted);
+  --fx-badge-background: var(--fx-color-disabled);
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  gap: var(--fx-space-1);
+
+  max-width: 100%;
+  min-width: 0;
+
+  border: 1px solid transparent;
+  border-radius: var(--fx-radius-full);
+
+  color: var(--fx-badge-color);
+
+  font-family: var(--fx-font-family);
+  font-weight: var(--fx-weight-semibold);
+  line-height: var(--fx-line-height);
+
+  vertical-align: middle;
+}
+
+.fx-status-badge-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.fx-status-badge-dot {
+  display: inline-block;
+
+  width: 7px;
+  height: 7px;
+
+  flex-shrink: 0;
+
+  background: currentColor;
+  border-radius: var(--fx-radius-full);
+}
+
+/* Semantic colour variants */
+
+.fx-status-badge--primary {
+  --fx-badge-color: var(--fx-color-primary);
+  --fx-badge-background: var(--fx-color-primary-light);
+}
+
+.fx-status-badge--success {
+  --fx-badge-color: var(--fx-color-success);
+  --fx-badge-background: var(--fx-color-success-light);
+}
+
+.fx-status-badge--warning {
+  --fx-badge-color: var(--fx-color-warning);
+  --fx-badge-background: var(--fx-color-warning-light);
+}
+
+.fx-status-badge--danger {
+  --fx-badge-color: var(--fx-color-danger);
+  --fx-badge-background: var(--fx-color-danger-light);
+}
+
+.fx-status-badge--info {
+  --fx-badge-color: var(--fx-color-info);
+  --fx-badge-background: var(--fx-color-info-light);
+}
+
+.fx-status-badge--neutral {
+  --fx-badge-color: var(--fx-color-text);
+  --fx-badge-background: var(--fx-color-disabled);
+}
+
+/* Appearance */
+
+.fx-status-badge--filled {
+  background: var(--fx-badge-background);
+}
+
+.fx-status-badge--outline {
+  background: transparent;
+  border-color: var(--fx-badge-color);
+}
+
+/* Sizes */
+
+.fx-status-badge--sm {
+  min-height: 22px;
+  padding: 2px 8px;
+  font-size: var(--fx-font-xs);
+}
+
+.fx-status-badge--md {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: var(--fx-font-sm);
+}
+
+.fx-status-badge--lg {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: var(--fx-font-md);
+}
+
+.fx-status-badge--sm .fx-status-badge-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.fx-status-badge--lg .fx-status-badge-dot {
+  width: 8px;
+  height: 8px;
+}

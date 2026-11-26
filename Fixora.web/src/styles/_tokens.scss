@@ -1,0 +1,145 @@
+:root {
+  /* Brand colours */
+  --fx-color-primary: #104e56;
+  --fx-color-primary-hover: #0c3e45;
+  --fx-color-secondary: #287d85;
+  --fx-color-primary-light: #edf6f6;
+
+  /* Surface colours */
+  --fx-color-background: #f4f7f8;
+  --fx-color-surface: #ffffff;
+  --fx-color-border: #e2e8f0;
+
+  /* Typography colours */
+  --fx-color-text: #1e293b;
+  --fx-color-text-muted: #64748b;
+  --fx-color-text-inverse: #ffffff;
+
+  /* Semantic colours */
+  --fx-color-success: #15803d;
+  --fx-color-success-light: #dcfce7;
+
+  --fx-color-warning: #b45309;
+  --fx-color-warning-light: #fef3c7;
+
+  --fx-color-danger: #b91c1c;
+  --fx-color-danger-hover: #991b1b;
+  --fx-color-danger-light: #fee2e2;
+
+  --fx-color-info: #1d4ed8;
+  --fx-color-info-light: #dbeafe;
+
+  --fx-color-disabled: #e2e8f0;
+  --fx-color-disabled-text: #64748b;
+  --fx-color-focus: #287d85;
+
+  /* Typography */
+  --fx-font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+
+  --fx-font-xs: 0.75rem;
+  --fx-font-sm: 0.875rem;
+  --fx-font-md: 1rem;
+  --fx-font-lg: 1.125rem;
+  --fx-font-xl: 1.25rem;
+  --fx-font-2xl: 1.5rem;
+  --fx-font-3xl: 1.875rem;
+
+  --fx-weight-normal: 400;
+  --fx-weight-medium: 500;
+  --fx-weight-semibold: 600;
+  --fx-weight-bold: 700;
+
+  --fx-line-height: 1.5;
+
+  /* Spacing */
+  --fx-space-1: 4px;
+  --fx-space-2: 8px;
+  --fx-space-3: 12px;
+  --fx-space-4: 16px;
+  --fx-space-5: 20px;
+  --fx-space-6: 24px;
+  --fx-space-8: 32px;
+  --fx-space-10: 40px;
+  --fx-space-12: 48px;
+
+  /* Border radius */
+  --fx-radius-sm: 4px;
+  --fx-radius-md: 8px;
+  --fx-radius-lg: 12px;
+  --fx-radius-xl: 16px;
+  --fx-radius-full: 9999px;
+
+  /* Elevation */
+  --fx-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --fx-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.1);
+  --fx-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.14);
+
+  /* Layout */
+  --fx-sidebar-width: 250px;
+  --fx-topbar-height: 64px;
+  --fx-control-height: 44px;
+
+  /* Layering */
+  --fx-z-sticky: 10;
+  --fx-z-dropdown: 100;
+  --fx-z-modal: 1000;
+  --fx-z-toast: 1100;
+
+  /* Motion */
+  --fx-transition-fast: 150ms ease;
+  --fx-transition-normal: 250ms ease;
+}
+/* FIXORA Manager Portal - Dark Theme */
+:root.dark-theme {
+  --fx-color-primary: #5eead4;
+  --fx-color-primary-hover: #99f6e4;
+  --fx-color-secondary: #2dd4bf;
+  --fx-color-primary-light: #164e53;
+
+  --fx-color-background: #0f172a;
+  --fx-color-surface: #1e293b;
+  --fx-color-border: #334155;
+
+  --fx-color-text: #e2e8f0;
+  --fx-color-text-muted: #94a3b8;
+  --fx-color-text-inverse: #0f172a;
+
+  --fx-color-success: #4ade80;
+  --fx-color-success-light: #14532d;
+
+  --fx-color-warning: #fbbf24;
+  --fx-color-warning-light: #78350f;
+
+  --fx-color-danger: #f87171;
+  --fx-color-danger-hover: #fca5a5;
+  --fx-color-danger-light: #7f1d1d;
+
+  --fx-color-info: #60a5fa;
+  --fx-color-info-light: #1e3a8a;
+
+  --fx-color-disabled: #334155;
+  --fx-color-disabled-text: #94a3b8;
+  --fx-color-focus: #5eead4;
+
+  --fx-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --fx-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --fx-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+/* FIXORA Sidebar Theme Tokens */
+:root {
+  --fx-sidebar-background: #104e56;
+  --fx-sidebar-text: #ffffff;
+  --fx-sidebar-muted: #b9dcdf;
+  --fx-sidebar-heading: #a9ced2;
+  --fx-sidebar-link: #dbeef0;
+  --fx-sidebar-active: #287d85;
+}
+
+:root.dark-theme {
+  --fx-sidebar-background: #102b35;
+  --fx-sidebar-text: #f1f5f9;
+  --fx-sidebar-muted: #94bfc4;
+  --fx-sidebar-heading: #8fb8bd;
+  --fx-sidebar-link: #d1e7e9;
+  --fx-sidebar-active: #17636b;
+}

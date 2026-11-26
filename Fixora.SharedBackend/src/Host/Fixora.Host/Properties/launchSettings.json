@@ -1,0 +1,19 @@
+﻿{
+  "$schema": "https://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "Fixora (SQL Server)": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:5080/swagger",
+      "applicationUrl": "http://0.0.0.0:5080",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    },
+    "Fixora (in-memory demo)": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "launchUrl": "http://localhost:5080/swagger",
+      "applicationUrl": "http://0.0.0.0:5080",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Demo" }
+    }
+  }
+}

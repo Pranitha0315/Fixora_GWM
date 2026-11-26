@@ -1,0 +1,29 @@
+<div [class]="cardClasses()">
+  @if (showHeader()) {
+    <div class="fx-card-header">
+      <div class="fx-card-heading">
+        @if (title()) {
+          <h2 class="fx-card-title">{{ title() }}</h2>
+        }
+
+        @if (subtitle()) {
+          <p class="fx-card-subtitle">{{ subtitle() }}</p>
+        }
+      </div>
+
+      <div class="fx-card-actions">
+        <ng-content select="[card-actions]"></ng-content>
+      </div>
+    </div>
+  }
+
+  <div class="fx-card-body">
+    <ng-content></ng-content>
+  </div>
+
+  @if (showFooter()) {
+    <div class="fx-card-footer">
+      <ng-content select="[card-footer]"></ng-content>
+    </div>
+  }
+</div>

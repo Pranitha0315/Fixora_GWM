@@ -1,0 +1,53 @@
+FIXORA booking-audit migration 25/11/2026 13:12:00.15 
+  Determining projects to restore...
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Domain\Fixora.Customer.Domain.csproj (in 233 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.Shared.Contracts\Fixora.Shared.Contracts.csproj (in 233 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Domain\Fixora.Mechanic.Domain.csproj (in 6 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Contracts\Fixora.Mechanic.Contracts.csproj (in 3 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.Shared.Infrastructure\Fixora.Shared.Infrastructure.csproj (in 612 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Application\Fixora.Mechanic.Application.csproj (in 168 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Api\Fixora.Customer.Api.csproj (in 616 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Infrastructure\Fixora.Customer.Infrastructure.csproj (in 239 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Infrastructure\Fixora.Mechanic.Infrastructure.csproj (in 614 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Infrastructure\Fixora.Manager.Infrastructure.csproj (in 87 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Contracts\Fixora.Customer.Contracts.csproj (in 3 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Domain\Fixora.Manager.Domain.csproj (in 72 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Api\Fixora.Mechanic.Api.csproj (in 126 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Contracts\Fixora.Manager.Contracts.csproj (in 80 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.SharedKernel\Fixora.SharedKernel.csproj (in 3 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Application\Fixora.Manager.Application.csproj (in 20 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Host\Fixora.Host\Fixora.Host.csproj (in 765 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Application\Fixora.Customer.Application.csproj (in 139 ms).
+  Restored C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Api\Fixora.Manager.Api.csproj (in 19 ms).
+  Fixora.Mechanic.Contracts -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Contracts\bin\Debug\net10.0\Fixora.Mechanic.Contracts.dll
+  Fixora.SharedKernel -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.SharedKernel\bin\Debug\net10.0\Fixora.SharedKernel.dll
+  Fixora.Customer.Contracts -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Contracts\bin\Debug\net10.0\Fixora.Customer.Contracts.dll
+  Fixora.Manager.Contracts -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Contracts\bin\Debug\net10.0\Fixora.Manager.Contracts.dll
+  Fixora.Manager.Domain -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Domain\bin\Debug\net10.0\Fixora.Manager.Domain.dll
+  Fixora.Customer.Domain -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Domain\bin\Debug\net10.0\Fixora.Customer.Domain.dll
+  Fixora.Mechanic.Domain -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Domain\bin\Debug\net10.0\Fixora.Mechanic.Domain.dll
+  Fixora.Shared.Contracts -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.Shared.Contracts\bin\Debug\net10.0\Fixora.Shared.Contracts.dll
+  Fixora.Manager.Application -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Application\bin\Debug\net10.0\Fixora.Manager.Application.dll
+  Fixora.Mechanic.Application -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Application\bin\Debug\net10.0\Fixora.Mechanic.Application.dll
+  Fixora.Shared.Infrastructure -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Shared\Fixora.Shared.Infrastructure\bin\Debug\net10.0\Fixora.Shared.Infrastructure.dll
+  Fixora.Manager.Api -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Api\bin\Debug\net10.0\Fixora.Manager.Api.dll
+  Fixora.Mechanic.Infrastructure -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Infrastructure\bin\Debug\net10.0\Fixora.Mechanic.Infrastructure.dll
+  Fixora.Mechanic.Api -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Mechanic\Fixora.Mechanic.Api\bin\Debug\net10.0\Fixora.Mechanic.Api.dll
+  Fixora.Manager.Infrastructure -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Manager\Fixora.Manager.Infrastructure\bin\Debug\net10.0\Fixora.Manager.Infrastructure.dll
+  Fixora.Customer.Application -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Application\bin\Debug\net10.0\Fixora.Customer.Application.dll
+  Fixora.Customer.Infrastructure -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Infrastructure\bin\Debug\net10.0\Fixora.Customer.Infrastructure.dll
+  Fixora.Customer.Api -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Customer\Fixora.Customer.Api\bin\Debug\net10.0\Fixora.Customer.Api.dll
+  Fixora.Host -> C:\GWMS\Gwm\Fixora_GWM\Fixora.SharedBackend\src\Host\Fixora.Host\bin\Debug\net10.0\Fixora.Host.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:43.11
+Build started...
+Build succeeded.
+Done. To undo this action, use 'ef migrations remove'
+Build started...
+Build succeeded.
+Done.
+ALL DONE 
