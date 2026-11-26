@@ -26,7 +26,23 @@ public sealed class MechanicJobService(IWorkshopJobGateway jobs, ICustomerDirect
     public Task<IReadOnlyList<ProposalDto>> ProposalsAsync(Guid mechanicId, Guid jobId, CancellationToken ct) => jobs.ListProposalsAsync(mechanicId, jobId, ct);
     public Task<ChangeRequestDto> AcknowledgeChangeAsync(Guid mechanicId, Guid changeId, string? note, CancellationToken ct) => jobs.AcknowledgeChangeRequestAsync(mechanicId, changeId, note, ct);
 
-    public Task<IReadOnlyList<SosDto>> SosAlertsAsync(Guid mechanicId, CancellationToken ct) => sos.ListForMechanicAsync(mechanicId, ct);
-    public Task<SosDto> SosStatusAsync(Guid mechanicId, Guid sosId, string status, string? note, CancellationToken ct)
-        => sos.UpdateStatusAsync(sosId, Fixora.SharedKernel.Roles.Mechanic, mechanicId, status, note, ct);
+    /// <summary>FX13-D10-NID-2: closed SOS hides lat/lng on mechanic responses only (DB + manager views keep coords).</summary>
+    public async Task<IReadOnlyList<SosDto>> SosAlertsAsync(Guid mechanicId, CancellationToken ct)
+    {
+        var rows = await sos.ListForMechanicAsync(mechanicId, ct);
+        return rows.Select(ForMechanicView).ToList();
+    }
+
+    public async Task<SosDto> SosStatusAsync(Guid mechanicId, Guid sosId, string status, string? note, CancellationToken ct)
+    {
+        var dto = await sos.UpdateStatusAsync(sosId, Fixora.SharedKernel.Roles.Mechanic, mechanicId, status, note, ct);
+        return ForMechanicView(dto);
+    }
+
+    /// <summary>Response-layer privacy: Resolved/Cancelled → null lat/lng for the mechanic app map hide.</summary>
+    internal static SosDto ForMechanicView(SosDto dto)
+    {
+        if (dto.Status is not ("Resolved" or "Cancelled")) return dto;
+        return dto with { Lat = null, Lng = null };
+    }
 }

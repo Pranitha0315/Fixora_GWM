@@ -178,12 +178,31 @@ public sealed class SosService(ICustomerDb db, INotificationService notifier, IC
         _ => "Other",
     };
 
+    /// <summary>
+    /// FX13-D10-NID-2: staff + customer get full coords; assigned mechanic gets a split publish
+    /// with lat/lng nulled after Resolved/Cancelled (HTTP mechanic path already redacts).
+    /// </summary>
     private async Task PublishAsync(SosRequest sos, CancellationToken ct)
     {
         var dto = await ToDtoAsync(sos, ct);
-        var groups = new List<string> { RealtimeGroups.Staff, RealtimeGroups.User(sos.CustomerId) };
-        if (sos.AssignedMechanicId is { } m) groups.Add(RealtimeGroups.User(m));
-        await notifier.PublishAsync(RealtimeEvents.SosUpdated, dto, groups, ct);
+        await notifier.PublishAsync(
+            RealtimeEvents.SosUpdated,
+            dto,
+            new[] { RealtimeGroups.Staff, RealtimeGroups.User(sos.CustomerId) },
+            ct);
+        if (sos.AssignedMechanicId is { } m)
+            await notifier.PublishAsync(
+                RealtimeEvents.SosUpdated,
+                ForMechanicRealtime(dto),
+                new[] { RealtimeGroups.User(m) },
+                ct);
+    }
+
+    /// <summary>Response-layer privacy for mechanic SignalR: closed SOS hides map coords.</summary>
+    public static SosDto ForMechanicRealtime(SosDto dto)
+    {
+        if (dto.Status is not ("Resolved" or "Cancelled")) return dto;
+        return dto with { Lat = null, Lng = null };
     }
 
     private async Task<IReadOnlyList<SosDto>> ToDtosAsync(List<SosRequest> rows, CancellationToken ct)
