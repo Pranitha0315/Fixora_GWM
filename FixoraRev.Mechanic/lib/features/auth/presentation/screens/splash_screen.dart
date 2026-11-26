@@ -6,10 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/di/app_services.dart';
 import '../../../../core/utils/nav.dart';
-import '../../../shell/presentation/main_shell.dart';
-import '../../../authentication/presentation/screens/login_screen.dart';
 import '../../../quick_login/data/quick_login_store.dart';
-import '../../../quick_login/presentation/screens/quick_login_screen.dart';
 
 /// Full-bleed brand splash matching the FIXORA REV garage artwork.
 class SplashScreen extends StatefulWidget {
@@ -38,10 +35,12 @@ class _SplashScreenState extends State<SplashScreen>
       Future<void>.delayed(const Duration(milliseconds: 2800)),
     ]).then((_) {
       if (!mounted) return;
-      context.resetTo(
+      // Navigate through GoRouter (not a raw Navigator reset) so the route stack stays in sync.
+      // A reset here re-runs this splash under later pushes and kicks the user back to login.
+      context.goRoute(
         AppServices.auth.isLoggedIn
-            ? const MainShell()
-            : (quick.enabled ? const QuickLoginScreen() : const LoginScreen()),
+            ? RouteNames.shell
+            : (quick.enabled ? RouteNames.quickLogin : RouteNames.login),
       );
     });
   }
