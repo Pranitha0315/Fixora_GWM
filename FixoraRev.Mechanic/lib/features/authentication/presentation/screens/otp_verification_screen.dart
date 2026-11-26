@@ -7,6 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_typography.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../../core/widgets/common.dart';
+import '../../../auth/domain/auth_entities.dart';
 import '../../../auth/presentation/screens/status_screens.dart';
 import '../../../shell/presentation/main_shell.dart';
 import '../../../../core/di/app_services.dart';
@@ -110,26 +111,46 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       return;
     }
     if (widget.args.purpose == OtpPurpose.login) {
-      final store = QuickLoginStore.instance;
-      await store.load();
-      if (!mounted) return;
-      final needsSetup = !store.enabled || store.email != widget.email.trim().toLowerCase();
-      context.resetTo(LoadingScreen(
-        title: 'Signing you in…',
-        subtitle: 'Please wait',
-        next: needsSetup
-            ? QuickLoginSetupScreen(
-                email: widget.email.trim().toLowerCase(),
-                name: AppServices.auth.user?.fullName ?? 'Mechanic',
-              )
-            : const MainShell(),
-      ));
+      await _goToGarage();
       return;
     }
+    // Email verified: sign the new account in so the mechanic goes straight into the garage
+    // (the login page only takes the garage PIN, so the new email/password account can't use it).
+    try {
+      await AppServices.auth.restoreSession(widget.email.trim().toLowerCase());
+    } on AuthFailure {
+      if (mounted) {
+        setState(() {
+          _verifying = false;
+          _error = 'Could not sign you in. Try again.';
+        });
+      }
+      return;
+    }
+    if (!mounted) return;
     setState(() {
       _verifying = false;
       _verified = true;
     });
+  }
+
+  /// Opens the garage: first time on this phone → set the quick-login PIN, otherwise → Home.
+  Future<void> _goToGarage() async {
+    final email = widget.email.trim().toLowerCase();
+    final store = QuickLoginStore.instance;
+    await store.load();
+    if (!mounted) return;
+    final needsSetup = !store.enabled || store.email != email;
+    context.resetTo(LoadingScreen(
+      title: 'Signing you in…',
+      subtitle: 'Please wait',
+      next: needsSetup
+          ? QuickLoginSetupScreen(
+              email: email,
+              name: AppServices.auth.user?.fullName ?? 'Mechanic',
+            )
+          : const MainShell(),
+    ));
   }
 
   @override
