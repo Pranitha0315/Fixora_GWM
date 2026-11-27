@@ -120,7 +120,10 @@ print(f"  {'PASS' if st == 'Dispatched' else 'FAIL'}  customer reads status {st}
 
 print("Flow D · Booking capacity: the last slot goes to one customer, the next gets 409")
 import datetime
-day = (datetime.date.today() + datetime.timedelta(days=2)).isoformat()
+day_date = datetime.date.today() + datetime.timedelta(days=2)
+while day_date.weekday() == 6:  # workshop is closed on Sundays; skip forward to a working day
+    day_date += datetime.timedelta(days=1)
+day = day_date.isoformat()
 svc = "60000000-0000-0000-0000-000000000004"
 slots = get(f"/api/v1/customer/appointments/slots?date={day}&serviceId={svc}", cust)
 slot = next(s for s in slots if s["freeBays"] > 0)
