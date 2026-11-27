@@ -1,0 +1,391 @@
+<section class="queue-page">
+  <header class="queue-header">
+    <div class="queue-heading">
+      <h1>Adaptive Queue</h1>
+      <p>
+        Queue positions and indicative completion times are calculated
+        by the backend and shown as received.
+      </p>
+
+      @if (state.hasBoard()) {
+        <p class="queue-sync" role="status">
+          @if (state.isRefreshing()) {
+            <span class="queue-sync-refreshing">Refreshing...</span>
+          }
+
+          @if (state.lastSyncedAt(); as synced) {
+            <span class="queue-sync-time">
+              Last synced: {{ synced | date: 'medium' }}
+            </span>
+          }
+
+          @if (state.isStale()) {
+            <fx-status-badge
+              class="queue-sync-stale"
+              size="sm"
+              tone="warning"
+              label="May be out of date"
+            />
+          }
+        </p>
+      }
+
+      @if (realtime.showConnection()) {
+        <div
+          class="queue-connection"
+          role="status"
+          [attr.data-connection]="realtime.connection().state"
+        >
+          <fx-status-badge
+            class="queue-connection-badge"
+            size="sm"
+            appearance="outline"
+            [tone]="connectionTone()"
+            [label]="realtime.connection().label"
+          />
+          <span class="queue-connection-description">
+            {{ realtime.connection().description }}
+          </span>
+
+          @if (realtime.canReconnect()) {
+            <fx-button
+              class="queue-reconnect"
+              variant="ghost"
+              size="sm"
+              (pressed)="reconnect()"
+            >
+              Reconnect live updates
+            </fx-button>
+          }
+        </div>
+      }
+    </div>
+
+    <fx-button
+      class="queue-refresh"
+      variant="outline"
+      [disabled]="state.isLoading()"
+      (pressed)="refresh()"
+    >
+      Refresh
+    </fx-button>
+  </header>
+
+  @if (state.viewState() === 'loading') {
+    <fx-loading-state
+      message="Loading adaptive queue..."
+      description="Retrieving jobs and bays."
+    />
+  } @else if (state.viewState() === 'error') {
+    <fx-error-state
+      [title]="errorTitle()"
+      [description]="errorDescription()"
+      [showRetry]="canRetry()"
+      (retryRequested)="refresh()"
+    />
+  } @else if (state.viewState() === 'idle') {
+    <fx-empty-state
+      title="Queue not loaded"
+      description="Refresh to load the adaptive queue."
+      actionLabel="Refresh"
+      (actionRequested)="refresh()"
+    />
+  } @else if (state.capacity(); as capacity) {
+    @if (state.refreshError()) {
+      <fx-alert
+        class="queue-refresh-alert"
+        tone="warning"
+        title="Latest refresh failed"
+        [message]="refreshFailureMessage()"
+        [announce]="false"
+      />
+    } @else if (state.isStale()) {
+      <fx-alert
+        class="queue-stale-alert"
+        tone="warning"
+        title="Queue data may be out of date"
+        [message]="staleMessage()"
+        [announce]="false"
+      />
+    }
+
+    @if (state.mechanicsStatus() === 'failed') {
+      <fx-alert
+        class="queue-roster-alert"
+        tone="info"
+        title="Mechanic roster unavailable"
+        [message]="rosterAlertMessage()"
+        [announce]="false"
+      />
+    }
+
+    <div class="queue-summary">
+      <fx-kpi-card
+        class="queue-kpi-waiting"
+        label="Waiting jobs"
+        [value]="capacity.waitingJobCount"
+        [showIcon]="false"
+      />
+      <fx-kpi-card
+        class="queue-kpi-active-phase"
+        label="Active-phase jobs"
+        [value]="capacity.activePhaseJobCount"
+        [showIcon]="false"
+      />
+      <fx-kpi-card
+        class="queue-kpi-bays"
+        label="Active bays"
+        [value]="capacity.activeBayCount"
+        [showIcon]="false"
+      />
+      <fx-kpi-card
+        class="queue-kpi-mechanics"
+        label="On-duty mechanics"
+        [value]="mechanicsKpi().value"
+        [description]="mechanicsKpi().description"
+        [showIcon]="false"
+      />
+    </div>
+
+    @if (state.viewState() === 'empty') {
+      <fx-empty-state
+        class="queue-empty"
+        [compact]="true"
+        title="No active jobs"
+        description="There are no waiting or active-phase jobs right now."
+      />
+    }
+
+    @if (state.warnings().length > 0) {
+      <section class="queue-section queue-advisories" aria-labelledby="advisories-heading">
+        <h2 id="advisories-heading">Advisories</h2>
+
+        <div class="queue-advisory-list">
+          @for (warning of state.warnings(); track warning.code) {
+            <fx-alert
+              class="queue-advisory"
+              [tone]="warning.severity === 'warning' ? 'warning' : 'info'"
+              [title]="warningTitle(warning.code)"
+              [message]="warning.message"
+              [announce]="false"
+            />
+          }
+        </div>
+
+        @if (hasSharedAssignments()) {
+          <ul class="queue-shared-assignments">
+            @for (group of state.duplicateBayAssignments(); track group.bayId) {
+              <li class="queue-shared-bay">
+                <strong>{{ group.bayLabel }}</strong>
+                is referenced by {{ group.jobs.length }} active-phase jobs:
+                @for (entry of group.jobs; track entry.job.id; let last = $last) {
+                  {{ entry.job.number }}{{ last ? '.' : ',' }}
+                }
+                Advisory only; this is not confirmed physical occupancy.
+              </li>
+            }
+
+            @for (group of state.duplicateMechanicAssignments(); track group.mechanicId) {
+              <li class="queue-shared-mechanic">
+                <strong>{{ group.mechanicLabel }}</strong>
+                is assigned to {{ group.jobs.length }} active-phase jobs:
+                @for (entry of group.jobs; track entry.job.id; let last = $last) {
+                  {{ entry.job.number }}{{ last ? '.' : ',' }}
+                }
+                Advisory only.
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+
+    <section class="queue-section queue-waiting" aria-labelledby="waiting-heading">
+      <h2 id="waiting-heading">
+        Waiting queue ({{ state.waitingJobs().length }})
+      </h2>
+      <p class="queue-hint">
+        One global queue in backend queue-position order. A bay shown on
+        a waiting job is a pre-assignment, not a reservation.
+      </p>
+
+      @if (state.waitingJobs().length > 0) {
+        <p class="queue-hint queue-reorder-note" role="note">
+          {{ reorderAvailability.message }}
+        </p>
+      }
+
+      @if (state.waitingJobs().length === 0) {
+        <p class="queue-none queue-waiting-empty">No jobs are waiting.</p>
+      } @else {
+        <ol class="queue-job-list queue-waiting-list">
+          @for (entry of state.waitingJobs(); track entry.job.id) {
+            <li>
+              <app-adaptive-queue-job-card
+                [item]="entry"
+                [showQueuePosition]="true"
+              />
+            </li>
+          }
+        </ol>
+      }
+    </section>
+
+    <section class="queue-section queue-bays" aria-labelledby="bays-heading">
+      <h2 id="bays-heading">
+        Active bays ({{ state.bayColumns().length }})
+      </h2>
+      <p class="queue-hint">
+        Jobs are grouped by the bay recorded on each job. A bay
+        assignment does not confirm that a vehicle is physically in the
+        bay.
+      </p>
+
+      @if (state.bayColumns().length === 0) {
+        <p class="queue-none queue-bays-empty">
+          No active bays are configured.
+        </p>
+      } @else {
+        <div class="queue-bay-grid">
+          @for (column of state.bayColumns(); track column.bay.id) {
+            <article class="queue-bay">
+              <header class="queue-bay-header">
+                <h3>{{ column.bay.name }}</h3>
+
+                @if (column.hasDuplicateActivePhaseAssignment) {
+                  <fx-status-badge
+                    class="queue-bay-advisory"
+                    size="sm"
+                    tone="warning"
+                    label="Shared assignment (advisory)"
+                  />
+                }
+              </header>
+
+              <div class="queue-bay-group queue-bay-active">
+                <h4>Active-phase jobs ({{ column.activePhaseJobs.length }})</h4>
+
+                @if (column.activePhaseJobs.length === 0) {
+                  <p class="queue-none">
+                    No active-phase job is assigned to this bay.
+                  </p>
+                } @else {
+                  <ul class="queue-job-list">
+                    @for (entry of column.activePhaseJobs; track entry.job.id) {
+                      <li>
+                        <app-adaptive-queue-job-card [item]="entry" />
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+
+              <div class="queue-bay-group queue-bay-preassigned">
+                <h4>
+                  Waiting jobs pre-assigned
+                  ({{ column.preAssignedWaitingJobs.length }})
+                </h4>
+
+                @if (column.preAssignedWaitingJobs.length === 0) {
+                  <p class="queue-none">
+                    No waiting jobs are pre-assigned to this bay.
+                  </p>
+                } @else {
+                  <ul class="queue-job-list">
+                    @for (entry of column.preAssignedWaitingJobs; track entry.job.id) {
+                      <li>
+                        <app-adaptive-queue-job-card
+                          [item]="entry"
+                          [showQueuePosition]="true"
+                        />
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            </article>
+          }
+        </div>
+      }
+    </section>
+
+    @if (hasFallbackGroups()) {
+      <section class="queue-section queue-fallbacks" aria-labelledby="fallbacks-heading">
+        <h2 id="fallbacks-heading">Jobs outside active bays</h2>
+        <p class="queue-hint">
+          These jobs do not belong to an active bay column.
+        </p>
+
+        @if (unassignedActivePhaseJobs().length > 0) {
+          <div class="queue-group queue-unassigned">
+            <h3>
+              Active-phase jobs with no bay
+              ({{ unassignedActivePhaseJobs().length }})
+            </h3>
+            <ul class="queue-job-list">
+              @for (entry of unassignedActivePhaseJobs(); track entry.job.id) {
+                <li><app-adaptive-queue-job-card [item]="entry" /></li>
+              }
+            </ul>
+          </div>
+        }
+
+        @for (group of state.inactiveBayAssignments(); track group.bayId) {
+          <div class="queue-group queue-inactive-bay">
+            <h3>{{ group.bayLabel }} (inactive bay)</h3>
+            <ul class="queue-job-list">
+              @for (entry of group.jobs; track entry.job.id) {
+                <li>
+                  <app-adaptive-queue-job-card
+                    [item]="entry"
+                    [showQueuePosition]="entry.phase === 'waiting'"
+                  />
+                </li>
+              }
+            </ul>
+          </div>
+        }
+
+        @for (group of state.unknownBayAssignments(); track group.bayId) {
+          <div class="queue-group queue-unknown-bay">
+            <h3>{{ group.bayLabel }} (not in the bay list)</h3>
+            <ul class="queue-job-list">
+              @for (entry of group.jobs; track entry.job.id) {
+                <li>
+                  <app-adaptive-queue-job-card
+                    [item]="entry"
+                    [showQueuePosition]="entry.phase === 'waiting'"
+                  />
+                </li>
+              }
+            </ul>
+          </div>
+        }
+      </section>
+    }
+
+    @if (state.unrecognizedStatusJobs().length > 0) {
+      <section class="queue-section queue-unrecognized" aria-labelledby="unrecognized-heading">
+        <h2 id="unrecognized-heading">
+          Unrecognized status ({{ state.unrecognizedStatusJobs().length }})
+        </h2>
+        <p class="queue-hint">
+          Listed so they are not lost. They are not counted as waiting
+          or active-phase jobs.
+        </p>
+
+        <ul class="queue-job-list">
+          @for (entry of state.unrecognizedStatusJobs(); track entry.job.id) {
+            <li><app-adaptive-queue-job-card [item]="entry" /></li>
+          }
+        </ul>
+      </section>
+    }
+
+    <p class="queue-footnote">
+      Times are shown in Asia/Colombo. A completion time is an
+      indicative estimate from the backend, not a start time or a
+      commitment.
+    </p>
+  }
+</section>

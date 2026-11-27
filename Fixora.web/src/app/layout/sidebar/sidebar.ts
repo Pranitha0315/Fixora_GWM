@@ -21,11 +21,12 @@ export class Sidebar {
     { label: 'Bookings', route: '/bookings', icon: '02' },
     { label: 'Vehicles', route: '/vehicles', icon: '03' },
     { label: 'Job Cards', route: '/job-cards', icon: '04' },
-    { label: 'Mechanics', route: '/mechanics', icon: '05' },
-    { label: 'Spare Parts', route: '/spare-parts', icon: '06' },
-    { label: 'Inventory', route: '/inventory', icon: '07' },
-    { label: 'Billing', route: '/billing', icon: '08' },
-    { label: 'Reports', route: '/reports', icon: '09' },
-    { label: 'Notifications', route: '/notifications', icon: '10' },
+    { label: 'Adaptive Queue', route: '/adaptive-queue', icon: '05' },
+    { label: 'Mechanics', route: '/mechanics', icon: '06' },
+    { label: 'Spare Parts', route: '/spare-parts', icon: '07' },
+    { label: 'Inventory', route: '/inventory', icon: '08' },
+    { label: 'Billing', route: '/billing', icon: '09' },
+    { label: 'Reports', route: '/reports', icon: '10' },
+    { label: 'Notifications', route: '/notifications', icon: '11' },
   ];
 }

@@ -1,0 +1,63 @@
+<article class="job-card" [attr.data-phase]="item().phase">
+  <header class="job-card-header">
+    <div class="job-card-title">
+      @if (showQueuePosition()) {
+        <span class="job-card-position">
+          Queue #{{ item().job.queuePosition }}
+        </span>
+      }
+
+      <strong class="job-card-number">{{ item().job.number }}</strong>
+    </div>
+
+    <div class="job-card-badges">
+      <fx-status-badge
+        class="job-card-status"
+        size="sm"
+        [label]="statusLabel()"
+        [tone]="statusTone()"
+      />
+
+      <fx-status-badge
+        class="job-card-priority"
+        size="sm"
+        appearance="outline"
+        [showDot]="false"
+        [label]="item().priorityLabel + ' priority'"
+        [tone]="priorityTone()"
+      />
+    </div>
+  </header>
+
+  <dl class="job-card-details">
+    <div class="job-card-field">
+      <dt>Customer</dt>
+      <dd class="job-card-customer">{{ item().job.customerName }}</dd>
+    </div>
+
+    <div class="job-card-field">
+      <dt>Vehicle</dt>
+      <dd class="job-card-vehicle">{{ item().job.vehicleLabel }}</dd>
+    </div>
+
+    <div class="job-card-field">
+      <dt>Mechanic</dt>
+      <dd class="job-card-mechanic">{{ mechanicText() }}</dd>
+    </div>
+
+    <div class="job-card-field">
+      <dt>Bay assignment</dt>
+      <dd class="job-card-bay">{{ bayText() }}</dd>
+    </div>
+
+    <div class="job-card-field">
+      <dt>Indicative completion</dt>
+      <dd
+        class="job-card-eta"
+        [class.job-card-eta--unavailable]="!hasEta()"
+      >
+        {{ etaText() }}
+      </dd>
+    </div>
+  </dl>
+</article>
