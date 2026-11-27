@@ -112,8 +112,9 @@ public sealed class ChangeRequestService(IManagerDb db, INotificationService not
     private async Task Publish(CustomerChangeRequest cr, JobCard job, bool toMechanic, CancellationToken ct)
     {
         var dto = WorkshopReadModel.ChangeRequest(cr, job.Number);
-        var groups = new List<string> { RealtimeGroups.Staff, RealtimeGroups.User(job.CustomerId) };
-        if (toMechanic && job.MechanicId is { } mech) groups.Add(RealtimeGroups.User(mech));
-        await notifier.PublishAsync(RealtimeEvents.ChangeRequestUpdated, dto, groups, ct);
+        var staff = new List<string> { RealtimeGroups.Staff };
+        if (toMechanic && job.MechanicId is { } mech) staff.Add(RealtimeGroups.User(mech));
+        await notifier.PublishAsync(RealtimeEvents.ChangeRequestUpdated, dto, staff, ct);
+        await notifier.PublishAsync(RealtimeEvents.ChangeRequestUpdated, dto.ForCustomer(), new[] { RealtimeGroups.User(job.CustomerId) }, ct);
     }
 }

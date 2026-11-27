@@ -66,14 +66,14 @@ public sealed class WorkshopGateway(
             .OrderByDescending(p => p.PublishedAt).Select(p => p.Id).ToListAsync(ct);
         var list = new List<ProposalDto>();
         foreach (var id in ids) list.Add(await read.ProposalAsync(id, false, ct));
-        return list;
+        return list.ForCustomer();
     }
 
-    public Task<ProposalDto> DecideItemsAsync(Guid customerId, Guid proposalId, DecideItemsRequest request, string idempotencyKey, CancellationToken ct = default)
-        => approvals.DecideAsync(customerId, proposalId, request, idempotencyKey, ct);
+    public async Task<ProposalDto> DecideItemsAsync(Guid customerId, Guid proposalId, DecideItemsRequest request, string idempotencyKey, CancellationToken ct = default)
+        => (await approvals.DecideAsync(customerId, proposalId, request, idempotencyKey, ct)).ForCustomer();
 
-    public Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default)
-        => changes.CreateAsync(customerId, jobId, request, ct);
+    public async Task<ChangeRequestDto> CreateChangeRequestAsync(Guid customerId, Guid jobId, ChangeRequestCreate request, CancellationToken ct = default)
+        => (await changes.CreateAsync(customerId, jobId, request, ct)).ForCustomer();
 
     public Task<IReadOnlyList<InvoiceDto>> ListInvoicesAsync(Guid customerId, CancellationToken ct = default) => billing.ListAsync(customerId, null, ct);
 

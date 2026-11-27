@@ -12,10 +12,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Fixora.Tests.Integration;
 
 /// <summary>
-/// CURRENT BEHAVIOUR (characterization only — no production change).
-/// Forwarding a proposal publishes approval.updated to the customer with the manager note still set.
-/// Forwarding a change request publishes one changeRequest.updated to staff, the customer, and the mechanic,
-/// and that payload still contains the forward note. Decline reasons are a different path and are not covered here.
+/// Forwarding publishes the manager note to staff and the assigned mechanic.
+/// The customer copy of approval.updated and changeRequest.updated has that note removed.
+/// The decline notification text is a separate customer-facing message and is not asserted here.
 /// </summary>
 [Collection("api")]
 public sealed class ProposalNoteRealtimeVisibilityTests : IDisposable
@@ -65,7 +64,8 @@ public sealed class ProposalNoteRealtimeVisibilityTests : IDisposable
 
         var toCustomer = Assert.Single(events, e => e.Groups.Contains(RealtimeGroups.User(DemoIds.CustomerKavitha)));
         var customerPayload = Assert.IsType<ProposalDto>(toCustomer.Payload);
-        Assert.Equal(ProposalSentinel, customerPayload.ManagerNote);
+        Assert.Null(customerPayload.ManagerNote);
+        Assert.DoesNotContain(ProposalSentinel, System.Text.Json.JsonSerializer.Serialize(customerPayload));
 
         var toStaff = Assert.Single(events, e => e.Groups.Contains(RealtimeGroups.Staff));
         Assert.Equal(ProposalSentinel, Assert.IsType<ProposalDto>(toStaff.Payload).ManagerNote);
@@ -101,12 +101,13 @@ public sealed class ProposalNoteRealtimeVisibilityTests : IDisposable
             new { note = ChangeSentinel });
         Assert.Equal(HttpStatusCode.OK, res.StatusCode);
 
-        var published = Assert.Single(
-            _factory.Notifier.Events,
-            e => e.Event == RealtimeEvents.ChangeRequestUpdated);
-        Assert.Contains(RealtimeGroups.Staff, published.Groups);
-        Assert.Contains(RealtimeGroups.User(DemoIds.CustomerKavitha), published.Groups);
-        Assert.Contains(RealtimeGroups.User(DemoIds.MechanicRavi), published.Groups);
-        Assert.Equal(ChangeSentinel, Assert.IsType<ChangeRequestDto>(published.Payload).ManagerNote);
+        var published = _factory.Notifier.Events.Where(e => e.Event == RealtimeEvents.ChangeRequestUpdated).ToList();
+        var toStaff = Assert.Single(published, e => e.Groups.Contains(RealtimeGroups.Staff));
+        Assert.Contains(RealtimeGroups.User(DemoIds.MechanicRavi), toStaff.Groups);
+        Assert.DoesNotContain(RealtimeGroups.User(DemoIds.CustomerKavitha), toStaff.Groups);
+        Assert.Equal(ChangeSentinel, Assert.IsType<ChangeRequestDto>(toStaff.Payload).ManagerNote);
+
+        var toCustomer = Assert.Single(published, e => e.Groups.Contains(RealtimeGroups.User(DemoIds.CustomerKavitha)));
+        Assert.Null(Assert.IsType<ChangeRequestDto>(toCustomer.Payload).ManagerNote);
     }
 }

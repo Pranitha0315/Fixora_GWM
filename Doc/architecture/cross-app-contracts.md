@@ -510,12 +510,10 @@ Route declarations confirm endpoint presence, not all acceptance checks.
 - Walk-in overlap is not locked. Confirm and staff reschedule use CapacityLock and EnsureResourcesFree.
   WalkInAsync does not, so an overlapping walk-in is still accepted.
   BT09 and BT09b characterize that hole. The production change belongs in BookingService and needs Thanujan's approval.
-- A forwarded proposal manager note and a change-request manager note are still returned to the customer
-  on job detail and on pending approvals. The job-card manager note is hidden.
-  ProposalChangeRequestNoteVisibilityTests characterizes the HTTP payloads.
-  ProposalNoteRealtimeVisibilityTests characterizes approval.updated and changeRequest.updated:
-  the customer group receives the same manager note. Decline reasons are customer-facing on purpose and are not part of this gap.
-  Masking those two notes is a product decision; mechanic job detail must keep the note.
+- A forwarded proposal manager note and a change-request forward note are internal.
+  Customer job detail, pending approvals, and the customer SignalR copy now clear ManagerNote.
+  Staff and the assigned mechanic still receive it. The decline notification text stays customer-facing.
+  ProposalChangeRequestNoteVisibilityTests and ProposalNoteRealtimeVisibilityTests lock that split.
 - Review assignment concurrency, duplicate writes, workflow transitions,
   event payloads, recipients and ownership with the relevant sources.
 - The 22 passing tests cover their existing assertions only.

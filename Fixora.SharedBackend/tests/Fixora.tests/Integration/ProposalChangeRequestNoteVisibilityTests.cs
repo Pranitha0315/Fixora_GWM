@@ -14,10 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Fixora.Tests.Integration;
 
 /// <summary>
-/// CURRENT BEHAVIOUR (characterization only — no production change).
-/// The job-card manager note is stripped for customers. The manager note on a forwarded proposal and on a
-/// change request is not: it is still present on the customer job detail and on pending approvals.
-/// A product decision is required before this is treated as a bug fix.
+/// The manager note is internal. Customers do not receive it on the job card, on a proposal, on a change
+/// request, or on pending approvals. Staff still see all three.
 /// Uses the shared API host and removes the seeded rows afterwards.
 /// </summary>
 [Collection("api")]
@@ -49,6 +47,7 @@ public class ProposalChangeRequestNoteVisibilityTests(FixoraFactory factory)
             JobCardId = job.Id,
             MechanicId = DemoIds.MechanicRavi,
             Status = ProposalStatus.AwaitingCustomer,
+            MechanicNote = "vis-marker-3a91",
             ManagerNote = ProposalSentinel,
             SubmittedAt = DateTime.UtcNow,
             PublishedAt = DateTime.UtcNow,
@@ -105,10 +104,12 @@ public class ProposalChangeRequestNoteVisibilityTests(FixoraFactory factory)
 
             Assert.Null(detail.Job.ManagerNote);
             Assert.DoesNotContain(JobSentinel, body);
-            var proposal = Assert.Single(detail.Proposals, p => p.ManagerNote == ProposalSentinel);
-            var change = Assert.Single(detail.ChangeRequests, c => c.ManagerNote == ChangeSentinel);
-            Assert.Contains(ProposalSentinel, body);
-            Assert.Contains(ChangeSentinel, body);
+            var proposal = Assert.Single(detail.Proposals, p => p.MechanicNote == "vis-marker-3a91");
+            var change = Assert.Single(detail.ChangeRequests, c => c.Number == "CR-TEST-3A91");
+            Assert.Null(proposal.ManagerNote);
+            Assert.Null(change.ManagerNote);
+            Assert.DoesNotContain(ProposalSentinel, body);
+            Assert.DoesNotContain(ChangeSentinel, body);
             Assert.Equal(DemoIds.JobKavithaToday, proposal.JobCardId);
             Assert.Equal(DemoIds.JobKavithaToday, change.JobCardId);
         }
@@ -130,8 +131,9 @@ public class ProposalChangeRequestNoteVisibilityTests(FixoraFactory factory)
             var body = await res.Content.ReadAsStringAsync();
             var pending = JsonSerializer.Deserialize<List<ProposalDto>>(body, Web)!;
 
-            Assert.Contains(pending, p => p.ManagerNote == ProposalSentinel);
-            Assert.Contains(ProposalSentinel, body);
+            var proposal = Assert.Single(pending);
+            Assert.Null(proposal.ManagerNote);
+            Assert.DoesNotContain(ProposalSentinel, body);
             Assert.DoesNotContain(JobSentinel, body);
         }
         finally
@@ -152,7 +154,7 @@ public class ProposalChangeRequestNoteVisibilityTests(FixoraFactory factory)
             var detail = (await res.Content.ReadFromJsonAsync<JobDetailDto>(Web))!;
 
             Assert.Equal(JobSentinel, detail.Job.ManagerNote);
-            Assert.Contains(detail.Proposals, p => p.ManagerNote == ProposalSentinel);
+            Assert.Contains(detail.Proposals, p => p.MechanicNote == "vis-marker-3a91" && p.ManagerNote == ProposalSentinel);
             Assert.Contains(detail.ChangeRequests, c => c.ManagerNote == ChangeSentinel);
         }
         finally

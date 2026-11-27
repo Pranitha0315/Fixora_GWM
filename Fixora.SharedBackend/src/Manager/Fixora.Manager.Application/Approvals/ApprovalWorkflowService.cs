@@ -311,7 +311,7 @@ public sealed class ApprovalWorkflowService(
         var full = await read.ProposalAsync(proposalId, false, ct);
         await notifier.PublishAsync(RealtimeEvents.ApprovalUpdated, full, new[] { RealtimeGroups.Staff }, ct);
         if (toCustomer && full.PublishedAt is not null)
-            await notifier.PublishAsync(RealtimeEvents.ApprovalUpdated, full, new[] { RealtimeGroups.User(job.CustomerId) }, ct);
+            await notifier.PublishAsync(RealtimeEvents.ApprovalUpdated, full.ForCustomer(), new[] { RealtimeGroups.User(job.CustomerId) }, ct);
         if (toMechanic && job.MechanicId is { } mech)
             await notifier.PublishAsync(RealtimeEvents.ApprovalUpdated, await read.ProposalAsync(proposalId, true, ct), new[] { RealtimeGroups.User(mech) }, ct);
         await notifier.PublishAsync(RealtimeEvents.JobUpdated, await read.JobAsync(job, ct), new[] { RealtimeGroups.Staff }, ct);

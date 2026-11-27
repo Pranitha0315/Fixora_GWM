@@ -113,8 +113,15 @@ public sealed class WorkshopReadModel(IManagerDb db, IMechanicDirectory mechanic
         var invoice = await db.Invoices.Include(i => i.Lines).AsNoTracking().FirstOrDefaultAsync(i => i.JobCardId == job.Id, ct);
 
         var summary = await JobAsync(job, ct);
-        if (viewer == Viewer.Customer) summary = summary.ForCustomer();
-        return new JobDetailDto(summary, timeline, issues, proposals, changes,
+        IReadOnlyList<ProposalDto> proposalView = proposals;
+        IReadOnlyList<ChangeRequestDto> changeView = changes;
+        if (viewer == Viewer.Customer)
+        {
+            summary = summary.ForCustomer();
+            proposalView = proposals.ForCustomer();
+            changeView = changes.ForCustomer();
+        }
+        return new JobDetailDto(summary, timeline, issues, proposalView, changeView,
             invoice is null ? null : Invoice(invoice), Queue(job));
     }
 }
@@ -124,6 +131,16 @@ public static class ManagerNoteVisibility
 {
     public static BookingDto ForCustomer(this BookingDto dto) => dto with { ManagerNote = null };
     public static JobSummaryDto ForCustomer(this JobSummaryDto dto) => dto with { ManagerNote = null };
+    public static ProposalDto ForCustomer(this ProposalDto dto) => dto with
+    {
+        ManagerNote = null,
+        Audit = dto.ManagerNote is null
+            ? dto.Audit
+            : dto.Audit.Select(a => a.Detail == dto.ManagerNote ? a with { Detail = null } : a).ToList(),
+    };
+    public static ChangeRequestDto ForCustomer(this ChangeRequestDto dto) => dto with { ManagerNote = null };
     public static IReadOnlyList<BookingDto> ForCustomer(this IReadOnlyList<BookingDto> list) => list.Select(d => d.ForCustomer()).ToList();
     public static IReadOnlyList<JobSummaryDto> ForCustomer(this IReadOnlyList<JobSummaryDto> list) => list.Select(d => d.ForCustomer()).ToList();
+    public static IReadOnlyList<ProposalDto> ForCustomer(this IReadOnlyList<ProposalDto> list) => list.Select(d => d.ForCustomer()).ToList();
+    public static IReadOnlyList<ChangeRequestDto> ForCustomer(this IReadOnlyList<ChangeRequestDto> list) => list.Select(d => d.ForCustomer()).ToList();
 }
