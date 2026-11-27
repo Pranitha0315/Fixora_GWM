@@ -503,11 +503,19 @@ Route declarations confirm endpoint presence, not all acceptance checks.
 - Customer decisions use item versions rather than a proposal version.
 - Invitation acceptance is marked AllowAnonymous in the current controller.
   This differs from the proposed signed-in, email-bound acceptance requirement.
-  Review the request and service before deciding the required change.
+  Current behaviour is characterized: an unknown token on the anonymous check returns 410 Gone, not 401 or 403.
+  Do not change the mechanic auth controller until the team picks signed-in acceptance.
 - Invitation expiry, account binding, token exposure and atomic acceptance
-  still require service review and focused tests.
+  have focused tests on develop. A production auth change is still a team decision.
+- Walk-in overlap is not locked. Confirm and staff reschedule use CapacityLock and EnsureResourcesFree.
+  WalkInAsync does not, so an overlapping walk-in is still accepted.
+  BT09 and BT09b characterize that hole. The production change belongs in BookingService and needs Thanujan's approval.
+- A forwarded proposal manager note and a change-request manager note are still returned to the customer
+  on job detail and on pending approvals. The job-card manager note is hidden.
+  ProposalChangeRequestNoteVisibilityTests characterizes the current payloads.
+  Masking those two notes is a product decision; mechanic job detail must keep the note.
 - Review assignment concurrency, duplicate writes, workflow transitions,
   event payloads, recipients and ownership with the relevant sources.
 - The 22 passing tests cover their existing assertions only.
   They do not prove every acceptance check in this document.
-- Task FX13-D01-NID-1 remains In Progress.
+- Task FX13-D01-NID-1 is delivered as this contract comparison.
