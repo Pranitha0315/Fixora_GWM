@@ -58,6 +58,7 @@ describe('Application Route Security', () => {
     'bookings',
     'vehicles',
     'job-cards',
+    'adaptive-queue',
     'mechanics',
     'spare-parts',
     'inventory',
@@ -134,7 +135,7 @@ describe('Application Route Security', () => {
     ]);
   });
 
-  it('should configure all ten workspace routes', () => {
+  it('should configure all eleven workspace routes', () => {
     const configuredPaths = shell.children
       ?.filter((route) => route.path !== '')
       .map((route) => route.path);
@@ -143,7 +144,60 @@ describe('Application Route Security', () => {
       expect.arrayContaining(menuPaths),
     );
 
-    expect(configuredPaths).toHaveLength(10);
+    expect(configuredPaths).toHaveLength(11);
+  });
+
+  it('should keep the adaptive queue route separate from job cards', () => {
+    const paths = shell.children?.map((route) => route.path);
+    const adaptiveQueue = shell.children?.find(
+      (route) => route.path === 'adaptive-queue',
+    );
+
+    expect(paths).toContain('job-cards');
+    expect(adaptiveQueue).toBeDefined();
+    expect(adaptiveQueue?.loadChildren).toBeTypeOf('function');
+    expect(adaptiveQueue?.redirectTo).toBeUndefined();
+    expect(paths?.indexOf('adaptive-queue')).toBe(
+      (paths?.indexOf('job-cards') ?? -2) + 1,
+    );
+  });
+
+  it('should lazy-load the adaptive queue routes behind the shell guards', async () => {
+    const adaptiveQueue = shell.children?.find(
+      (route) => route.path === 'adaptive-queue',
+    );
+
+    const loaded = await (
+      adaptiveQueue?.loadChildren as () => Promise<Routes>
+    )();
+
+    expect(loaded).toHaveLength(1);
+    expect(loaded[0].path).toBe('');
+    expect(loaded[0].title).toBe('FIXORA | Adaptive Queue');
+    expect(shell.canActivate).toEqual([
+      authGuard,
+      managerRoleGuard,
+    ]);
+  });
+
+  it('should allow a manager to open the adaptive queue route', async () => {
+    session.setSession(createSession(['Manager']));
+
+    const harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/adaptive-queue');
+
+    expect(router.url).toBe('/adaptive-queue');
+  });
+
+  it('should reject unauthorized roles from the adaptive queue route', async () => {
+    session.setSession(createSession(['PlatformAdmin']));
+
+    const harness = await RouterTestingHarness.create();
+
+    await harness.navigateByUrl('/adaptive-queue');
+
+    expect(router.url).toBe('/login?reason=access-denied');
   });
 
   it('should allow public login access', async () => {
