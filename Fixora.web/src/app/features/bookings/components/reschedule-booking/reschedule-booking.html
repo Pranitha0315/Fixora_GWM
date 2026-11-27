@@ -1,0 +1,129 @@
+<fx-modal
+  dialogId="reschedule-booking-dialog"
+  title="Reschedule Booking"
+  size="md"
+  [open]="true"
+  [busy]="submitting()"
+  (closeRequested)="close()"
+>
+  <div class="reschedule-content">
+    <div class="reschedule-summary">
+      <strong>{{ booking().customerName }}</strong>
+      <span>{{ booking().vehicleLabel }}</span>
+      <span>{{ booking().serviceName }}</span>
+      <span>Status: {{ booking().status }}</span>
+      <span>
+        Current appointment:
+        {{ booking().slotStart | date:'medium':'+0530' }}
+      </span>
+      <span>All times are Sri Lanka time.</span>
+    </div>
+
+    @if (!eligible()) {
+      <p role="alert">
+        Only requested and confirmed bookings can be rescheduled.
+      </p>
+    } @else {
+      <div class="reschedule-field">
+        <label for="reschedule-date">
+          New Appointment Date
+        </label>
+
+        <input
+          id="reschedule-date"
+          name="appointmentDate"
+          type="date"
+          required
+          [min]="minimumDate"
+          [ngModel]="selectedDate()"
+          (ngModelChange)="changeDate($event)"
+          [disabled]="locked() || loadingSlots()"
+        />
+      </div>
+
+      <fx-button
+        variant="outline"
+        [disabled]="!canLoadSlots()"
+        [loading]="loadingSlots()"
+        (pressed)="loadSlots()"
+      >
+        Load Time Slots
+      </fx-button>
+
+      @if (loadingSlots()) {
+        <p role="status">Loading time slots...</p>
+      }
+
+      @if (slotError(); as error) {
+        <p class="reschedule-error" role="alert">
+          {{ error }}
+        </p>
+      }
+
+      @if (slotsLoaded()) {
+        @if (slots().length === 0) {
+          <p role="status">
+            No suitable time slots were returned.
+            Please choose another date.
+          </p>
+        } @else {
+          <div class="reschedule-field">
+            <label for="reschedule-slot">
+              New Appointment Time
+            </label>
+
+            <select
+              id="reschedule-slot"
+              name="appointmentSlot"
+              required
+              [ngModel]="selectedSlot()"
+              (ngModelChange)="changeSlot($event)"
+              [disabled]="locked() || loadingSlots()"
+            >
+              <option value="">Select a time slot</option>
+
+              @for (slot of slots(); track $index) {
+                <option [value]="slot.start">
+                  {{ slot.start | date:'shortTime':'+0530' }}
+                  - {{ slot.freeBays }} free bay(s)
+                </option>
+              }
+            </select>
+          </div>
+        }
+      }
+
+      <p class="reschedule-help">
+        Time slots indicate general workshop capacity.
+        Final availability is checked by the server.
+        Existing mechanic and bay assignments may affect
+        rescheduling.
+      </p>
+    }
+
+    @if (actionError(); as error) {
+      <p class="reschedule-error" role="alert">
+        {{ error }}
+      </p>
+    }
+  </div>
+
+  <div modal-footer class="reschedule-footer">
+    <fx-button
+      variant="outline"
+      [disabled]="submitting() || completed()"
+      (pressed)="close()"
+    >
+      {{ requiresRefresh() ? 'Refresh bookings' : 'Cancel' }}
+    </fx-button>
+
+    <fx-button
+      variant="primary"
+      [disabled]="!canSubmit()"
+      [loading]="submitting()"
+      (pressed)="submit()"
+    >
+      {{ submitting() ? 'Rescheduling...' : 'Reschedule Booking' }}
+    </fx-button>
+  </div>
+</fx-modal>

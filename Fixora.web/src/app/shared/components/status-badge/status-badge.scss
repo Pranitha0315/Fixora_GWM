@@ -119,3 +119,19 @@
   width: 8px;
   height: 8px;
 }
+
+/* STEP 04-K12B: Preserve complete status labels */
+
+:host {
+  flex-shrink: 0;
+}
+
+.fx-status-badge {
+  flex-shrink: 0;
+}
+
+.fx-status-badge-label {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}

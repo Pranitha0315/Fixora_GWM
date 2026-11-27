@@ -47,7 +47,14 @@
 
 .fx-table-scroll {
   width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.fx-table-scroll:focus-visible {
+  outline: 2px solid var(--fx-color-focus);
+  outline-offset: -2px;
 }
 
 .fx-table {
@@ -64,16 +71,17 @@
   white-space: nowrap;
 }
 
-.fx-table th,
-.fx-table td {
-  padding: 12px 16px;
+.fx-table :is(th, td) {
+  padding: 10px 12px;
   border-bottom: 1px solid var(--fx-color-border);
   vertical-align: middle;
   text-align: start;
+  line-height: 1.5;
 }
 
 .fx-table td {
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .fx-table-data-row:hover {
@@ -107,14 +115,21 @@
 .fx-table-pagination {
   display: flex;
   align-items: center;
+}
+
+.fx-table-pagination {
   flex-wrap: wrap;
   gap: var(--fx-space-2);
 }
 
+.fx-table-actions {
+  flex-wrap: nowrap;
+  width: max-content;
+  gap: 6px;
+}
+
 .fx-table-action,
 .fx-table-page-button {
-  min-height: 34px;
-  padding: 6px 12px;
   border: 1px solid var(--fx-color-border);
   border-radius: var(--fx-radius-md);
   background: var(--fx-color-surface);
@@ -123,16 +138,38 @@
   font-weight: var(--fx-weight-medium);
 }
 
-.fx-table-action:hover:not(:disabled),
-.fx-table-page-button:hover:not(:disabled) {
+.fx-table-page-button {
+  min-height: 34px;
+  padding: 6px 12px;
+}
+
+.fx-table-action {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 6px 10px;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  cursor: pointer;
+}
+
+:is(.fx-table-action, .fx-table-page-button):hover:not(:disabled) {
   background: var(--fx-color-primary-light);
 }
 
-.fx-data-table button:disabled,
-.fx-data-table input:disabled,
-.fx-data-table select:disabled {
+.fx-data-table :is(button, input, select):disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+:is(
+  .fx-table-sort,
+  .fx-table-action,
+  .fx-table-page-button,
+  .fx-table-search,
+  .fx-table-filter
+):focus-visible {
+  outline: 2px solid var(--fx-color-focus);
+  outline-offset: 2px;
 }
 
 .fx-table-page-number,
@@ -193,8 +230,45 @@
     flex: 1 1 100%;
   }
 
-  .fx-table th,
-  .fx-table td {
-    padding: 10px 12px;
+  .fx-table :is(th, td) {
+    padding: 10px;
   }
+}
+
+.fx-table-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  font-size: 1.125rem;
+}
+
+.fx-table-action-options[popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid var(--fx-color-border);
+  border-radius: var(--fx-radius-md);
+  background: var(--fx-color-surface);
+  color: var(--fx-color-text);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  overflow-y: auto;
+  max-width: calc(100vw - 16px);
+}
+
+.fx-table-action-options[popover]:not(:popover-open) {
+  display: none;
+}
+
+.fx-table-action-options:popover-open {
+  display: grid;
+  gap: 6px;
+}
+
+.fx-table-action-options .fx-table-action {
+  width: 100%;
+  text-align: start;
+  white-space: normal;
 }

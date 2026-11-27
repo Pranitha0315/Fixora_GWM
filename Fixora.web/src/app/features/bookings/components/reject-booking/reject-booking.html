@@ -1,0 +1,78 @@
+<fx-modal
+  dialogId="reject-booking-dialog"
+  title="Reject Booking"
+  size="md"
+  [open]="true"
+  [busy]="submitting()"
+  (closeRequested)="close()"
+>
+  <div class="reject-booking-content">
+    <div class="reject-booking-summary">
+      <strong>{{ booking().customerName }}</strong>
+      <span>{{ booking().vehicleLabel }}</span>
+      <span>{{ booking().serviceName }}</span>
+      <span>
+        {{ booking().slotStart | date:'medium':'+0530' }}
+        (Sri Lanka time)
+      </span>
+    </div>
+
+    @if (booking().status !== 'Requested') {
+      <p role="alert">
+        Only requested bookings can be rejected.
+      </p>
+    } @else {
+      <p class="reject-booking-warning">
+        Rejecting this booking will change its status to Declined.
+      </p>
+
+      <div class="reject-booking-reason">
+        <label for="reject-booking-reason">
+          Rejection Reason (Required)
+        </label>
+
+        <textarea
+          id="reject-booking-reason"
+          name="reason"
+          rows="4"
+          required
+          [ngModel]="reason()"
+          (ngModelChange)="changeReason($event)"
+          [disabled]="locked()"
+          aria-describedby="reject-booking-reason-help"
+          placeholder="Enter the reason for rejecting this booking..."
+        ></textarea>
+
+        <p id="reject-booking-reason-help">
+          Enter a clear reason for rejecting the appointment.
+          Do not include confidential internal information.
+        </p>
+      </div>
+    }
+
+    @if (actionError(); as error) {
+      <p class="reject-booking-error" role="alert">
+        {{ error }}
+      </p>
+    }
+  </div>
+
+  <div modal-footer class="reject-booking-footer">
+    <fx-button
+      variant="outline"
+      [disabled]="submitting() || completed()"
+      (pressed)="close()"
+    >
+      {{ requiresRefresh() ? 'Refresh bookings' : 'Cancel' }}
+    </fx-button>
+
+    <fx-button
+      variant="danger"
+      [disabled]="!canSubmit()"
+      [loading]="submitting()"
+      (pressed)="submit()"
+    >
+      {{ submitting() ? 'Rejecting...' : 'Reject Booking' }}
+    </fx-button>
+  </div>
+</fx-modal>

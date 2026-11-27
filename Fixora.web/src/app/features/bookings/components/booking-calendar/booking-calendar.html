@@ -1,0 +1,123 @@
+<section
+  class="booking-calendar"
+  aria-label="Booking calendar"
+>
+  <button
+    type="button"
+    class="calendar-toggle"
+    [attr.aria-expanded]="expanded()"
+    [disabled]="disabled()"
+    (click)="toggleCalendar()"
+  >
+    <span class="calendar-toggle-title">
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <rect x="3" y="5" width="18" height="16" rx="2"/>
+        <path d="M16 3v4M8 3v4M3 10h18"/>
+        <path d="M8 14h2m4 0h2m-8 3h2m4 0h2"/>
+      </svg>
+      <span>Booking Calendar</span>
+    </span>
+
+    <span class="calendar-toggle-meta">
+      <span>{{ monthLabel() }}</span>
+
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        class="calendar-chevron"
+        [class.expanded]="expanded()"
+        aria-hidden="true"
+      >
+        <path d="m6 9 6 6 6-6"/>
+      </svg>
+    </span>
+  </button>
+
+  <div class="calendar-body" [hidden]="!expanded()">
+    <header class="calendar-header">
+    <h2 aria-live="polite">{{ monthLabel() }}</h2>
+
+    <div class="calendar-navigation">
+      <button
+        type="button"
+        aria-label="Previous month"
+        [disabled]="disabled() || !canPrevious()"
+        (click)="previousMonth()"
+      >
+        Previous
+      </button>
+
+      <button
+        type="button"
+        [disabled]="disabled()"
+        (click)="goToToday()"
+      >
+        Today
+      </button>
+
+      <button
+        type="button"
+        aria-label="Next month"
+        [disabled]="disabled() || !canNext()"
+        (click)="nextMonth()"
+      >
+        Next
+      </button>
+    </div>
+  </header>
+
+  <div class="calendar-grid">
+    @for (weekday of weekdays; track weekday) {
+      <span class="calendar-weekday">
+        {{ weekday }}
+      </span>
+    }
+
+    @for (day of days(); track day.date) {
+      <button
+        type="button"
+        class="calendar-day"
+        [class.outside-month]="!day.inCurrentMonth"
+        [class.today]="day.isToday"
+        [class.selected]="day.isSelected"
+        [attr.aria-label]="day.date"
+        [attr.aria-pressed]="day.isSelected"
+        [attr.aria-current]="day.isToday ? 'date' : null"
+        [attr.data-date]="day.date"
+        [disabled]="disabled()"
+        (click)="selectDate(day.date)"
+      >
+        {{ day.day }}
+      </button>
+    }
+  </div>
+
+  <footer class="calendar-footer">
+    <p>
+      Selected date:
+      {{ selectedDate() || 'No date selected' }}
+    </p>
+
+    <small>
+      Sri Lanka local date (Asia/Colombo).
+      Select a date to filter bookings.
+    </small>
+  </footer>
+  </div>
+</section>

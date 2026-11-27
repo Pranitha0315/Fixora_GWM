@@ -1,0 +1,116 @@
+<fx-modal
+  dialogId="confirm-booking-dialog"
+  title="Confirm Booking"
+  size="md"
+  [open]="true"
+  [busy]="submitting()"
+  (closeRequested)="close()"
+>
+  <div class="confirm-booking-content">
+    <div class="confirm-booking-summary">
+      <strong>{{ booking().customerName }}</strong>
+      <span>{{ booking().vehicleLabel }}</span>
+      <span>{{ booking().serviceName }}</span>
+      <span>
+        {{ booking().slotStart | date:'medium':'+0530' }}
+        (Sri Lanka time)
+      </span>
+    </div>
+
+    @if (booking().status !== 'Requested') {
+      <p role="alert">
+        Only requested bookings can be confirmed.
+      </p>
+    } @else if (loading()) {
+      <p role="status">Loading mechanics and bays...</p>
+    } @else if (resourceError(); as error) {
+      <p role="alert">{{ error }}</p>
+
+      <fx-button
+        variant="outline"
+        (pressed)="loadResources()"
+      >
+        Retry
+      </fx-button>
+    } @else {
+      @if (mechanicOptions().length === 0) {
+        <p role="status">No mechanics available for selection.</p>
+      }
+
+      @if (bayOptions().length === 0) {
+        <p role="status">No active service bays available.</p>
+      }
+
+      <fx-select
+        controlId="confirm-booking-mechanic"
+        label="Assign mechanic"
+        placeholder="Select mechanic"
+        [options]="mechanicOptions()"
+        [ngModel]="mechanicId()"
+        (ngModelChange)="mechanicId.set($event)"
+        [disabled]="submitting() || requiresRefresh() || completed()"
+      />
+
+      <p>
+        Off-duty mechanics may be assigned to future bookings.
+      </p>
+
+      <fx-select
+        controlId="confirm-booking-bay"
+        label="Assign service bay"
+        placeholder="Select bay"
+        [options]="bayOptions()"
+        [ngModel]="bayId()"
+        (ngModelChange)="bayId.set($event)"
+        [disabled]="submitting() || requiresRefresh() || completed()"
+      />
+
+      <div class="confirm-booking-note">
+        <label for="confirm-booking-note">
+          Manager Note (Optional)
+        </label>
+
+        <textarea
+          id="confirm-booking-note"
+          name="managerNote"
+          rows="4"
+          [maxLength]="maxNoteLength"
+          [ngModel]="note()"
+          (ngModelChange)="note.set($event)"
+          [disabled]="submitting() || requiresRefresh() || completed()"
+          aria-describedby="confirm-booking-note-help"
+          placeholder="Enter internal workshop instructions..."
+        ></textarea>
+
+        <div id="confirm-booking-note-help">
+          Internal - staff and mechanic only.
+          {{ note().length }} / {{ maxNoteLength }}
+        </div>
+      </div>
+    }
+
+    @if (actionError(); as error) {
+      <p class="confirm-booking-error" role="alert">
+        {{ error }}
+      </p>
+    }
+  </div>
+
+  <div modal-footer class="confirm-booking-footer">
+    <fx-button
+      variant="outline"
+      [disabled]="submitting() || completed()"
+      (pressed)="close()"
+    >
+      {{ requiresRefresh() ? 'Refresh bookings' : 'Cancel' }}
+    </fx-button>
+
+    <fx-button
+      [disabled]="!canSubmit()"
+      [loading]="submitting()"
+      (pressed)="submit()"
+    >
+      {{ submitting() ? 'Confirming...' : 'Confirm Booking' }}
+    </fx-button>
+  </div>
+</fx-modal>
