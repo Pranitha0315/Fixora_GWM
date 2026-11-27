@@ -1,0 +1,183 @@
+<fx-modal
+  dialogId="walk-in-booking-dialog"
+  title="New Walk-in Booking"
+  size="lg"
+  [open]="true"
+  [busy]="submitting()"
+  (closeRequested)="close()"
+>
+  <div class="walk-in-content">
+    @if (createdJob(); as job) {
+      <section class="walk-in-result" role="status">
+        <h3>Walk-in booking created</h3>
+        <p>Job Card: {{ job.number }}</p>
+        <p>Customer: {{ job.customerName }}</p>
+        <p>Vehicle: {{ job.vehicleLabel }}</p>
+        <p>Status: {{ job.status }}</p>
+        <p>Queue position: {{ job.queuePosition }}</p>
+
+        <p>
+          Estimated start:
+          @if (job.etaAt) {
+            {{ job.etaAt | date:'medium':'+0530' }}
+            (Sri Lanka time)
+          } @else {
+            Not available
+          }
+        </p>
+
+        <small>Queue estimates may change.</small>
+      </section>
+    } @else {
+      <p>
+        Enter walk-in customer and vehicle details.
+        This form does not register a customer account
+        or link an existing vehicle.
+      </p>
+
+      @if (loading()) {
+        <p role="status">Loading workshop resources...</p>
+      }
+
+      @if (resourceError(); as error) {
+        <p class="walk-in-error" role="alert">{{ error }}</p>
+        <fx-button variant="outline" (pressed)="loadResources()">
+          Retry loading resources
+        </fx-button>
+      }
+
+      <fieldset [disabled]="locked()">
+        <legend>Customer and vehicle</legend>
+
+        <label for="walk-in-customer">Customer name *</label>
+        <input
+          id="walk-in-customer"
+          name="customerName"
+          required
+          [ngModel]="customerName()"
+          (ngModelChange)="customerName.set($event)"
+        />
+
+        <label for="walk-in-vehicle">Vehicle details *</label>
+        <input
+          id="walk-in-vehicle"
+          name="vehicleLabel"
+          required
+          [ngModel]="vehicleLabel()"
+          (ngModelChange)="vehicleLabel.set($event)"
+        />
+      </fieldset>
+
+      <fieldset [disabled]="locked() || loading() || !resourcesLoaded()">
+        <legend>Service and assignment</legend>
+
+        <label for="walk-in-service">Service *</label>
+        <select
+          id="walk-in-service"
+          name="serviceId"
+          required
+          [ngModel]="serviceId()"
+          (ngModelChange)="serviceId.set($event)"
+        >
+          <option value="">Select service</option>
+          @for (service of services(); track service.id) {
+            <option [value]="service.id">
+              {{ service.name }} ({{ service.standardMinutes }} min)
+            </option>
+          }
+        </select>
+
+        <label for="walk-in-mechanic">On-duty mechanic *</label>
+        <select
+          id="walk-in-mechanic"
+          name="mechanicId"
+          required
+          [ngModel]="mechanicId()"
+          (ngModelChange)="mechanicId.set($event)"
+        >
+          <option value="">Select mechanic</option>
+          @for (mechanic of onDutyMechanics(); track mechanic.id) {
+            <option [value]="mechanic.id">
+              {{ mechanic.name }} ({{ mechanic.activeJobs }} active jobs)
+            </option>
+          }
+        </select>
+
+        <label for="walk-in-bay">Active bay *</label>
+        <select
+          id="walk-in-bay"
+          name="bayId"
+          required
+          [ngModel]="bayId()"
+          (ngModelChange)="bayId.set($event)"
+        >
+          <option value="">Select bay</option>
+          @for (bay of activeBays(); track bay.id) {
+            <option [value]="bay.id">{{ bay.name }}</option>
+          }
+        </select>
+
+        <small>
+          Active bays and on-duty mechanics are not necessarily free.
+          The backend determines the waiting queue and estimated start.
+        </small>
+      </fieldset>
+
+      <fieldset [disabled]="locked()">
+        <legend>Priority and complaint</legend>
+
+        <label for="walk-in-priority">Priority *</label>
+        <select
+          id="walk-in-priority"
+          name="priority"
+          [ngModel]="priority()"
+          (ngModelChange)="changePriority($event)"
+        >
+          @for (item of priorities; track item.value) {
+            <option [ngValue]="item.value">{{ item.label }}</option>
+          }
+        </select>
+
+        <label for="walk-in-complaint">Customer complaint</label>
+        <textarea
+          id="walk-in-complaint"
+          name="complaint"
+          rows="3"
+          [ngModel]="complaint()"
+          (ngModelChange)="complaint.set($event)"
+        ></textarea>
+      </fieldset>
+
+      @if (actionError(); as error) {
+        <p class="walk-in-error" role="alert">{{ error }}</p>
+      }
+
+      @if (requiresRefresh()) {
+        <p role="alert">
+          Do not create another walk-in until you have reviewed
+          the existing bookings and job cards.
+        </p>
+      }
+    }
+  </div>
+
+  <div modal-footer class="walk-in-footer">
+    <fx-button
+      variant="outline"
+      [disabled]="submitting()"
+      (pressed)="close()"
+    >
+      {{ createdJob() ? 'Done' : requiresRefresh() ? 'Review bookings' : 'Cancel' }}
+    </fx-button>
+
+    @if (!createdJob() && !requiresRefresh()) {
+      <fx-button
+        [disabled]="!canSubmit()"
+        [loading]="submitting()"
+        (pressed)="submit()"
+      >
+        Create Walk-in
+      </fx-button>
+    }
+  </div>
+</fx-modal>

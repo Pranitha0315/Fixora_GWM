@@ -7,6 +7,8 @@
       @if (searchable()) {
         <input
           class="fx-table-search"
+          [id]="searchControlId"
+          [name]="searchControlId"
           type="search"
           aria-label="Search table records"
           [placeholder]="searchPlaceholder()"
@@ -19,6 +21,8 @@
       @if (filter(); as config) {
         <select
           class="fx-table-filter"
+          [id]="filterControlId"
+          [name]="filterControlId"
           [attr.aria-label]="config.label"
           [disabled]="loading()"
           (change)="onFilter($event)"
@@ -128,6 +132,57 @@
 
               @if (actions().length > 0) {
                 <td>
+                  @if (compactActions()) {
+                    <div class="fx-table-actions fx-table-actions--compact">
+                      @for (action of actions(); track action.id) {
+                        @if (action.id === 'view') {
+                          <button
+                            type="button"
+                            class="fx-table-action"
+                            [attr.aria-label]="action.label + ' ' + rowKey()(row)"
+                            [disabled]="isActionDisabled(action, row)"
+                            (click)="triggerAction(action, row)"
+                          >
+                            {{ action.label }}
+                          </button>
+                        }
+                      }
+
+                      <button
+                        type="button"
+                        class="fx-table-action fx-table-more"
+                        [attr.aria-label]="'More actions for ' + rowKey()(row)"
+                        [attr.popovertarget]="actionMenuId(row)"
+                        [disabled]="loading()"
+                        (click)="positionActionMenu($event, actionMenu)"
+                      >
+                        <span aria-hidden="true">&#8943;</span>
+                      </button>
+
+                      <div
+                        #actionMenu
+                        class="fx-table-action-options"
+                        popover="auto"
+                        [id]="actionMenuId(row)"
+                        role="group"
+                        [attr.aria-label]="'Booking actions for ' + rowKey()(row)"
+                      >
+                        @for (action of actions(); track action.id) {
+                          @if (action.id !== 'view') {
+                            <button
+                              type="button"
+                              class="fx-table-action"
+                              [attr.aria-label]="action.label + ' ' + rowKey()(row)"
+                              [disabled]="isActionDisabled(action, row)"
+                              (click)="selectCompactAction(action, row, actionMenu)"
+                            >
+                              {{ action.label }}
+                            </button>
+                          }
+                        }
+                      </div>
+                    </div>
+                  } @else {
                   <div class="fx-table-actions">
                     @for (action of actions(); track action.id) {
                       <button
@@ -143,6 +198,7 @@
                       </button>
                     }
                   </div>
+                  }
                 </td>
               }
             </tr>

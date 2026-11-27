@@ -1,0 +1,68 @@
+:host {
+  display: block;
+}
+
+.walk-in-content,
+.walk-in-content fieldset {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.walk-in-content fieldset {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+}
+
+.walk-in-content legend,
+.walk-in-content label {
+  font-weight: 600;
+}
+
+.walk-in-content input,
+.walk-in-content select,
+.walk-in-content textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.75rem;
+  border: 1px solid #9ca3af;
+  border-radius: 0.5rem;
+  font: inherit;
+  color: inherit;
+}
+
+.walk-in-content textarea {
+  resize: vertical;
+}
+
+.walk-in-content input:focus-visible,
+.walk-in-content select:focus-visible,
+.walk-in-content textarea:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.walk-in-content p {
+  margin: 0;
+}
+
+.walk-in-error {
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+}
+
+.walk-in-result {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #15803d;
+  border-radius: 0.5rem;
+}
+
+.walk-in-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

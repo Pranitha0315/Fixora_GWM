@@ -183,6 +183,469 @@ describe('DataTable', () => {
     fixture.detectChanges();
   });
 
+
+  function enableCompactActions(): void {
+    fixture.componentRef.setInput('actions', ACTIONS);
+    fixture.componentRef.setInput('compactActions', true);
+    fixture.detectChanges();
+  }
+
+  function floatingMenu(index = 0): HTMLElement {
+    return dataRows()[index].querySelector(
+      '.fx-table-action-options',
+    ) as HTMLElement;
+  }
+
+  function floatingTrigger(index = 0): HTMLButtonElement {
+    return dataRows()[index].querySelector(
+      '.fx-table-more',
+    ) as HTMLButtonElement;
+  }
+
+  it('FM01 preserves default inline actions', () => {
+    fixture.componentRef.setInput('actions', ACTIONS);
+    fixture.detectChanges();
+
+    expect(component.compactActions()).toBe(false);
+    expect(element('.fx-table-more')).toBeNull();
+    expect(element('[popover]')).toBeNull();
+
+    expect(
+      fixture.nativeElement.querySelectorAll('.fx-table-action').length,
+    ).toBe(6);
+  });
+
+  it('FM02 renders compact action triggers for each row', () => {
+    enableCompactActions();
+
+    expect(
+      fixture.nativeElement.querySelectorAll('.fx-table-more').length,
+    ).toBe(3);
+
+    expect(
+      fixture.nativeElement.querySelectorAll('[popover="auto"]').length,
+    ).toBe(3);
+  });
+
+  it('FM03 keeps View outside the floating menu', () => {
+    enableCompactActions();
+
+    const row = dataRows()[0];
+
+    expect(
+      row.querySelector('[aria-label="View BK-003"]'),
+    ).not.toBeNull();
+
+    expect(
+      floatingMenu().querySelector('[aria-label="View BK-003"]'),
+    ).toBeNull();
+
+    expect(
+      floatingMenu().querySelector('[aria-label="Edit BK-003"]'),
+    ).not.toBeNull();
+  });
+
+  it('FM04 assigns matching popover targets and menu IDs', () => {
+    enableCompactActions();
+
+    ROWS.forEach((row, index) => {
+      const menu = floatingMenu(index);
+      const trigger = floatingTrigger(index);
+
+      expect(menu.id).toBe(component.actionMenuId(row));
+      expect(trigger.getAttribute('popovertarget')).toBe(menu.id);
+      expect(menu.getAttribute('popover')).toBe('auto');
+    });
+  });
+
+  it('FM05 generates distinct stable row menu identifiers', () => {
+    enableCompactActions();
+
+    const ids = ROWS.map(row => component.actionMenuId(row));
+
+    expect(new Set(ids).size).toBe(3);
+
+    component.toggleSort(COLUMNS[1]);
+    fixture.detectChanges();
+
+    expect(
+      ROWS.map(row => component.actionMenuId(row)),
+    ).toEqual(ids);
+  });
+
+  it('FM06 generates unique menu IDs across table instances', () => {
+    enableCompactActions();
+
+    const second = TestBed.createComponent(DataTable<TestRow>);
+
+    try {
+      second.componentRef.setInput('rows', ROWS);
+      second.componentRef.setInput('columns', COLUMNS);
+      second.componentRef.setInput(
+        'rowKey',
+        (row: TestRow) => row.id,
+      );
+      second.componentRef.setInput('actions', ACTIONS);
+      second.componentRef.setInput('compactActions', true);
+      second.detectChanges();
+
+      expect(
+        second.componentInstance.actionMenuId(ROWS[0]),
+      ).not.toBe(component.actionMenuId(ROWS[0]));
+    } finally {
+      second.destroy();
+    }
+  });
+
+  it('FM07 emits View directly in compact mode', () => {
+    enableCompactActions();
+
+    const handler = vi.fn();
+    component.actionTriggered.subscribe(handler);
+
+    const button = dataRows()[0].querySelector(
+      '[aria-label="View BK-003"]',
+    ) as HTMLButtonElement;
+
+    button.click();
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith({
+      actionId: 'view',
+      row: ROWS[0],
+    });
+  });
+
+  it('FM08 emits an enabled compact action exactly once', () => {
+    enableCompactActions();
+
+    const handler = vi.fn();
+    component.actionTriggered.subscribe(handler);
+
+    const close = vi.spyOn(
+      component,
+      'closeActionMenu',
+    ).mockImplementation(() => {});
+
+    try {
+      const button = floatingMenu(1).querySelector(
+        '[aria-label="Edit BK-001"]',
+      ) as HTMLButtonElement;
+
+      button.click();
+
+      expect(close).toHaveBeenCalledWith(floatingMenu(1));
+      expect(handler).toHaveBeenCalledTimes(1);
+      expect(handler).toHaveBeenCalledWith({
+        actionId: 'edit',
+        row: ROWS[1],
+      });
+    } finally {
+      close.mockRestore();
+    }
+  });
+
+  it('FM09 blocks disabled compact actions', () => {
+    enableCompactActions();
+
+    const handler = vi.fn();
+    component.actionTriggered.subscribe(handler);
+
+    const menu = floatingMenu();
+
+    const button = menu.querySelector(
+      '[aria-label="Edit BK-003"]',
+    ) as HTMLButtonElement;
+
+    const close = vi.spyOn(
+      component,
+      'closeActionMenu',
+    ).mockImplementation(() => {});
+
+    try {
+      expect(button.disabled).toBe(true);
+
+      button.click();
+      component.selectCompactAction(ACTIONS[1], ROWS[0], menu);
+
+      expect(handler).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+    } finally {
+      close.mockRestore();
+    }
+  });
+
+  it('FM10 blocks compact actions during loading', () => {
+    enableCompactActions();
+
+    const menu = floatingMenu(1);
+    const handler = vi.fn();
+
+    component.actionTriggered.subscribe(handler);
+
+    fixture.componentRef.setInput('loading', true);
+
+    component.selectCompactAction(ACTIONS[1], ROWS[1], menu);
+
+    fixture.detectChanges();
+
+    expect(handler).not.toHaveBeenCalled();
+    expect(element('.fx-table-more')).toBeNull();
+  });
+
+  it('FM11 closes an open popover', () => {
+    enableCompactActions();
+
+    const menu = floatingMenu();
+    const hide = vi.fn();
+
+    Object.defineProperty(menu, 'hidePopover', {
+      configurable: true,
+      value: hide,
+    });
+
+    const matches = vi.spyOn(menu, 'matches').mockReturnValue(true);
+
+    try {
+      component.closeActionMenu(menu);
+
+      expect(matches).toHaveBeenCalledWith(':popover-open');
+      expect(hide).toHaveBeenCalledTimes(1);
+    } finally {
+      matches.mockRestore();
+    }
+  });
+
+  it('FM12 does not close an already closed popover', () => {
+    enableCompactActions();
+
+    const menu = floatingMenu();
+    const hide = vi.fn();
+
+    Object.defineProperty(menu, 'hidePopover', {
+      configurable: true,
+      value: hide,
+    });
+
+    const matches = vi.spyOn(menu, 'matches').mockReturnValue(false);
+
+    try {
+      component.closeActionMenu(menu);
+
+      expect(hide).not.toHaveBeenCalled();
+    } finally {
+      matches.mockRestore();
+    }
+  });
+
+  function positionFloatingMenu(
+    rect: DOMRect,
+    width: number,
+    height: number,
+  ): HTMLElement {
+    enableCompactActions();
+
+    const trigger = floatingTrigger();
+    const menu = floatingMenu();
+
+    const matches = vi.spyOn(menu, 'matches').mockReturnValue(false);
+
+    const bounds = vi.spyOn(
+      trigger,
+      'getBoundingClientRect',
+    ).mockReturnValue(rect);
+
+    const originalWidth = Object.getOwnPropertyDescriptor(
+      window,
+      'innerWidth',
+    );
+
+    const originalHeight = Object.getOwnPropertyDescriptor(
+      window,
+      'innerHeight',
+    );
+
+    try {
+      Object.defineProperty(window, 'innerWidth', {
+        configurable: true,
+        value: width,
+      });
+
+      Object.defineProperty(window, 'innerHeight', {
+        configurable: true,
+        value: height,
+      });
+
+      component.positionActionMenu(
+        { currentTarget: trigger } as unknown as Event,
+        menu,
+      );
+
+      return menu;
+    } finally {
+      matches.mockRestore();
+      bounds.mockRestore();
+
+      if (originalWidth) {
+        Object.defineProperty(window, 'innerWidth', originalWidth);
+      } else {
+        Reflect.deleteProperty(window, 'innerWidth');
+      }
+
+      if (originalHeight) {
+        Object.defineProperty(window, 'innerHeight', originalHeight);
+      } else {
+        Reflect.deleteProperty(window, 'innerHeight');
+      }
+    }
+  }
+
+  it('FM13 positions the floating menu below when space is available', () => {
+    const menu = positionFloatingMenu(
+      new DOMRect(900, 100, 40, 40),
+      1200,
+      800,
+    );
+
+    expect(menu.style.width).toBe('240px');
+    expect(menu.style.left).toBe('700px');
+    expect(menu.style.top).toBe('146px');
+    expect(menu.style.bottom).toBe('auto');
+    expect(menu.style.maxHeight).toBe('644px');
+  });
+
+  it('FM14 positions the floating menu above near the viewport bottom', () => {
+    const menu = positionFloatingMenu(
+      new DOMRect(900, 720, 40, 40),
+      1200,
+      800,
+    );
+
+    expect(menu.style.top).toBe('auto');
+    expect(menu.style.bottom).toBe('86px');
+    expect(menu.style.maxHeight).toBe('704px');
+  });
+
+  it('FM15 constrains the floating menu within a narrow viewport', () => {
+    const menu = positionFloatingMenu(
+      new DOMRect(160, 100, 30, 40),
+      200,
+      600,
+    );
+
+    expect(menu.style.width).toBe('184px');
+    expect(menu.style.left).toBe('8px');
+    expect(menu.style.top).toBe('146px');
+  });
+
+  it('AT01 should provide a search input identifier', () => {
+    const control = element('.fx-table-search') as HTMLInputElement;
+
+    expect(control).not.toBeNull();
+    expect(control.id).toMatch(/^fx-data-table-\d+-search$/);
+    expect(control.id).toBe(component.searchControlId);
+  });
+
+  it('AT02 should provide a search input name', () => {
+    const control = element('.fx-table-search') as HTMLInputElement;
+
+    expect(control.name).toBeTruthy();
+    expect(control.name).toBe(control.id);
+  });
+
+  it('AT03 should provide a filter dropdown identifier', () => {
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    const control = element('.fx-table-filter') as HTMLSelectElement;
+
+    expect(control).not.toBeNull();
+    expect(control.id).toMatch(/^fx-data-table-\d+-filter$/);
+    expect(control.id).toBe(component.filterControlId);
+  });
+
+  it('AT04 should provide a filter dropdown name', () => {
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    const control = element('.fx-table-filter') as HTMLSelectElement;
+
+    expect(control.name).toBeTruthy();
+    expect(control.name).toBe(control.id);
+  });
+
+  it('AT05 should use distinct search and filter identifiers', () => {
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    const searchInput = element('.fx-table-search') as HTMLInputElement;
+    const filterInput = element('.fx-table-filter') as HTMLSelectElement;
+
+    expect(searchInput.id).not.toBe(filterInput.id);
+    expect(searchInput.name).not.toBe(filterInput.name);
+  });
+
+  it('AT06 should use unique identifiers across table instances', () => {
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    const second = TestBed.createComponent(DataTable<TestRow>);
+
+    try {
+      second.componentRef.setInput('rows', ROWS);
+      second.componentRef.setInput('columns', COLUMNS);
+      second.componentRef.setInput('rowKey', (row: TestRow) => row.id);
+      second.componentRef.setInput('filter', FILTER);
+      second.detectChanges();
+
+      const controls = [
+        element('.fx-table-search') as HTMLInputElement,
+        element('.fx-table-filter') as HTMLSelectElement,
+        second.nativeElement.querySelector('.fx-table-search') as HTMLInputElement,
+        second.nativeElement.querySelector('.fx-table-filter') as HTMLSelectElement,
+      ];
+
+      const ids = controls.map(control => control.id);
+      const names = controls.map(control => control.name);
+
+      expect(ids.every(id => id.length > 0)).toBe(true);
+      expect(names.every(name => name.length > 0)).toBe(true);
+      expect(new Set(ids).size).toBe(4);
+      expect(new Set(names).size).toBe(4);
+    } finally {
+      second.destroy();
+    }
+  });
+
+  it('AT07 should preserve identifiers during table interactions', () => {
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    const searchId = element('.fx-table-search')!.id;
+    const filterId = element('.fx-table-filter')!.id;
+
+    search('Honda');
+    component.toggleSort(COLUMNS[1]);
+    fixture.detectChanges();
+
+    expect(element('.fx-table-search')!.id).toBe(searchId);
+    expect(element('.fx-table-filter')!.id).toBe(filterId);
+
+    fixture.componentRef.setInput('searchable', false);
+    fixture.componentRef.setInput('filter', null);
+    fixture.detectChanges();
+
+    expect(element('.fx-table-search')).toBeNull();
+    expect(element('.fx-table-filter')).toBeNull();
+
+    fixture.componentRef.setInput('searchable', true);
+    fixture.componentRef.setInput('filter', FILTER);
+    fixture.detectChanges();
+
+    expect(element('.fx-table-search')!.id).toBe(searchId);
+    expect(element('.fx-table-filter')!.id).toBe(filterId);
+  });
+
   it('should create the data table', () => {
     expect(component).toBeTruthy();
   });

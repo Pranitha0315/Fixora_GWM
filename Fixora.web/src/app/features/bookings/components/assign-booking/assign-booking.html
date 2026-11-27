@@ -1,0 +1,117 @@
+<div class="assignment-backdrop">
+  <section
+    class="assignment-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="assignment-title"
+  >
+    <header class="assignment-header">
+      <h2 id="assignment-title">Assign Mechanic &amp; Bay</h2>
+      <button
+        type="button"
+        aria-label="Close assignment"
+        [disabled]="submitting()"
+        (click)="close()"
+      >&#215;</button>
+    </header>
+
+    <div class="assignment-body">
+      <div class="assignment-summary">
+        <strong>{{ booking().customerName }}</strong>
+        <p>{{ booking().vehicleLabel }}</p>
+        <p>{{ booking().serviceName }}</p>
+      </div>
+
+      @if (loading()) {
+        <p role="status">Loading current job details...</p>
+      }
+
+      @if (resourceError(); as error) {
+        <p class="assignment-error" role="alert">{{ error }}</p>
+
+        <button
+          type="button"
+          [disabled]="locked()"
+          (click)="loadResources()"
+        >Reload Job Details</button>
+      }
+
+      @if (job(); as current) {
+        <div class="assignment-summary">
+          <strong>{{ current.number }}</strong>
+          <p>Job status: {{ current.status }}</p>
+          <p>
+            Current mechanic:
+            {{ current.mechanicName ?? 'Not assigned' }}
+          </p>
+          <p>
+            Current bay:
+            {{ current.bayName ?? 'Not assigned' }}
+          </p>
+        </div>
+
+        <label for="assignment-mechanic">Mechanic</label>
+        <select
+          id="assignment-mechanic"
+          name="assignmentMechanic"
+          [ngModel]="mechanicId()"
+          (ngModelChange)="changeMechanic($event)"
+          [disabled]="locked() || !!resourceError()"
+        >
+          <option value="">Select an on-duty mechanic</option>
+
+          @for (mechanic of availableMechanics(); track mechanic.id) {
+            <option [value]="mechanic.id">
+              {{ mechanic.name }} - {{ mechanic.activeJobs }} active job(s)
+            </option>
+          }
+        </select>
+
+        <label for="assignment-bay">Workshop Bay</label>
+        <select
+          id="assignment-bay"
+          name="assignmentBay"
+          [ngModel]="bayId()"
+          (ngModelChange)="changeBay($event)"
+          [disabled]="locked() || !!resourceError()"
+        >
+          <option value="">Select an active bay</option>
+
+          @for (bay of availableBays(); track bay.id) {
+            <option [value]="bay.id">{{ bay.name }}</option>
+          }
+        </select>
+
+        <p class="assignment-warning">
+          Active resources are not guaranteed to be free.
+          Verify workshop availability before assigning.
+          This action updates the job card, not the original
+          booking assignment.
+        </p>
+      }
+
+      @if (actionError(); as error) {
+        <p class="assignment-error" role="alert">{{ error }}</p>
+      }
+    </div>
+
+    <footer class="assignment-footer">
+      <button
+        type="button"
+        [disabled]="submitting()"
+        (click)="close()"
+      >
+        {{ requiresRefresh() ? 'Close and Review' : 'Cancel' }}
+      </button>
+
+      <button
+        type="button"
+        class="assignment-primary"
+        [disabled]="!canSubmit()"
+        (click)="submit()"
+      >
+        {{ submitting() ? 'Assigning...' : 'Save Assignment' }}
+      </button>
+    </footer>
+  </section>
+</div>
