@@ -27,6 +27,17 @@ import type {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DataTable<T> {
+  private static nextInstanceId = 0;
+
+  private readonly instanceId =
+    ++DataTable.nextInstanceId;
+
+  readonly searchControlId =
+    `fx-data-table-${this.instanceId}-search`;
+
+  readonly filterControlId =
+    `fx-data-table-${this.instanceId}-filter`;
+
   readonly columns =
     input.required<readonly DataTableColumn<T>[]>();
 
@@ -43,6 +54,8 @@ export class DataTable<T> {
     input<DataTableFilter<T> | null>(null);
 
   readonly tableLabel = input('Data table');
+
+  readonly compactActions = input(false);
 
   readonly searchable = input(true);
   readonly pagination = input(true);
@@ -306,6 +319,81 @@ export class DataTable<T> {
         this.currentPage() + 1,
       ),
     );
+  }
+
+  actionMenuId(row: T): string {
+    const key = this.rowKey()(row);
+
+    return `fx-table-menu-${this.instanceId}-${typeof key}-${encodeURIComponent(String(key))}`;
+  }
+
+  positionActionMenu(
+    event: Event,
+    menu: HTMLElement,
+  ): void {
+    const trigger = event.currentTarget;
+
+    if (!(trigger instanceof HTMLElement)) {
+      return;
+    }
+
+    if (menu.matches(':popover-open')) {
+      return;
+    }
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const width = Math.min(240, viewportWidth - 16);
+
+    menu.style.width = `${width}px`;
+
+    const left = Math.max(
+      8,
+      Math.min(
+        rect.right - width,
+        viewportWidth - width - 8,
+      ),
+    );
+
+    menu.style.left = `${left}px`;
+
+    const below = Math.max(
+      0,
+      viewportHeight - rect.bottom - 16,
+    );
+
+    const above = Math.max(0, rect.top - 16);
+
+    if (below >= 230 || below >= above) {
+      menu.style.top = `${rect.bottom + 6}px`;
+      menu.style.bottom = 'auto';
+      menu.style.maxHeight = `${below}px`;
+    } else {
+      menu.style.top = 'auto';
+      menu.style.bottom =
+        `${viewportHeight - rect.top + 6}px`;
+      menu.style.maxHeight = `${above}px`;
+    }
+  }
+
+  closeActionMenu(menu: HTMLElement): void {
+    if (menu.matches(':popover-open')) {
+      menu.hidePopover();
+    }
+  }
+
+  selectCompactAction(
+    action: DataTableAction<T>,
+    row: T,
+    menu: HTMLElement,
+  ): void {
+    if (this.isActionDisabled(action, row)) {
+      return;
+    }
+
+    this.closeActionMenu(menu);
+    this.triggerAction(action, row);
   }
 
   isActionDisabled(

@@ -1,0 +1,344 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.bookings-page {
+  display: grid;
+  gap: 1.5rem;
+  min-width: 0;
+}
+
+.bookings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.bookings-header h1,
+.bookings-header p {
+  margin: 0;
+}
+
+.bookings-header p {
+  margin-top: 0.5rem;
+}
+
+.bookings-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bookings-summary p {
+  margin: 0;
+}
+
+.bookings-updated,
+.bookings-timezone {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.bookings-warning {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+fx-data-table {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.booking-details {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.booking-details-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
+  gap: 1rem;
+  margin: 0;
+}
+
+.booking-details-grid > div {
+  min-width: 0;
+}
+
+.booking-details-grid dt {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin-bottom: 0.375rem;
+}
+
+.booking-details-grid dd {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.booking-detail-full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .bookings-page {
+    gap: 1rem;
+  }
+
+  .bookings-header {
+    align-items: flex-start;
+  }
+
+  .bookings-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .booking-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Server-side booking filters and pagination */
+
+.bookings-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    auto;
+  gap: 1rem;
+  align-items: start;
+}
+
+.bookings-filters > * {
+  min-width: 0;
+}
+
+.bookings-filters > fx-button {
+  align-self: center;
+}
+
+.bookings-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.bookings-pagination > span {
+  min-width: 7rem;
+  text-align: center;
+  font-size: 0.875rem;
+}
+
+.bookings-page-search-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .bookings-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bookings-filters > fx-button {
+    justify-self: start;
+  }
+
+  .bookings-pagination {
+    justify-content: center;
+  }
+
+  .bookings-pagination > span {
+    min-width: 0;
+  }
+}
+
+
+/* Day 04 - Compact booking workspace */
+
+.bookings-page {
+  gap: 0.875rem;
+  width: 100%;
+}
+
+.bookings-header {
+  gap: 0.75rem;
+}
+
+.bookings-header h1 {
+  font-size: clamp(1.375rem, 2vw, 1.75rem);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.bookings-header p {
+  margin-top: 0.25rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.bookings-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.bookings-filters {
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1fr)
+    auto;
+  gap: 0.75rem;
+  align-items: start;
+  min-width: 0;
+}
+
+.bookings-filters > fx-button {
+  align-self: start;
+  margin-top: 1.5rem;
+}
+
+.bookings-summary {
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.bookings-updated,
+.bookings-timezone,
+.bookings-page-search-note {
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.bookings-pagination {
+  gap: 0.5rem;
+}
+
+.bookings-pagination > span {
+  min-width: 6rem;
+  font-size: 0.8125rem;
+}
+
+.booking-details {
+  gap: 0.75rem;
+}
+
+.booking-details-grid {
+  gap: 0.75rem 1rem;
+}
+
+.booking-details-grid dt {
+  font-size: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.booking-details-grid dd {
+  font-size: 0.875rem;
+}
+
+@media (max-width: 900px) {
+  .bookings-header {
+    align-items: flex-start;
+  }
+
+  .bookings-header-actions {
+    flex-shrink: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .bookings-page {
+    gap: 0.75rem;
+  }
+
+  .bookings-header {
+    flex-direction: column;
+  }
+
+  .bookings-header-actions {
+    width: 100%;
+  }
+
+  .bookings-filters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.625rem;
+  }
+
+  .bookings-filters > fx-button {
+    margin-top: 0;
+    justify-self: start;
+  }
+
+  .bookings-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .bookings-pagination {
+    justify-content: center;
+  }
+
+  .booking-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* Day 04 - Compact booking list card */
+
+.bookings-list-card {
+  display: grid;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.875rem;
+  background: var(--fx-color-surface);
+  border: 1px solid var(--fx-color-border);
+  border-radius: var(--fx-radius-lg);
+}
+
+.bookings-list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.bookings-list-heading h2 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.bookings-list-heading > span {
+  color: var(--fx-color-text-muted);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .bookings-list-card {
+    padding: 0.625rem;
+  }
+}

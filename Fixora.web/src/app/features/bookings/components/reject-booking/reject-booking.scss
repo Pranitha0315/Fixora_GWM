@@ -1,0 +1,60 @@
+:host {
+  display: block;
+}
+
+.reject-booking-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.reject-booking-summary {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+
+.reject-booking-reason {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.reject-booking-reason label {
+  font-weight: 600;
+}
+
+.reject-booking-reason textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100px;
+  padding: 0.75rem;
+  border: 1px solid currentColor;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.reject-booking-reason textarea:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.reject-booking-warning,
+.reject-booking-error {
+  overflow-wrap: anywhere;
+}
+
+.reject-booking-error {
+  font-weight: 600;
+}
+
+.reject-booking-footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}

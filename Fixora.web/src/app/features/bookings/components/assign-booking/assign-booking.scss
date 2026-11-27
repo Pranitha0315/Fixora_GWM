@@ -1,0 +1,84 @@
+.assignment-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.assignment-dialog {
+  width: min(100%, 560px);
+  max-height: 90vh;
+  overflow: auto;
+  border-radius: 12px;
+  background: #17212e;
+  color: #f8fafc;
+}
+
+.assignment-header,
+.assignment-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+}
+
+.assignment-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.assignment-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.assignment-summary {
+  padding: 0.85rem;
+  border: 1px solid #475569;
+  border-radius: 8px;
+}
+
+.assignment-summary p {
+  margin: 0.35rem 0;
+}
+
+select,
+button {
+  padding: 0.65rem;
+  border: 1px solid #64748b;
+  border-radius: 6px;
+  background: #243244;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.assignment-primary {
+  background: #2563eb;
+}
+
+.assignment-warning {
+  color: #fcd34d;
+  font-size: 0.85rem;
+}
+
+.assignment-error {
+  color: #fca5a5;
+}
+
+.assignment-footer {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}

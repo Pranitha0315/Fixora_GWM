@@ -1,1 +1,333 @@
-<p>bookings works!</p>
+<section class="bookings-page">
+  <header class="bookings-header">
+    <div>
+      <h1>Bookings</h1>
+      <p>Manage workshop appointments and view booking information.</p>
+    </div>
+
+    <div class="bookings-header-actions">
+    <fx-button
+      variant="outline"
+      [disabled]="isLoading() || actionModalOpen()"
+      (pressed)="refresh()"
+    >
+      Refresh
+    </fx-button>
+
+    <fx-button
+      variant="primary"
+      [disabled]="isLoading() || !!errorMessage() || actionModalOpen() || !!selectedBooking()"
+      (pressed)="openWalkIn()"
+    >
+      New Walk-in
+    </fx-button>
+    </div>
+  </header>
+
+  <div class="bookings-filters">
+    <fx-input
+      controlId="booking-date-filter"
+      label="Appointment date"
+      type="date"
+      [ngModel]="selectedDate()"
+      (ngModelChange)="changeDate($event)"
+      [disabled]="isLoading() || actionModalOpen()"
+      helperText="Sri Lanka local date"
+    />
+
+    <fx-select
+      controlId="booking-status-filter"
+      label="Booking status"
+      placeholder="All statuses"
+      [options]="statusOptions"
+      [ngModel]="selectedStatus()"
+      (ngModelChange)="changeStatus($event)"
+      [disabled]="isLoading() || actionModalOpen()"
+    />
+
+    <fx-button
+      variant="outline"
+      [disabled]="isLoading() || actionModalOpen()"
+      (pressed)="clearFilters()"
+    >
+      Clear filters
+    </fx-button>
+  </div>
+
+  <app-booking-calendar
+    [selectedDate]="selectedDate() || null"
+    [disabled]="isLoading() || actionModalOpen() || !!selectedBooking()"
+    (dateSelected)="changeDate($event)"
+  />
+
+  <ng-template #statusCell let-row>
+    <fx-status-badge
+      [label]="statusLabel(row.status)"
+      [tone]="statusTone(row.status)"
+    />
+  </ng-template>
+
+  <ng-template #appointmentCell let-row>
+    {{ row.slotStart | date:'medium':'+0530' }}
+  </ng-template>
+
+  @if (isLoading()) {
+    <fx-loading-state
+      message="Loading bookings..."
+      description="Retrieving workshop appointments."
+    />
+  } @else if (errorMessage(); as error) {
+    <fx-error-state
+      title="Bookings unavailable"
+      [description]="error"
+      (retryRequested)="refresh()"
+    />
+  } @else {
+    @if (currentPage() > pageCount()) {
+      <p class="bookings-warning" role="status">
+        This page is no longer available.
+        Return to the first page to view current bookings.
+      </p>
+    }
+
+    <div class="bookings-list-card">
+      <div class="bookings-list-heading">
+        <h2>Booking List</h2>
+        <span>{{ totalRecords() }} bookings</span>
+      </div>
+
+    <div class="bookings-summary">
+      <p>
+        Retrieved range:
+        <strong>
+          {{ firstRecord() }}-{{ lastRecord() }}
+        </strong>
+        of {{ totalRecords() }} bookings
+      </p>
+
+      @if (lastUpdated(); as updated) {
+        <p class="bookings-updated" role="status">
+          Last updated:
+          {{ updated | date:'medium':'+0530' }}
+        </p>
+      }
+    </div>
+
+    <fx-data-table
+      tableLabel="Workshop bookings"
+      searchPlaceholder="Search current page..."
+      emptyTitle="No bookings found"
+      emptyMessage="No bookings on this page match the current search or filters."
+      [rows]="bookings()"
+      [columns]="columns()"
+      [rowKey]="rowKey"
+      [actions]="actions"
+      [compactActions]="true"
+      [pagination]="false"
+      [loading]="isLoading()"
+      (actionTriggered)="handleAction($event)"
+    />
+
+    <p class="bookings-page-search-note">
+      Search and sorting apply to the current page only.
+      Date and status filters apply to all matching bookings.
+    </p>
+
+    <nav
+      class="bookings-pagination"
+      aria-label="Booking pagination"
+    >
+      <fx-button
+        variant="outline"
+        [disabled]="isLoading() || actionModalOpen() || currentPage() === 1"
+        (pressed)="firstPage()"
+      >
+        First
+      </fx-button>
+
+      <fx-button
+        variant="outline"
+        [disabled]="!canPrevious() || actionModalOpen()"
+        (pressed)="previousPage()"
+      >
+        Previous
+      </fx-button>
+
+      <span aria-live="polite" aria-atomic="true">
+        @if (currentPage() > pageCount()) {
+          Page unavailable
+        } @else {
+          Page {{ currentPage() }} of {{ pageCount() }}
+        }
+      </span>
+
+      <fx-button
+        variant="outline"
+        [disabled]="!canNext() || actionModalOpen()"
+        (pressed)="nextPage()"
+      >
+        Next
+      </fx-button>
+    </nav>
+
+    </div>
+
+    <p class="bookings-timezone">
+      Appointment times are displayed in Sri Lanka time
+      (UTC+05:30).
+    </p>
+  }
+
+  <fx-modal
+    dialogId="booking-details-dialog"
+    title="Booking Details"
+    size="lg"
+    [open]="selectedBooking() !== null"
+    (closeRequested)="closeDetails()"
+  >
+    @if (selectedBooking(); as booking) {
+      <div class="booking-details">
+        <fx-status-badge
+          [label]="statusLabel(booking.status)"
+          [tone]="statusTone(booking.status)"
+        />
+
+        <dl class="booking-details-grid">
+          <div>
+            <dt>Booking ID</dt>
+            <dd>{{ booking.id }}</dd>
+          </div>
+
+          <div>
+            <dt>Customer</dt>
+            <dd>{{ booking.customerName }}</dd>
+          </div>
+
+          <div>
+            <dt>Vehicle</dt>
+            <dd>{{ booking.vehicleLabel }}</dd>
+          </div>
+
+          <div>
+            <dt>Service</dt>
+            <dd>{{ booking.serviceName }}</dd>
+          </div>
+
+          <div>
+            <dt>Appointment Start</dt>
+            <dd>
+              {{ booking.slotStart | date:'medium':'+0530' }}
+            </dd>
+          </div>
+
+          <div>
+            <dt>Appointment End</dt>
+            <dd>
+              {{ booking.slotEnd | date:'medium':'+0530' }}
+            </dd>
+          </div>
+
+          <div>
+            <dt>Mechanic</dt>
+            <dd>{{ booking.mechanicName ?? 'Not assigned' }}</dd>
+          </div>
+
+          <div>
+            <dt>Bay</dt>
+            <dd>{{ booking.bayName ?? 'Not assigned' }}</dd>
+          </div>
+
+          <div>
+            <dt>Booking Source</dt>
+            <dd>{{ booking.source }}</dd>
+          </div>
+
+          <div>
+            <dt>Created At</dt>
+            <dd>
+              {{ booking.createdAt | date:'medium':'+0530' }}
+            </dd>
+          </div>
+
+          <div>
+            <dt>Job Card ID</dt>
+            <dd>{{ booking.jobCardId ?? 'Not created' }}</dd>
+          </div>
+
+          <div>
+            <dt>Promo Code</dt>
+            <dd>{{ booking.promoCode ?? 'None' }}</dd>
+          </div>
+
+          <div class="booking-detail-full">
+            <dt>Notes</dt>
+            <dd>{{ booking.notes ?? 'No notes' }}</dd>
+          </div>
+
+          <div class="booking-detail-full" data-testid="booking-manager-note">
+            <dt>Manager Note</dt>
+            <dd>{{ booking.managerNote ?? 'No manager note' }}</dd>
+            <p class="bookings-page-search-note">
+              Internal - staff and mechanic only.
+            </p>
+          </div>
+
+          <div class="booking-detail-full">
+            <dt>Decline Reason</dt>
+            <dd>{{ booking.declineReason ?? 'Not applicable' }}</dd>
+          </div>
+        </dl>
+      </div>
+    }
+
+    <div modal-footer>
+      <fx-button
+        variant="outline"
+        (pressed)="closeDetails()"
+      >
+        Close
+      </fx-button>
+    </div>
+  </fx-modal>
+
+  @if (walkInOpen()) {
+    <app-walk-in-booking
+      (created)="onWalkInCreated($event)"
+      (cancelled)="closeWalkIn()"
+      (refreshRequired)="onWalkInRefreshRequired()"
+    />
+  }
+
+  @if (confirmingBooking(); as booking) {
+    <app-confirm-booking
+      [booking]="booking"
+      (confirmed)="onBookingConfirmed($event)"
+      (cancelled)="closeConfirmation()"
+      (refreshRequired)="onConfirmationRefreshRequired()"
+    />
+  }
+  @if (rejectingBooking(); as booking) {
+    <app-reject-booking
+      [booking]="booking"
+      (rejected)="onBookingRejected($event)"
+      (cancelled)="closeRejection()"
+      (refreshRequired)="onRejectionRefreshRequired()"
+    />
+  }
+  @if (reschedulingBooking(); as booking) {
+    <app-reschedule-booking
+      [booking]="booking"
+      (rescheduled)="onBookingRescheduled($event)"
+      (cancelled)="closeReschedule()"
+      (refreshRequired)="onRescheduleRefreshRequired()"
+    />
+  }
+  @if (assigningBooking(); as booking) {
+    <app-assign-booking
+      [booking]="booking"
+      (assigned)="onJobAssigned($event)"
+      (cancelled)="closeAssignment()"
+      (refreshRequired)="onAssignmentRefreshRequired()"
+    />
+  }
+</section>
