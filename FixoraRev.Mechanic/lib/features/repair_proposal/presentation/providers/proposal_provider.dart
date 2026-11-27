@@ -1,6 +1,5 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/mock/mock_data.dart';
 import '../../domain/entities/repair_item.dart';
 
 /// Repair items per job id. Customer approves/declines each item
@@ -9,8 +8,7 @@ class ProposalNotifier extends Notifier<Map<String, List<RepairItem>>> {
   int _counter = 100;
 
   @override
-  Map<String, List<RepairItem>> build() =>
-      MockData.repairItems.map((k, v) => MapEntry(k, List<RepairItem>.from(v)));
+  Map<String, List<RepairItem>> build() => {};
 
   List<RepairItem> itemsFor(String jobId) => state[jobId] ?? const [];
 

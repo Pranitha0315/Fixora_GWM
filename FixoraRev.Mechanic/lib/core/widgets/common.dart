@@ -344,20 +344,34 @@ class StatStrip extends StatelessWidget {
 
 /// Small square thumbnail for [MediaRow]: camera or play icon on a soft tile.
 class MediaThumb extends StatelessWidget {
-  const MediaThumb({super.key, this.isVideo = false});
+  const MediaThumb({super.key, this.isVideo = false, this.imageUrl});
   final bool isVideo;
+
+  /// Signed server preview (GET /media/{ref}?exp=&sig=). Shown for photos; videos keep the play icon.
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
+    final placeholder = Center(
+      child: Icon(
+        isVideo ? Icons.play_circle_fill_rounded : Icons.photo_camera_back_rounded,
+        color: AppColors.muted,
+        size: 28,
+      ),
+    );
+    final url = imageUrl;
     return DecoratedBox(
       decoration: BoxDecoration(color: AppColors.surfaceAlt),
-      child: Center(
-        child: Icon(
-          isVideo ? Icons.play_circle_fill_rounded : Icons.photo_camera_back_rounded,
-          color: AppColors.muted,
-          size: 28,
-        ),
-      ),
+      child: (url == null || url.isEmpty || isVideo)
+          ? placeholder
+          : Image.network(
+              url,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              errorBuilder: (_, __, ___) => placeholder,
+              loadingBuilder: (_, child, progress) => progress == null ? child : placeholder,
+            ),
     );
   }
 }

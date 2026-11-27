@@ -22,16 +22,13 @@ class StatusChip extends StatelessWidget {
   static ChipTone _jobTone(JobStatus s) {
     switch (s) {
       case JobStatus.waiting:
-      case JobStatus.approved:
         return ChipTone.info;
       case JobStatus.diagnosing:
       case JobStatus.inProgress:
         return ChipTone.orange;
       case JobStatus.awaitingApproval:
-      case JobStatus.qualityCheck:
         return ChipTone.warning;
       case JobStatus.completed:
-      case JobStatus.parked:
         return ChipTone.success;
     }
   }

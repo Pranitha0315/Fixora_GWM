@@ -4,20 +4,47 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../../core/widgets/buttons.dart';
 
-/// Full-screen loader ("Signing you in…", "Processing…").
-/// When [next] is given it opens that screen after [delay].
-class LoadingScreen extends StatefulWidget {
-  const LoadingScreen({
-    super.key,
+/// What the `/loading` route shows, and where it goes next.
+class LoadingArgs {
+  const LoadingArgs({
     required this.title,
     required this.subtitle,
-    this.next,
+    required this.nextRoute,
+    this.nextExtra,
     this.delay = const Duration(milliseconds: 1800),
   });
 
   final String title;
   final String subtitle;
-  final Widget? next;
+  final String nextRoute;
+  final Object? nextExtra;
+  final Duration delay;
+}
+
+/// Full-screen loader ("Signing you in…", "Processing…").
+/// When [nextRoute] is given it moves there (through GoRouter) after [delay].
+class LoadingScreen extends StatefulWidget {
+  const LoadingScreen({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    this.nextRoute,
+    this.nextExtra,
+    this.delay = const Duration(milliseconds: 1800),
+  });
+
+  factory LoadingScreen.fromArgs(LoadingArgs a) => LoadingScreen(
+        title: a.title,
+        subtitle: a.subtitle,
+        nextRoute: a.nextRoute,
+        nextExtra: a.nextExtra,
+        delay: a.delay,
+      );
+
+  final String title;
+  final String subtitle;
+  final String? nextRoute;
+  final Object? nextExtra;
   final Duration delay;
 
   @override
@@ -32,10 +59,10 @@ class _LoadingScreenState extends State<LoadingScreen>
   @override
   void initState() {
     super.initState();
-    final next = widget.next;
+    final next = widget.nextRoute;
     if (next != null) {
       Future<void>.delayed(widget.delay, () {
-        if (mounted) context.resetTo(next);
+        if (mounted) context.goRoute(next, extra: widget.nextExtra);
       });
     }
   }

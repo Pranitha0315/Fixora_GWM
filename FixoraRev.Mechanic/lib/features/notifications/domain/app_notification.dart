@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum NotificationKind { job, approval, parts, sos, queue, passport }
+enum NotificationKind { job, approval, sos, queue }
 
 class AppNotification {
   AppNotification({
@@ -30,9 +30,7 @@ class AppNotification {
   IconData get icon => switch (kind) {
         NotificationKind.job => Icons.assignment_outlined,
         NotificationKind.approval => Icons.thumb_up_alt_outlined,
-        NotificationKind.parts => Icons.inventory_2_outlined,
         NotificationKind.sos => Icons.sos_rounded,
         NotificationKind.queue => Icons.low_priority_rounded,
-        NotificationKind.passport => Icons.menu_book_outlined,
       };
 }

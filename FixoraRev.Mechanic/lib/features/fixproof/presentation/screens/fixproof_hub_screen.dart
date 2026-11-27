@@ -67,9 +67,10 @@ class FixProofHubScreen extends ConsumerWidget {
                     onAction: () => MainShell.switchTab(context, MainShell.jobs),
                   ),
                 )
-              else
-                // One primary action: only the next car gets the Start button.
-                for (final (i, j) in toInspect.indexed)
+              else ...[
+                // The mechanic picks which car to inspect: every car has its own
+                // Start button, and "Choose vehicle" searches the whole list.
+                for (final (i, j) in toInspect.take(_maxListed).indexed)
                   _ReportTile(
                     job: j,
                     subtitle: i == 0 ? 'Next · ${j.serviceType}' : j.serviceType,
@@ -77,8 +78,15 @@ class FixProofHubScreen extends ConsumerWidget {
                     tone: AppColors.primarySoft,
                     iconColor: AppColors.primaryStrong,
                     route: RouteNames.inspectionCapture,
-                    cta: i == 0 ? 'Start' : null,
+                    cta: 'Start',
                   ),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+                  onPressed: () => _chooseVehicle(context, toInspect),
+                  icon: const Icon(Icons.directions_car_filled_outlined),
+                  label: Text('Choose vehicle (${toInspect.length})'),
+                ),
+              ],
               const SectionHeader(title: 'Published'),
               if (published.isEmpty)
                 AppCard(
@@ -102,6 +110,93 @@ class FixProofHubScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+const _maxListed = 7;
+
+/// Lets the mechanic search every open car and pick the one to inspect.
+Future<void> _chooseVehicle(BuildContext context, List<Job> candidates) async {
+  final picked = await showModalBottomSheet<Job>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (_) => _VehiclePickerSheet(candidates: candidates),
+  );
+  if (picked == null || !context.mounted) return;
+  context.pushRoute(RouteNames.inspectionCapture, extra: picked.id);
+}
+
+class _VehiclePickerSheet extends StatefulWidget {
+  const _VehiclePickerSheet({required this.candidates});
+  final List<Job> candidates;
+
+  @override
+  State<_VehiclePickerSheet> createState() => _VehiclePickerSheetState();
+}
+
+class _VehiclePickerSheetState extends State<_VehiclePickerSheet> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _search.text.trim().toLowerCase();
+    final list = widget.candidates.where((j) {
+      if (q.isEmpty) return true;
+      return j.vehicle.plate.toLowerCase().contains(q) ||
+          j.vehicle.title.toLowerCase().contains(q) ||
+          j.customer.name.toLowerCase().contains(q) ||
+          j.id.toLowerCase().contains(q);
+    }).toList();
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
+        child: SizedBox(
+          height: MediaQuery.sizeOf(context).height * 0.6,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Choose vehicle to inspect', style: AppText.title),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _search,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  hintText: 'Search plate, vehicle or customer',
+                  prefixIcon: Icon(Icons.search_rounded),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: list.isEmpty
+                    ? Center(child: Text('No vehicle matches "$q"', style: AppText.body))
+                    : ListView.separated(
+                        itemCount: list.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, i) {
+                          final j = list[i];
+                          return ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(Icons.directions_car_filled_outlined, color: AppColors.primaryStrong),
+                            title: Text('${j.vehicle.title} · ${j.vehicle.plate}', style: AppText.bodyStrong),
+                            subtitle: Text('${j.customer.name} · ${j.serviceType}', style: AppText.caption),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => Navigator.of(context).pop(j),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

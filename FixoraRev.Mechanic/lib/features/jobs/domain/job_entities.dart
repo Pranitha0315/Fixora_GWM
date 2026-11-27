@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../diagnosis/domain/diagnosis_entities.dart';
 
 class Vehicle {
   const Vehicle({
@@ -94,20 +93,15 @@ class Customer {
   final String phone;
 }
 
-/// Mechanic's lifecycle of a job card.
-///
-/// waiting → diagnosing → awaitingApproval → approved → inProgress
-/// → qualityCheck → completed. An inconclusive diagnosis is `parked`
-/// in the Evidence Passport instead.
+/// Mechanic's view of a job card. Every status here comes from the backend's JobStatus
+/// (Open, Inspecting, AwaitingManagerReview / AwaitingCustomerApproval / AwaitingRelease,
+/// InProgress, Paused, Completed, Closed).
 enum JobStatus {
   waiting,
   diagnosing,
   awaitingApproval,
-  approved,
   inProgress,
-  qualityCheck,
   completed,
-  parked,
 }
 
 extension JobStatusX on JobStatus {
@@ -117,47 +111,35 @@ extension JobStatusX on JobStatus {
         JobStatus.waiting => 'Pending',
         JobStatus.diagnosing => 'In Progress',
         JobStatus.awaitingApproval => 'Awaiting Review',
-        JobStatus.approved => 'Pending',
         JobStatus.inProgress => 'In Progress',
-        JobStatus.qualityCheck => 'Awaiting Review',
         JobStatus.completed => 'Completed',
-        JobStatus.parked => 'Completed',
       };
 
   Color get color => switch (this) {
         JobStatus.waiting => AppColors.info,
         JobStatus.diagnosing => AppColors.primary,
         JobStatus.awaitingApproval => AppColors.warning,
-        JobStatus.approved => AppColors.info,
         JobStatus.inProgress => AppColors.primary,
-        JobStatus.qualityCheck => AppColors.warning,
         JobStatus.completed => AppColors.success,
-        JobStatus.parked => AppColors.success,
       };
 
   IconData get icon => switch (this) {
         JobStatus.waiting => Icons.schedule_rounded,
         JobStatus.diagnosing => Icons.troubleshoot_rounded,
         JobStatus.awaitingApproval => Icons.hourglass_top_rounded,
-        JobStatus.approved => Icons.thumb_up_alt_outlined,
         JobStatus.inProgress => Icons.build_circle_outlined,
-        JobStatus.qualityCheck => Icons.fact_check_outlined,
         JobStatus.completed => Icons.check_circle_outline_rounded,
-        JobStatus.parked => Icons.bookmark_added_outlined,
       };
 
-  bool get isActive => this != JobStatus.completed && this != JobStatus.parked;
+  bool get isActive => this != JobStatus.completed;
 
   /// 0..1 progress used on cards.
   double get progress => switch (this) {
         JobStatus.waiting => 0.05,
         JobStatus.diagnosing => 0.2,
         JobStatus.awaitingApproval => 0.35,
-        JobStatus.approved => 0.45,
         JobStatus.inProgress => 0.65,
-        JobStatus.qualityCheck => 0.9,
         JobStatus.completed => 1,
-        JobStatus.parked => 1,
       };
 }
 
@@ -194,50 +176,6 @@ extension JobPriorityX on JobPriority {
       };
 }
 
-class EstimateLine {
-  EstimateLine({
-    required this.partId,
-    required this.name,
-    required this.qty,
-    required this.unitPrice,
-    this.reservedQty = 0,
-  });
-
-  String partId;
-  String name;
-  int qty;
-  double unitPrice;
-
-  /// How many units are already held for this job in the stock room.
-  int reservedQty;
-
-  double get total => qty * unitPrice;
-}
-
-class Estimate {
-  Estimate({
-    required this.lines,
-    required this.labourHours,
-    required this.recommendedRepair,
-    this.labourRate = 3500,
-  });
-
-  final List<EstimateLine> lines;
-  double labourHours;
-  double labourRate;
-  String recommendedRepair;
-
-  double get partsTotal => lines.fold<double>(0, (sum, l) => sum + l.total);
-  double get labourTotal => labourHours * labourRate;
-  double get total => partsTotal + labourTotal;
-}
-
-class RepairTask {
-  RepairTask(this.title, {this.done = false});
-  final String title;
-  bool done;
-}
-
 class TimelineEvent {
   TimelineEvent(this.title, this.time, {this.detail, this.icon = Icons.circle});
   final String title;
@@ -258,21 +196,14 @@ class Job {
     required this.estimatedMinutes,
     required this.status,
     required this.bay,
-    required this.scenario,
     this.priority = JobPriority.normal,
-    this.diagnosis,
-    this.estimate,
-    this.partsReserved = false,
-    List<RepairTask>? tasks,
-    List<TimelineEvent>? timeline,
-    this.progressPhotos = 0,
     this.startedAt,
     this.completedAt,
-    this.passportEntryId,
     this.customerNote,
     this.managerNote,
-  })  : tasks = tasks ?? [],
-        timeline = timeline ?? [];
+    this.paused = false,
+    List<TimelineEvent>? timeline,
+  }) : timeline = timeline ?? [];
 
   final String id;
   final int token;
@@ -285,28 +216,18 @@ class Job {
   JobStatus status;
   String bay;
 
-  /// True while repair is paused (synced via jobAction pause/resume).
-  bool paused = false;
+  /// True while the backend reports the job as Paused.
+  bool paused;
 
-  /// Key of the mock OBD / AI scenario used by the diagnosis service.
-  final String scenario;
   JobPriority priority;
-  DiagnosisReport? diagnosis;
-  Estimate? estimate;
-  bool partsReserved;
-  List<RepairTask> tasks;
-  final List<TimelineEvent> timeline;
-  int progressPhotos;
   DateTime? startedAt;
   DateTime? completedAt;
-  String? passportEntryId;
   String? customerNote;
 
   /// Manager → mechanic instruction from the booking (never shown to the customer).
   String? managerNote;
 
-  double get taskProgress =>
-      tasks.isEmpty ? 0 : tasks.where((t) => t.done).length / tasks.length;
+  final List<TimelineEvent> timeline;
 
   void log(String title, {String? detail, IconData icon = Icons.circle}) =>
       timeline.insert(

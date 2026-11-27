@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../app/theme/app_typography.dart';
-import '../../../../core/mock/mock_data.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/common.dart';
 import '../../../../core/widgets/status_chip.dart';
@@ -16,28 +16,70 @@ import '../widgets/inspection_issue_form.dart';
 /// FixProof step 2–3: the mechanic checks every AI-drafted line,
 /// edits if needed, then confirms and publishes to the customer.
 /// AI never decides faults or prices on its own.
-class ReportReviewScreen extends ConsumerWidget {
+class ReportReviewScreen extends ConsumerStatefulWidget {
   const ReportReviewScreen({super.key, required this.jobId});
   final String jobId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ReportReviewScreen> createState() => _ReportReviewScreenState();
+}
+
+class _ReportReviewScreenState extends ConsumerState<ReportReviewScreen> {
+  bool _publishing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (liveFixProof) _loadDrafts();
+  }
+
+  Future<void> _loadDrafts() async {
+    try {
+      await ref.read(reportDraftProvider.notifier).loadRemote(widget.jobId);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not load the drafts: $e')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final jobId = widget.jobId;
     final issues = ref.watch(reportDraftProvider);
     final tamil = ref.watch(reportTamilProvider);
     final job = AppServices.jobs.byId(jobId);
+    final voiceText = liveFixProof
+        ? ref
+            .watch(captureProvider)
+            .voiceNotes
+            .map((v) => v.transcript ?? v.sttReason ?? '')
+            .where((t) => t.isNotEmpty)
+            .join('\n\n')
+        : '';
 
     final verified = issues.where((i) => i.verified).length;
     final allVerified = issues.isNotEmpty && verified == issues.length;
     final critical = issues.where((i) => i.severity == IssueSeverity.critical).length;
     final soon = issues.where((i) => i.severity == IssueSeverity.soon).length;
 
-    void publish() {
+    Future<void> publish() async {
+      final messenger = ScaffoldMessenger.of(context);
+      final router = GoRouter.of(context);
+      setState(() => _publishing = true);
+      try {
+        await ref.read(reportDraftProvider.notifier).publishChecked();
+      } catch (e) {
+        if (mounted) setState(() => _publishing = false);
+        messenger.showSnackBar(SnackBar(content: Text('Could not publish: $e')));
+        return;
+      }
       ref.read(reportStateProvider.notifier).set(jobId, ReportState.published);
       AppServices.jobs.publishFixProof(job, issues: issues.length);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(content: Text('Report published. ${job.customer.name} can see it now.')),
       );
-      Navigator.of(context).pushReplacementNamed(RouteNames.repairProposal, arguments: jobId);
+      router.go(RouteNames.repairProposal, extra: jobId);
     }
 
     return Scaffold(
@@ -96,15 +138,17 @@ class ReportReviewScreen extends ConsumerWidget {
           AppCard(
             child: InspectionIssueForm(
               onSave: ({required area, required title, required detail, required severity}) {
-                ref.read(reportDraftProvider.notifier).addManual(
-                      area: area,
-                      title: title,
-                      detail: detail,
-                      severity: severity,
-                    );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Issue added')),
-                );
+                ref.read(reportDraftProvider.notifier)
+                    .addManual(area: area, title: title, detail: detail, severity: severity)
+                    .then((_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Issue added')));
+                  }
+                }).catchError((Object e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not add the issue: $e')));
+                  }
+                });
               },
             ),
           ),
@@ -121,7 +165,7 @@ class ReportReviewScreen extends ConsumerWidget {
                 leading: Icon(Icons.record_voice_over_rounded, color: AppColors.muted),
                 title: Text('Your voice note (transcript)', style: AppText.bodyStrong),
                 children: [
-                  Text(MockData.voiceTranscript, style: AppText.body),
+                  Text(voiceText.isEmpty ? 'No transcript yet.' : voiceText, style: AppText.body),
                 ],
               ),
             ),
@@ -141,9 +185,11 @@ class ReportReviewScreen extends ConsumerWidget {
             ),
           // One primary action; saving the draft is the quiet second option.
           FilledButton.icon(
-            onPressed: allVerified ? publish : null,
-            icon: const Icon(Icons.verified_rounded),
-            label: const Text('Confirm & publish'),
+            onPressed: allVerified && !_publishing ? publish : null,
+            icon: _publishing
+                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.5))
+                : const Icon(Icons.verified_rounded),
+            label: Text(_publishing ? 'Publishing…' : 'Confirm & publish'),
           ),
           TextButton(
             onPressed: () {
@@ -283,12 +329,12 @@ class _IssueCard extends ConsumerWidget {
                 const Spacer(),
                 IconButton(
                   tooltip: 'Edit issue',
-                  onPressed: () => _edit(context, ref),
+                  onPressed: issue.published ? null : () => _edit(context, ref),
                   icon: Icon(Icons.edit_outlined, color: AppColors.body, size: 20),
                 ),
                 IconButton(
                   tooltip: 'Remove issue',
-                  onPressed: () => notifier.remove(issue.id),
+                  onPressed: issue.published ? null : () => notifier.remove(issue.id),
                   icon: Icon(Icons.delete_outline_rounded, color: AppColors.body, size: 20),
                 ),
               ],
@@ -309,7 +355,7 @@ class _IssueCard extends ConsumerWidget {
             const SizedBox(height: 8),
             CheckboxListTile(
               value: issue.verified,
-              onChanged: (_) => notifier.toggleVerified(issue.id),
+              onChanged: issue.published ? null : (_) => notifier.toggleVerified(issue.id),
               contentPadding: EdgeInsets.zero,
               controlAffinity: ListTileControlAffinity.leading,
               activeColor: AppColors.primaryStrong,

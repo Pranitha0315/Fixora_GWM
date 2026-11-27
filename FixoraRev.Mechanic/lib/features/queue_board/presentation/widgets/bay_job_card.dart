@@ -5,7 +5,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../../core/widgets/rev_common.dart';
-import '../../../inventory/domain/part.dart';
 import '../../../jobs/domain/job_entities.dart';
 import '../../../jobs/presentation/screens/job_detail_screen.dart';
 
@@ -19,8 +18,6 @@ class BayJobCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final jobs = AppServices.jobs;
     final eta = jobs.etaFor(job);
-    final hasPassport = AppServices.passport.openFor(job.vehicle).isNotEmpty;
-    final availability = job.estimate == null ? null : AppServices.inventory.jobAvailability(job);
 
     return AppCard(
       margin: const EdgeInsets.only(bottom: 12),
@@ -87,9 +84,8 @@ class BayJobCard extends StatelessWidget {
               Pill(label: job.status.label, color: job.status.color, icon: job.status.icon, dense: true),
               if (job.priority != JobPriority.normal)
                 Pill(label: job.priority.label, color: job.priority.color, icon: job.priority.icon, dense: true),
-              if (hasPassport && job.priority != JobPriority.returning)
-                Pill(label: 'Passport', color: AppColors.purple, icon: Icons.history_rounded, dense: true),
-              if (availability != null && job.status.isActive) TrafficLight(availability, short: true),
+            if (job.paused)
+                Pill(label: 'Paused', color: AppColors.warning, icon: Icons.pause_circle_rounded, dense: true),
             ],
           ),
           if (!compact) ...[
@@ -116,7 +112,7 @@ class BayJobCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: LinearProgressIndicator(
-                value: job.status == JobStatus.inProgress ? 0.5 + job.taskProgress * 0.4 : job.status.progress,
+                value: job.status.progress,
                 minHeight: 5,
                 backgroundColor: AppColors.field,
                 color: job.status.color,

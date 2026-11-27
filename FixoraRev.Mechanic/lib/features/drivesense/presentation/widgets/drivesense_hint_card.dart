@@ -60,7 +60,7 @@ class _DriveSenseHintCardState extends State<DriveSenseHintCard> {
             Text('DriveSense', style: AppText.bodyStrong),
             const SizedBox(height: 6),
             Text(
-              'Customer has not opted in. Wear hints stay private.',
+              'Not shared: the customer has not opted in, or there are no trips yet.',
               style: AppText.caption,
             ),
           ],

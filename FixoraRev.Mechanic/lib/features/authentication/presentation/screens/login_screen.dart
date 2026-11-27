@@ -9,20 +9,11 @@ import '../../../../core/backend/fixora_config.dart';
 import '../../../../core/backend/mechanic_backend.dart';
 import '../../../../core/di/app_services.dart';
 import '../../../../core/utils/nav.dart';
-import '../../../../core/widgets/buttons.dart' show GoogleGlyph;
 import '../../../../core/widgets/warm_ui.dart';
-import '../../../auth/presentation/screens/forgot_password_screen.dart';
 import '../../../auth/presentation/screens/status_screens.dart';
-import '../../../auth/presentation/widgets/auth_scaffold.dart' show OrDivider;
-import '../../../auth/presentation/widgets/google_account_sheet.dart';
-import '../../../quick_login/data/quick_login_store.dart';
-import '../../../quick_login/presentation/screens/quick_login_setup_screen.dart';
-import '../../../shell/presentation/main_shell.dart';
 
-/// Garage PIN login, plus Google / forgot password / new mechanic links.
-///
-/// Quick login is NOT offered here. After the first successful sign-in the app asks the
-/// mechanic to set a 4-digit PIN; every later start opens the quick-login screen instead.
+/// Garage PIN login: employee ID + PIN goes straight to Home.
+/// Accounts are created by the manager's invitation link, not from this screen.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.initialEmail = ''});
   final String initialEmail;
@@ -32,13 +23,31 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  late final _idCtrl = TextEditingController(text: widget.initialEmail);
+  /// Every employee ID starts with this; the mechanic types only the 3 digits.
+  static const _idPrefix = 'EMP-';
+
+  late final _idCtrl = TextEditingController(
+    text: widget.initialEmail.contains('@') ? '' : widget.initialEmail.replaceAll(RegExp(r'\D'), ''),
+  );
   final _secretCtrl = TextEditingController();
   bool _hide = true;
   bool _loading = false;
   String? _idError;
   String? _secretError;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sent back here because the server ended the session: say why, once.
+    final auth = AppServices.auth;
+    if (auth.sessionExpired) {
+      auth.sessionExpired = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.toast('Your session expired. Please sign in again.', icon: Icons.info_outline_rounded);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -52,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final id = _idCtrl.text.trim();
     final secret = _secretCtrl.text;
     setState(() {
-      _idError = id.isEmpty ? 'Enter your employee ID' : null;
+      _idError = id.isEmpty ? 'Enter the 3 digits of your employee ID' : null;
       _secretError = secret.isEmpty ? 'Enter your PIN' : null;
       _error = null;
     });
@@ -60,9 +69,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _loading = true);
     try {
-      await MechanicBackend.instance.pinLogin(id.toUpperCase(), secret.trim());
+      await MechanicBackend.instance.pinLogin('$_idPrefix${id.padLeft(3, '0')}', secret.trim());
       if (!mounted) return;
-      await _afterSignIn();
+      _afterSignIn();
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -78,41 +87,16 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _google() async {
-    final account = await showGoogleAccountSheet(context);
-    if (account == null || !mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final result = await AppServices.auth.signInWithGoogle(account);
-      if (!mounted) return;
-      if (result.needsGarageLink) {
-        await AppServices.auth.linkGoogleAccount(result.account, 'FXR2048');
-        if (!mounted) return;
-      }
-      await _afterSignIn();
-    } catch (_) {
-      if (mounted) setState(() => _error = 'Google sign-in failed. Try again.');
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  /// First sign-in on this phone → set up the quick-login PIN. Already set up → Home.
-  Future<void> _afterSignIn() async {
-    final user = AppServices.auth.user;
-    final email = (user?.email ?? _idCtrl.text.trim()).toLowerCase();
-    final store = QuickLoginStore.instance;
-    await store.load();
-    if (!mounted) return;
-    final needsSetup = !store.enabled || store.email != email;
-    context.resetTo(LoadingScreen(
-      title: 'Signing you in…',
-      subtitle: 'Loading your jobs',
-      next: needsSetup ? QuickLoginSetupScreen(email: email, name: user?.fullName ?? 'Mechanic') : const MainShell(),
-    ));
+  /// Employee ID + PIN → Home (the PIN just typed is the garage PIN).
+  void _afterSignIn() {
+    context.goRoute(
+      RouteNames.loading,
+      extra: const LoadingArgs(
+        title: 'Signing you in…',
+        subtitle: 'Loading your jobs',
+        nextRoute: RouteNames.shell,
+      ),
+    );
   }
 
   InputDecoration _dec(String hint, IconData icon, String? error, {Widget? suffix}) => InputDecoration(
@@ -152,11 +136,23 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     TextField(
                       controller: _idCtrl,
-                      textCapitalization: TextCapitalization.characters,
+                      keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                       autofillHints: const [AutofillHints.username],
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(3)],
                       onChanged: (_) => setState(() => _idError = null),
-                      decoration: _dec('Employee ID', Icons.badge_outlined, _idError),
+                      decoration: _dec('001', Icons.badge_outlined, _idError).copyWith(
+                        prefixIcon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(width: 12),
+                            Icon(Icons.badge_outlined, color: AppColors.muted),
+                            const SizedBox(width: 8),
+                            Text(_idPrefix, style: AppText.body.copyWith(fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -184,31 +180,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                     const SizedBox(height: 16),
                     ArrowPillButton(label: _loading ? 'Signing in…' : 'Start your shift', onPressed: _loading ? null : _signIn),
-                    const OrDivider(),
-                    OutlinedButton.icon(
-                      onPressed: _loading ? null : _google,
-                      icon: const GoogleGlyph(),
-                      label: const Text('Continue with Google'),
-                    ),
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  onPressed: () => context.push(
-                    ForgotPasswordScreen(initialEmail: _idCtrl.text.contains('@') ? _idCtrl.text.trim() : ''),
-                  ),
-                  child: const Text('Forgot password?'),
-                ),
-                TextButton(
-                  onPressed: () => context.pushRoute(RouteNames.register),
-                  child: const Text('New mechanic?'),
-                ),
-              ],
             ),
           ],
         ),

@@ -10,17 +10,10 @@ import '../../../core/widgets/rev_common.dart' show confirmDialog;
 import '../../../core/widgets/common.dart' show StatStrip;
 import '../../../core/widgets/rev_ui.dart';
 import '../../fixproof/presentation/providers/fixproof_provider.dart';
-import '../../jobs/domain/job_entities.dart';
-import '../../quick_login/data/quick_login_store.dart';
-import '../../quick_login/presentation/screens/quick_login_setup_screen.dart';
-import 'more/change_password_screen.dart';
-import 'more/devices_screen.dart';
+import 'more/change_pin_screen.dart';
 import 'more/help_screen.dart';
-import 'more/salary_screen.dart';
-import 'more/service_history_screen.dart';
-
 /// Profile tab: photo, stats, account, preferences (appearance, duty,
-/// quick login, notifications, Tamil reports), More and log out.
+/// notifications, Tamil reports), More and log out.
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -29,79 +22,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _push = true;
   final _prefsKey = GlobalKey();
-
-  Future<void> _changePhoto() async {
-    try {
-      final changed = await AppServices.profilePhoto.choosePhoto();
-      if (changed && mounted) {
-        context.toast('Profile photo updated', icon: Icons.check_circle_outline_rounded);
-      }
-    } catch (_) {
-      if (mounted) {
-        context.toast('Could not open your photos. Please try again.', icon: Icons.error_outline_rounded);
-      }
-    }
-  }
-
-  Future<void> _setUpPin() async {
-    final user = AppServices.auth.user;
-    if (user == null) return;
-    await context.push<bool>(QuickLoginSetupScreen(
-      email: user.email.trim().toLowerCase(),
-      name: user.fullName,
-      fromProfile: true,
-    ));
-  }
-
-  Future<void> _openQuickLogin() async {
-    final ql = QuickLoginStore.instance;
-    await ql.load();
-    if (!mounted) return;
-    if (!ql.enabled) {
-      await _setUpPin();
-      return;
-    }
-    await showModalBottomSheet<void>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Quick login', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink)),
-              const SizedBox(height: 2),
-              Text('Sign in with a 4-digit PIN on this phone', style: TextStyle(color: AppColors.body)),
-              const SizedBox(height: 8),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.password_rounded, color: AppColors.body),
-                title: Text('Change PIN', style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.ink)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _setUpPin();
-                },
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.block_rounded, color: AppColors.danger),
-                title: Text('Turn off quick login',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.danger)),
-                onTap: () async {
-                  await ql.disable();
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (mounted) context.toast('Quick login turned off', icon: Icons.lock_outline_rounded);
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Future<void> _logout() async {
     final ok = await confirmDialog(
@@ -130,19 +51,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       listenable: Listenable.merge([
         AppServices.auth,
         AppServices.jobs,
-        AppServices.profilePhoto,
-        QuickLoginStore.instance,
         ThemeController.instance,
       ]),
       builder: (context, _) {
         final user = AppServices.auth.user;
-        final jobs = AppServices.jobs.all;
         final doneToday = AppServices.jobs.completedToday;
-        final diagnosed = jobs.where((j) => j.diagnosis != null).length;
-        final finished = jobs.where((j) => !j.status.isActive).length;
         final onDuty = AppServices.auth.onDuty;
-        final ql = QuickLoginStore.instance;
-        final photo = AppServices.profilePhoto.bytes;
 
         return RevTabPage(
           title: '',
@@ -165,32 +79,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: AppColors.surface, width: 3),
                         boxShadow: [BoxShadow(color: AppColors.shadow, blurRadius: 12, offset: const Offset(0, 4))],
-                        image: DecorationImage(
+                        image: const DecorationImage(
                           fit: BoxFit.cover,
-                          image: photo != null
-                              ? MemoryImage(photo)
-                              : const AssetImage('assets/images/mechanic_avatar.jpg') as ImageProvider,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      right: -10,
-                      bottom: -10,
-                      child: Semantics(
-                        button: true,
-                        label: 'Change profile photo',
-                        child: Material(
-                          color: AppColors.primaryStrong,
-                          shape: CircleBorder(side: BorderSide(color: AppColors.surface, width: 2)),
-                          child: InkWell(
-                            customBorder: const CircleBorder(),
-                            onTap: _changePhoto,
-                            child: SizedBox(
-                              width: 44,
-                              height: 44,
-                              child: Icon(Icons.photo_camera_rounded, size: 18, color: AppColors.onPrimary),
-                            ),
-                          ),
+                          image: AssetImage('assets/images/mechanic_avatar.jpg'),
                         ),
                       ),
                     ),
@@ -218,7 +109,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
             const SizedBox(height: 18),
-            StatStrip(items: [(doneToday.toString().padLeft(2, '0'), 'Jobs today'), (diagnosed.toString().padLeft(2, '0'), 'Diagnoses'), ('4.8', 'Rating')]),
+            StatStrip(items: [
+              (doneToday.toString().padLeft(2, '0'), 'Jobs done today'),
+              (AppServices.jobs.activeCount.toString().padLeft(2, '0'), 'Active jobs'),
+            ]),
 
             // Account
             const RevSection('Account'),
@@ -226,6 +120,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               padding: EdgeInsets.zero,
               child: Column(
                 children: [
+                  _KvRow(
+                    icon: Icons.badge_outlined,
+                    label: 'Employee ID',
+                    value: (user?.employeeId.isEmpty ?? true) ? '-' : user!.employeeId,
+                  ),
                   _KvRow(icon: Icons.mail_outline_rounded, label: 'Email', value: user?.email ?? '-'),
                   _KvRow(
                     icon: Icons.call_outlined,
@@ -273,18 +172,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     value: onDuty,
                     onChanged: AppServices.auth.setOnDuty,
                   ),
-                  _NavRow(
-                    icon: Icons.pin_outlined,
-                    title: 'Quick login (Mechanic PIN)',
-                    subtitle: ql.enabled ? 'On · 4-digit PIN' : 'Off · sign in faster on this phone',
-                    onTap: _openQuickLogin,
-                  ),
-                  _SwitchRow(
-                    icon: Icons.notifications_none_rounded,
-                    title: 'Push notifications',
-                    value: _push,
-                    onChanged: (v) => setState(() => _push = v),
-                  ),
                   _SwitchRow(
                     icon: Icons.translate_rounded,
                     title: 'Reports in Tamil first',
@@ -304,32 +191,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               child: Column(
                 children: [
                   _NavRow(
-                    icon: Icons.payments_outlined,
-                    title: 'Salary & payments',
-                    subtitle: 'LKR 85,000 · paid for this month',
-                    onTap: () => context.push(const SalaryScreen()),
-                  ),
-                  _NavRow(
-                    icon: Icons.history_rounded,
-                    title: 'Service history',
-                    subtitle: '$finished finished job${finished == 1 ? '' : 's'} today',
-                    onTap: () => context.push(const ServiceHistoryScreen()),
-                  ),
-                  _NavRow(
-                    icon: Icons.devices_other_outlined,
-                    title: 'Devices',
-                    subtitle: 'OBD-II, cameras and signed-in phones',
-                    onTap: () => context.push(const DevicesScreen()),
-                  ),
-                  _NavRow(
                     icon: Icons.help_outline_rounded,
                     title: 'Help & FixProof guide',
                     onTap: () => context.push(const HelpScreen()),
                   ),
                   _NavRow(
                     icon: Icons.lock_outline_rounded,
-                    title: 'Change password',
-                    onTap: () => context.push(const ChangePasswordScreen()),
+                    title: 'Change PIN',
+                    onTap: () => context.push(const ChangePinScreen()),
                     last: true,
                   ),
                 ],
@@ -652,11 +521,10 @@ class _WhiteKnob extends StatelessWidget {
 }
 
 class _NavRow extends StatelessWidget {
-  const _NavRow({required this.icon, required this.title, required this.onTap, this.subtitle, this.last = false});
+  const _NavRow({required this.icon, required this.title, required this.onTap, this.last = false});
 
   final IconData icon;
   final String title;
-  final String? subtitle;
   final VoidCallback onTap;
   final bool last;
 
@@ -682,8 +550,6 @@ class _NavRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink)),
-                    if (subtitle != null)
-                      Text(subtitle!, style: TextStyle(fontSize: 13, color: AppColors.muted)),
                   ],
                 ),
               ),

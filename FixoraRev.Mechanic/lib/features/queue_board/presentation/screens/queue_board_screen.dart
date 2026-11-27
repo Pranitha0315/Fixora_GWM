@@ -8,12 +8,11 @@ import '../../../../core/utils/nav.dart';
 import '../../../../core/widgets/rev_common.dart' show EmptyState;
 import '../../../../core/widgets/rev_ui.dart';
 import '../../../home/presentation/screens/home_screen.dart' show showJobQuickActions;
-import '../../../inventory/domain/part.dart';
 import '../../../jobs/domain/job_entities.dart';
 import '../../../jobs/presentation/screens/job_detail_screen.dart';
 import '../../../shell/presentation/main_shell.dart';
 
-/// Today queue board — search, status chips, bay cards.
+/// Today queue board — search, status chips, job cards.
 /// Pull-to-refresh + SignalR (`job*` / `queue*`) reload assignments after manager reassignment.
 class QueueBoardScreen extends StatefulWidget {
   const QueueBoardScreen({super.key, this.asTab = false});
@@ -31,8 +30,10 @@ enum _Group { inProgress, upNext, completed }
 
 class _QueueBoardScreenState extends State<QueueBoardScreen> {
   final _search = TextEditingController();
-  int _chip = 0; // All · Pending · In progress · Review · Done
+  static const _maxShown = 7;
+  int _chip = 0; // All · Pending · In progress · Review
   bool _sortByPriority = true;
+  bool _showAll = false;
 
   @override
   void dispose() {
@@ -40,9 +41,9 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
     super.dispose();
   }
 
-  static bool _isPending(Job j) => j.status == JobStatus.waiting || j.status == JobStatus.approved;
+  static bool _isPending(Job j) => j.status == JobStatus.waiting;
   static bool _isWorking(Job j) => j.status == JobStatus.diagnosing || j.status == JobStatus.inProgress;
-  static bool _isReview(Job j) => j.status == JobStatus.awaitingApproval || j.status == JobStatus.qualityCheck;
+  static bool _isReview(Job j) => j.status == JobStatus.awaitingApproval;
 
   static _Group _groupOf(Job j) {
     if (!j.status.isActive) return _Group.completed;
@@ -50,11 +51,11 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
     return _Group.upNext;
   }
 
+  // The board shows active jobs only (assigned to this mechanic). Finished jobs are not listed here.
   bool _matchesChip(Job j) => switch (_chip) {
         1 => _isPending(j),
         2 => _isWorking(j),
         3 => _isReview(j),
-        4 => !j.status.isActive,
         _ => true,
       };
 
@@ -74,13 +75,12 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
       listenable: Listenable.merge([AppServices.jobs, AppServices.notifications, MechanicBackend.instance]),
       builder: (context, _) {
         final ctrl = AppServices.jobs;
-        final all = [...ctrl.queue, ...ctrl.finished];
+        final all = ctrl.queue; // active jobs only
         final counts = [
           all.length,
           all.where(_isPending).length,
           all.where(_isWorking).length,
           all.where(_isReview).length,
-          all.where((j) => !j.status.isActive).length,
         ];
         final visible = all.where((j) => _matchesChip(j) && _matchesSearch(j)).toList();
 
@@ -88,15 +88,28 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
         if (!_sortByPriority) {
           upNext.sort((a, b) => a.slotTime.compareTo(b.slotTime));
         }
-        final groups = <(_Group, String, List<Job>)>[
+        final fullGroups = <(_Group, String, List<Job>)>[
           (_Group.inProgress, 'In progress', visible.where((j) => _groupOf(j) == _Group.inProgress).toList()),
           (_Group.upNext, 'Up next', upNext),
-          (_Group.completed, 'Completed', visible.where((j) => _groupOf(j) == _Group.completed).toList()),
         ];
+
+        // The mechanic's history can run to dozens of cards. Show the first
+        // [_maxShown] (work in hand first, then the waiting line) and keep the
+        // rest behind "Show all".
+        final capped = !_showAll && visible.length > _maxShown;
+        var budget = capped ? _maxShown : visible.length;
+        final groups = <(_Group, String, List<Job>)>[];
+        for (final (group, title, jobs) in fullGroups) {
+          final take = jobs.take(budget).toList();
+          budget -= take.length;
+          groups.add((group, title, take));
+        }
 
         final page = RevTabPage(
           title: 'My jobs',
-          subtitle: '${all.length} jobs today · live queue',
+          subtitle: capped
+              ? 'Showing $_maxShown of ${visible.length} jobs · live queue'
+              : '${all.length} jobs · live queue',
           action: widget.asTab
               ? RevBell(
                   unread: AppServices.notifications.unread,
@@ -134,7 +147,6 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
                 'Pending ${counts[1]}',
                 'In progress ${counts[2]}',
                 'Review ${counts[3]}',
-                'Done ${counts[4]}',
               ],
               selected: _chip,
               onSelected: (i) => setState(() => _chip = i),
@@ -174,6 +186,15 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
                 ),
                 for (final j in jobs) BayJobRowCard(job: j),
               ],
+            if (visible.length > _maxShown)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _showAll = !_showAll),
+                  icon: Icon(_showAll ? Icons.expand_less_rounded : Icons.expand_more_rounded),
+                  label: Text(_showAll ? 'Show fewer' : 'Show all ${visible.length} jobs'),
+                ),
+              ),
             const SizedBox(height: 4),
             Text('Press and hold a job for quick actions · pull down to refresh.',
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, color: AppColors.muted)),
@@ -204,43 +225,38 @@ class _QueueBoardScreenState extends State<QueueBoardScreen> {
   }
 }
 
-/// Bay card used on the today queue board.
+/// Job card used on the queue board.
 class BayJobRowCard extends StatelessWidget {
   const BayJobRowCard({super.key, required this.job});
   final Job job;
 
   static RevTone toneFor(JobStatus s) => switch (s) {
-        JobStatus.waiting || JobStatus.approved => RevTone.blue,
+        JobStatus.waiting => RevTone.blue,
         JobStatus.diagnosing || JobStatus.inProgress => RevTone.orange,
-        JobStatus.awaitingApproval || JobStatus.qualityCheck => RevTone.amber,
-        JobStatus.completed || JobStatus.parked => RevTone.green,
+        JobStatus.awaitingApproval => RevTone.amber,
+        JobStatus.completed => RevTone.green,
       };
 
   static String shortStatus(JobStatus s) => switch (s) {
-        JobStatus.waiting || JobStatus.approved => 'Pending',
+        JobStatus.waiting => 'Pending',
         JobStatus.diagnosing || JobStatus.inProgress => 'In progress',
-        JobStatus.awaitingApproval || JobStatus.qualityCheck => 'Review',
+        JobStatus.awaitingApproval => 'Review',
         JobStatus.completed => 'Done',
-        JobStatus.parked => 'Parked',
       };
 
   String _timeLine(DateTime? eta) {
+    if (job.paused) return 'Paused';
     switch (job.status) {
       case JobStatus.inProgress:
-        final pct = ((job.tasks.isEmpty ? job.status.progress : 0.5 + job.taskProgress * 0.4) * 100).round();
+        final pct = (job.status.progress * 100).round();
         return job.startedAt != null ? 'Started ${Fmt.time(job.startedAt!)} · $pct%' : 'In progress · $pct%';
       case JobStatus.diagnosing:
-        return 'Diagnosing now';
+        return 'Inspecting now';
       case JobStatus.awaitingApproval:
-        return 'Waiting for customer';
-      case JobStatus.qualityCheck:
-        return 'Quality check';
+        return 'Waiting for manager review';
       case JobStatus.completed:
         return job.completedAt != null ? 'Finished ${Fmt.time(job.completedAt!)}' : 'Finished';
-      case JobStatus.parked:
-        return 'Parked in Evidence Passport';
       case JobStatus.waiting:
-      case JobStatus.approved:
         return eta != null ? 'ETA ${Fmt.time(eta)}' : 'Slot ${Fmt.time(job.slotTime)}';
     }
   }
@@ -248,9 +264,6 @@ class BayJobRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final eta = AppServices.jobs.etaFor(job);
-    final hasPassport = AppServices.passport.openFor(job.vehicle).isNotEmpty;
-    final availability =
-        job.estimate == null || !job.status.isActive ? null : AppServices.inventory.jobAvailability(job);
 
     final tags = <Widget>[
       if (job.priority == JobPriority.sos) const RevPill(label: 'SOS', tone: RevTone.red, icon: Icons.sos_rounded),
@@ -258,11 +271,6 @@ class BayJobRowCard extends StatelessWidget {
         const RevPill(label: 'Safety critical', tone: RevTone.red, icon: Icons.warning_amber_rounded),
       if (job.priority == JobPriority.returning)
         const RevPill(label: 'Returning issue', tone: RevTone.purple, icon: Icons.history_rounded),
-      if (hasPassport) const RevPill(label: 'Passport', tone: RevTone.grey, icon: Icons.menu_book_outlined),
-      if (availability == PartAvailability.blocked)
-        const RevPill(label: 'Parts blocked', tone: RevTone.red, icon: Icons.inventory_2_outlined)
-      else if (availability == PartAvailability.partial)
-        const RevPill(label: 'Parts partly in', tone: RevTone.amber, icon: Icons.inventory_2_outlined),
     ];
 
     return GestureDetector(

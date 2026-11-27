@@ -37,6 +37,7 @@ class InspectionIssue {
     required this.severity,
     required this.evidenceLabels,
     this.verified = false,
+    this.published = false,
   });
 
   final String id;
@@ -48,6 +49,9 @@ class InspectionIssue {
   final IssueSeverity severity;
   final List<String> evidenceLabels;
   final bool verified;
+
+  /// Confirmed on the server and sent to the manager/customer. Locked for editing.
+  final bool published;
 
   InspectionIssue copyWith({
     String? area,
@@ -69,6 +73,7 @@ class InspectionIssue {
       severity: severity ?? this.severity,
       evidenceLabels: evidenceLabels ?? this.evidenceLabels,
       verified: verified ?? this.verified,
+      published: published,
     );
   }
 }

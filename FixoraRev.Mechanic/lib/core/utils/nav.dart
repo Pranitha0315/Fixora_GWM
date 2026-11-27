@@ -16,17 +16,9 @@ extension NavX on BuildContext {
   Future<T?> replaceWith<T>(Widget page) => Navigator.of(this)
       .pushReplacement<T, void>(MaterialPageRoute(builder: (_) => page));
 
-  /// Clears the whole stack and shows [page] (used after login / logout).
-  Future<T?> resetTo<T>(Widget page) =>
-      Navigator.of(this).pushAndRemoveUntil<T>(
-        PageRouteBuilder<T>(
-          transitionDuration: const Duration(milliseconds: 450),
-          pageBuilder: (_, __, ___) => page,
-          transitionsBuilder: (_, animation, __, child) =>
-              FadeTransition(opacity: animation, child: child),
-        ),
-        (_) => false,
-      );
+  // Do not clear the stack with Navigator.pushAndRemoveUntil: it removes GoRouter's own
+  // pages and leaves the router on a stale location (Back then lands on Login).
+  // Use goRoute() instead.
 
   /// Clears stack via GoRouter path (preferred for named destinations).
   void resetToRoute(String location, {Object? extra}) => go(location, extra: extra);

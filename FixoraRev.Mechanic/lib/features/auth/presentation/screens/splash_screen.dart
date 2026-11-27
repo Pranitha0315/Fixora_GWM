@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import '../../../../app/router/route_names.dart';
 import '../../../../core/di/app_services.dart';
 import '../../../../core/utils/nav.dart';
-import '../../../quick_login/data/quick_login_store.dart';
-
 /// Full-bleed brand splash matching the FIXORA REV garage artwork.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -29,19 +27,11 @@ class _SplashScreenState extends State<SplashScreen>
     // Full screen splash: hide the phone status bar (time, Wi-Fi, signal,
     // battery) and the navigation bar while the brand screen shows.
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    final quick = QuickLoginStore.instance;
-    Future.wait<void>([
-      quick.load(),
-      Future<void>.delayed(const Duration(milliseconds: 2800)),
-    ]).then((_) {
+    Future<void>.delayed(const Duration(milliseconds: 2800)).then((_) {
       if (!mounted) return;
       // Navigate through GoRouter (not a raw Navigator reset) so the route stack stays in sync.
-      // A reset here re-runs this splash under later pushes and kicks the user back to login.
-      context.goRoute(
-        AppServices.auth.isLoggedIn
-            ? RouteNames.shell
-            : (quick.enabled ? RouteNames.quickLogin : RouteNames.login),
-      );
+      // Signed out → the Login page (Employee ID + PIN).
+      context.goRoute(AppServices.auth.isLoggedIn ? RouteNames.shell : RouteNames.login);
     });
   }
 
