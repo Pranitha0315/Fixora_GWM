@@ -79,6 +79,9 @@ class ApiClient {
   Session? session;
   Future<String?>? _refreshing;
 
+  /// Called when the server rejects the refresh token (session expired or revoked).
+  void Function()? onSessionExpired;
+
   Dio get dio => _dio;
   bool get signedIn => session != null;
 
@@ -135,8 +138,15 @@ class ApiClient {
       );
       await saveSession(j as Map<String, dynamic>);
       return session!.accessToken;
+    } on ApiException catch (e) {
+      // Only a server rejection means the session is over. A network blip or a 5xx
+      // keeps the saved session so the mechanic is not logged out by bad Wi-Fi.
+      if (e.status == 400 || e.status == 401 || e.status == 403) {
+        await clear();
+        onSessionExpired?.call();
+      }
+      return null;
     } catch (_) {
-      await clear();
       return null;
     } finally {
       _refreshing = null;

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../core/backend/mechanic_backend.dart';
 import '../../../core/di/app_services.dart';
 import '../domain/sos_entities.dart';
 
-/// Roadside SOS requests routed to this mechanic (BRD USP 2).
+/// Roadside SOS requests routed to this mechanic. Each step is a backend status change
+/// (`POST /mechanic/sos/{id}/status`): Acknowledged, Dispatched, OnSite, Resolved.
 class SosController extends ChangeNotifier {
   SosController(this._requests);
 
@@ -12,7 +14,7 @@ class SosController extends ChangeNotifier {
   List<SosRequest> get open => _requests.where((r) => r.isOpen).toList();
   List<SosRequest> get all => List.unmodifiable(_requests);
 
-  /// Replaces the demo requests with the SOS alerts the backend routed to this mechanic.
+  /// Replaces the requests with the SOS alerts the backend routed to this mechanic.
   void replaceAll(List<SosRequest> list) {
     _requests
       ..clear()
@@ -34,45 +36,42 @@ class SosController extends ChangeNotifier {
     }
   }
 
-  void accept(SosRequest r) {
+  /// Accept the request: backend status Acknowledged. The phone changes only after the server accepts.
+  Future<void> accept(SosRequest r) async {
     _ensureAllowed(r);
+    await _pushStatus(r, 'Acknowledged');
     r.status = SosStatus.accepted;
     r.assignedMechanicId ??= AppServices.auth.user?.id;
     notifyListeners();
   }
 
-  void startNavigation(SosRequest r) {
+  /// On the way: backend status Dispatched.
+  Future<void> startNavigation(SosRequest r) async {
     _ensureAllowed(r);
+    await _pushStatus(r, 'Dispatched');
     r.status = SosStatus.enRoute;
     notifyListeners();
   }
 
-  void arrived(SosRequest r) {
+  /// Reached the customer: backend status OnSite.
+  Future<void> arrived(SosRequest r) async {
     _ensureAllowed(r);
+    await _pushStatus(r, 'OnSite');
     r.status = SosStatus.arrived;
-    r.etaMinutes = 0;
     notifyListeners();
   }
 
-  void resolveOnSite(SosRequest r) {
+  /// Fixed on the spot: backend status Resolved.
+  Future<void> resolveOnSite(SosRequest r) async {
     _ensureAllowed(r);
+    await _pushStatus(r, 'Resolved');
     r.status = SosStatus.resolvedOnSite;
     notifyListeners();
   }
 
-  void decline(SosRequest r) {
-    _ensureAllowed(r);
-    r.status = SosStatus.declined;
-    notifyListeners();
-  }
-
-  /// Vehicle needs the workshop: create a priority job in the queue.
-  String convertToJob(SosRequest r) {
-    _ensureAllowed(r);
-    final job = AppServices.jobs.addSosJob(r);
-    r.status = SosStatus.converted;
-    r.jobId = job.id;
-    notifyListeners();
-    return job.id;
+  Future<void> _pushStatus(SosRequest r, String status) async {
+    final be = MechanicBackend.instance;
+    if (!be.live) throw StateError('Not connected to the garage server.');
+    await be.sosStatus(r.id, status);
   }
 }

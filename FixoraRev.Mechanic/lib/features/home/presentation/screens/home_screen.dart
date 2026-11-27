@@ -43,6 +43,11 @@ class _HomeScreenState extends State<HomeScreen> {
     _Category('Diagnose', '', ['diagnos', 'engine', 'noise', 'light', 'check', 'start']),
   ];
 
+  static const _maxOnHome = 2;
+
+  /// A car needs inspection while its job card is Open (waiting) or Inspecting.
+  static bool _needsInspection(Job j) => j.status == JobStatus.waiting || j.status == JobStatus.diagnosing;
+
   final _search = TextEditingController();
   int _category = 0;
 
@@ -77,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final sos = AppServices.sos.open;
         final onDuty = AppServices.auth.onDuty;
         final active = jobsCtrl.all.where((j) => j.status.isActive).length;
-        final today = [...jobsCtrl.queue.where(_matches), ...jobsCtrl.finished.where(_matches)];
+        // Home shows only the cars still waiting for their inspection, two at a time.
+        // The full list lives on the Proof and Jobs tabs.
+        final toInspect = jobsCtrl.queue.where(_needsInspection).where(_matches).toList();
+        final today = toInspect.take(_maxOnHome).toList();
 
         return ColoredBox(
           color: AppColors.background,
@@ -181,7 +189,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
                 const SizedBox(height: 18),
 
-                // ---------------------------------------------------- jobs
+                // ---------------------------------------------------- jobs (cars to inspect)
+                WarmSection(
+                  'Needs inspection',
+                  action: toInspect.length > _maxOnHome ? 'View all ${toInspect.length}' : null,
+                  onAction: () => MainShell.switchTab(context, MainShell.fixProof),
+                ),
                 if (today.isEmpty)
                   SoftCard(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -211,8 +224,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             : EmptyState(
                                 compact: true,
                                 icon: Icons.car_repair_outlined,
-                                title: 'No jobs yet today',
-                                message: 'New jobs from the manager appear here by themselves. Pull down to check now.',
+                                title: 'No vehicles to inspect',
+                                message: 'Cars waiting for inspection appear here by themselves. Pull down to check now.',
                                 actionLabel: 'Check for jobs',
                                 actionIcon: Icons.refresh_rounded,
                                 onAction: MechanicBackend.instance.pullRefresh,
@@ -240,13 +253,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 // ---------------------------------------------------- tools
                 const WarmSection('Tools'),
-                _ToolCard(
-                  icon: Icons.menu_book_outlined,
-                  title: 'Evidence passport',
-                  subtitle: 'Vehicle history and open issues',
-                  onTap: () => context.pushRoute(RouteNames.passport),
-                ),
-                const SizedBox(height: 10),
                 _ToolCard(
                   icon: Icons.sos_rounded,
                   title: 'Roadside SOS',
@@ -358,13 +364,11 @@ class _JobTile extends StatelessWidget {
   final String cutoutAsset;
 
   (String, WarmTone) get _badge => switch (job.status) {
-        JobStatus.approved => ('Approved', WarmTone.green),
         JobStatus.inProgress => ('In progress', WarmTone.amber),
         JobStatus.diagnosing => ('Inspecting', WarmTone.amber),
-        JobStatus.awaitingApproval => ('With customer', WarmTone.red),
-        JobStatus.qualityCheck => ('Final check', WarmTone.amber),
+        JobStatus.awaitingApproval => ('Awaiting review', WarmTone.red),
         JobStatus.waiting => (current ? 'Now' : 'Next', WarmTone.neutral),
-        JobStatus.completed || JobStatus.parked => ('Done', WarmTone.green),
+        JobStatus.completed => ('Done', WarmTone.green),
       };
 
   @override
@@ -500,7 +504,7 @@ class _SosCard extends StatelessWidget {
     final dark = AppColors.isDark;
     return Semantics(
       button: true,
-      label: 'Roadside SOS, ${request.distanceKm} kilometres, ${request.issue}, ${request.locationLabel}',
+      label: 'Roadside SOS, ${request.issue}, ${request.locationLabel}',
       excludeSemantics: true,
       child: Material(
         color: dark ? const Color(0xFF2A1215) : const Color(0xFFFDE8E4),
@@ -523,7 +527,7 @@ class _SosCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Roadside SOS · ${request.distanceKm} km',
+                      Text('Roadside SOS · ${request.status.label}',
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.danger)),
                       const SizedBox(height: 2),
                       Text('${request.issue} · ${request.locationLabel}',
@@ -571,10 +575,8 @@ class _DemoBanner extends StatelessWidget {
                       style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.ink)),
                   const SizedBox(height: 3),
                   Text(
-                    FixoraConfig.demoOnly
-                        ? 'This build runs without a server. Proposals stay on this phone.'
-                        : 'Proposals and updates stay on this phone and never reach the manager. '
-                            'Sign out, start the server (${FixoraConfig.apiBase}) and sign in with your employee ID.',
+                    'Jobs and updates are not reaching the manager. '
+                        'Start the server (${FixoraConfig.apiBase}) and sign in with your employee ID.',
                     style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.body),
                   ),
                 ],
@@ -589,7 +591,6 @@ class _DemoBanner extends StatelessWidget {
 
 /// Long-press menu for a job (Home and Jobs): the common next steps in one bottom sheet.
 Future<void> showJobQuickActions(BuildContext context, Job job) {
-  final messenger = ScaffoldMessenger.of(context);
   return showActionSheet(
     context,
     title: '${job.vehicle.title} · ${job.vehicle.plate}',
@@ -599,18 +600,6 @@ Future<void> showJobQuickActions(BuildContext context, Job job) {
         icon: Icons.open_in_new_rounded,
         label: 'Open job card',
         onTap: () => context.pushRoute(RouteNames.jobDetails, extra: job.id),
-      ),
-      SheetAction(
-        icon: Icons.call_outlined,
-        label: 'Call ${job.customer.name}',
-        subtitle: job.customer.phone,
-        onTap: () => messenger.showSnackBar(SnackBar(content: Text('Calling ${job.customer.name}…'))),
-      ),
-      SheetAction(
-        icon: Icons.menu_book_outlined,
-        label: 'Vehicle passport',
-        subtitle: 'History and open issues for ${job.vehicle.plate}',
-        onTap: () => context.pushRoute(RouteNames.passport),
       ),
     ],
   );

@@ -52,17 +52,6 @@ class ExpiredInviteScreen extends StatelessWidget {
             icon: Icons.login_rounded,
             onPressed: () => context.goRoute(RouteNames.login),
           ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () => context.pushRoute(RouteNames.register),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-              foregroundColor: AppColors.primaryStrong,
-              side: BorderSide(color: AppColors.primaryBorder),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-            ),
-            child: const Text('Create account instead'),
-          ),
         ],
       ),
     );

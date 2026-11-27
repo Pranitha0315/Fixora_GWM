@@ -8,8 +8,6 @@ import '../../../core/widgets/action_sheet.dart';
 import '../../../core/widgets/rev_common.dart' show EmptyState;
 import '../../../core/widgets/rev_ui.dart';
 import '../../jobs/presentation/screens/job_detail_screen.dart';
-import '../../passport/presentation/passport_screen.dart';
-import '../../inventory/presentation/inventory_screen.dart';
 import '../../sos/presentation/sos_screen.dart';
 import '../domain/app_notification.dart';
 import '../../../core/backend/api_client.dart';
@@ -32,16 +30,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     ('All', null),
     ('Jobs', {NotificationKind.job, NotificationKind.queue}),
     ('Approvals', {NotificationKind.approval}),
-    ('Parts', {NotificationKind.parts}),
     ('SOS', {NotificationKind.sos}),
-    ('Passport', {NotificationKind.passport}),
   ];
 
   static RevTone toneFor(NotificationKind k) => switch (k) {
         NotificationKind.sos => RevTone.red,
         NotificationKind.approval => RevTone.green,
-        NotificationKind.parts => RevTone.amber,
-        NotificationKind.passport => RevTone.purple,
         NotificationKind.queue => RevTone.blue,
         NotificationKind.job => RevTone.orange,
       };
@@ -99,10 +93,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       case NotificationKind.sos:
         final open = AppServices.sos.open;
         if (open.isNotEmpty) context.push(SosDetailScreen(requestId: open.first.id));
-      case NotificationKind.parts when n.jobId == null:
-        context.push(const InventoryScreen(standalone: true));
-      case NotificationKind.passport when n.jobId == null:
-        context.push(const PassportScreen(standalone: true));
       default:
         if (n.jobId != null) context.push(JobDetailScreen(jobId: n.jobId!));
     }

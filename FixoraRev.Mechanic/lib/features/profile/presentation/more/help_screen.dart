@@ -21,8 +21,8 @@ class HelpScreen extends StatelessWidget {
 
   static const _faq = <(String, String)>[
     (
-      'I forgot my Mechanic PIN',
-      'Tap "Use password" on the PIN screen and sign in with your email and password. Then set a new PIN in Profile → Quick login.'
+      'I forgot my PIN or Employee ID',
+      'Your Employee ID is on Profile → Account. If you forgot your PIN, ask the service manager to send you a new invitation link.'
     ),
     (
       'The customer declined one item',

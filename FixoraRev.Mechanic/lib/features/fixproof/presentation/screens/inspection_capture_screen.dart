@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 
 import '../../../../app/router/route_names.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -11,6 +15,7 @@ import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/common.dart';
 import '../../../../core/widgets/rev_common.dart' show EmptyState;
 import '../../../../core/di/app_services.dart';
+import '../../../../core/utils/nav.dart';
 import '../providers/fixproof_provider.dart';
 
 /// FixProof step 1: capture photo/video evidence and a Tamil voice note.
@@ -29,22 +34,50 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
   int _seconds = 0;
   bool _recording = false;
   bool _generating = false;
+  final AudioRecorder _recorder = AudioRecorder();
+
+  @override
+  void initState() {
+    super.initState();
+    // Live: show the photos already uploaded for this job (GET .../fixproof/media).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(captureProvider.notifier).loadRemoteMedia(widget.jobId);
+    });
+  }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _recorder.dispose();
     super.dispose();
   }
 
-  void _toggleRecording() {
+  Future<void> _toggleRecording() async {
     if (_recording) {
       _timer?.cancel();
-      ref.read(captureProvider.notifier).addVoiceNote(math.max(_seconds, 1));
+      final seconds = math.max(_seconds, 1);
       setState(() {
         _recording = false;
         _seconds = 0;
       });
+      final path = await _recorder.stop();
+      final audio = path == null ? null : await XFile(path).readAsBytes();
+      if (!mounted) return;
+      if (audio == null || audio.isEmpty) {
+        context.toast('The recording came out empty. Try again.', icon: Icons.mic_off_rounded);
+        return;
+      }
+      await ref.read(captureProvider.notifier).addVoiceNote(jobId: widget.jobId, seconds: seconds, audio: audio);
     } else {
+      if (!await _recorder.hasPermission()) {
+        if (mounted) context.toast('Allow microphone access to record a voice note.', icon: Icons.mic_off_rounded);
+        return;
+      }
+      final dir = kIsWeb ? '' : '${(await getTemporaryDirectory()).path}/';
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.wav),
+        path: '${dir}voice-${DateTime.now().millisecondsSinceEpoch}.wav',
+      );
       setState(() => _recording = true);
       _timer = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted) setState(() => _seconds++);
@@ -54,12 +87,24 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
 
   Future<void> _generate() async {
     setState(() => _generating = true);
-    await Future<void>.delayed(const Duration(milliseconds: 1800));
+    try {
+      if (liveFixProof) {
+        await ref.read(captureProvider.notifier).createDrafts(widget.jobId);
+      } else {
+        await Future<void>.delayed(const Duration(milliseconds: 1800));
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _generating = false);
+        context.toast('Could not create the AI draft: $e', icon: Icons.error_outline_rounded);
+      }
+      return;
+    }
     if (!mounted) return;
     ref.read(reportStateProvider.notifier).set(widget.jobId, ReportState.draft);
     AppServices.jobs.startFixProof(AppServices.jobs.byId(widget.jobId));
     setState(() => _generating = false);
-    Navigator.of(context).pushReplacementNamed(RouteNames.reportReview, arguments: widget.jobId);
+    context.goRoute(RouteNames.reportReview, extra: widget.jobId);
   }
 
   String get _clock {
@@ -119,9 +164,9 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
           // Add buttons first (big, one per row), then one captured item per row.
           Row(
             children: [
-              Expanded(child: _AddMediaButton(icon: Icons.add_a_photo_rounded, label: 'Photo', onTap: () => notifier.addMedia(isVideo: false))),
+              Expanded(child: _AddMediaButton(icon: Icons.add_a_photo_rounded, label: 'Photo', onTap: () => notifier.addMedia(jobId: widget.jobId, isVideo: false))),
               const SizedBox(width: 10),
-              Expanded(child: _AddMediaButton(icon: Icons.videocam_rounded, label: 'Video', onTap: () => notifier.addMedia(isVideo: true))),
+              Expanded(child: _AddMediaButton(icon: Icons.videocam_rounded, label: 'Video', onTap: () => notifier.addMedia(jobId: widget.jobId, isVideo: true))),
             ],
           ),
           const SizedBox(height: 10),
@@ -137,9 +182,11 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
           else
             for (final m in capture.media)
               MediaRow(
-                thumbnail: MediaThumb(isVideo: m.isVideo),
+                thumbnail: MediaThumb(isVideo: m.isVideo, imageUrl: m.previewUrl),
                 title: m.label,
-                subtitle: m.isVideo ? 'Video' : 'Photo',
+                subtitle: m.uploading
+                    ? 'Uploading…'
+                    : (m.error ?? (m.isVideo ? 'Video' : 'Photo')),
                 onRemove: () => notifier.removeMedia(m.id),
               ),
           const SizedBox(height: 8),
@@ -200,7 +247,7 @@ class _InspectionCaptureScreenState extends ConsumerState<InspectionCaptureScree
                       leading: const IconBox(icon: Icons.play_arrow_rounded, size: 40),
                       title: Text('Voice note · ${v.duration}', style: AppText.bodyStrong),
                       subtitle: Text(
-                        v.transcript ?? v.sttReason ?? 'Tamil · ready for AI',
+                        v.busy ? 'Transcribing…' : (v.transcript ?? v.sttReason ?? 'Tamil · ready for AI'),
                         style: AppText.caption,
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,

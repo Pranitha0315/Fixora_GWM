@@ -7,7 +7,6 @@ import '../../../../app/theme/app_typography.dart';
 import '../../../../core/utils/nav.dart';
 import '../../../../core/widgets/app_card.dart';
 import '../../../../core/widgets/common.dart';
-import '../../../evidence_passport/presentation/providers/evidence_provider.dart';
 import '../../../jobs/domain/job_entities.dart';
 import '../../../repair_proposal/domain/entities/repair_item.dart';
 import '../../../repair_proposal/presentation/providers/proposal_provider.dart';
@@ -23,8 +22,6 @@ class FixProofJobSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final report = ref.watch(reportStateProvider)[job.id] ?? ReportState.notStarted;
     final items = ref.watch(proposalProvider)[job.id] ?? const <RepairItem>[];
-    final evidence = ref.watch(evidenceProvider).where((e) => e.jobId == job.id).length;
-
     final approved = items.where((i) => i.decision == ApprovalDecision.approved).length;
     final pending = items.where((i) => i.decision == ApprovalDecision.pending).length;
     final notSent = items.where((i) => i.decision == ApprovalDecision.notSent).length;
@@ -52,16 +49,9 @@ class FixProofJobSection extends ConsumerWidget {
           onTap: () => open(RouteNames.repairProposal),
         ),
         _Row(
-          icon: Icons.collections_rounded,
-          title: 'Job evidence · before & after',
-          subtitle: '$evidence photos & videos · time-stamped',
-          done: false,
-          onTap: () => open(RouteNames.evidencePassport),
-        ),
-        _Row(
           icon: Icons.update_rounded,
-          title: 'Progress note / running late',
-          subtitle: 'Updates the queue ETA',
+          title: 'Progress note',
+          subtitle: 'Sent to the manager and customer',
           done: false,
           onTap: () => open(RouteNames.progressUpdate),
         ),

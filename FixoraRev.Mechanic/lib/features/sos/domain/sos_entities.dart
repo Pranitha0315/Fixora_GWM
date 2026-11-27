@@ -1,13 +1,14 @@
 import '../../jobs/domain/job_entities.dart';
 
+/// SOS statuses the mechanic app can move through. Each one is a backend status:
+/// pending (Received, sent to the mechanic), accepted (Acknowledged), enRoute (Dispatched),
+/// arrived (OnSite), resolvedOnSite (Resolved).
 enum SosStatus {
   pending,
   accepted,
   enRoute,
   arrived,
-  converted,
   resolvedOnSite,
-  declined
 }
 
 extension SosStatusX on SosStatus {
@@ -16,14 +17,9 @@ extension SosStatusX on SosStatus {
         SosStatus.accepted => 'Accepted',
         SosStatus.enRoute => 'On the way',
         SosStatus.arrived => 'Arrived',
-        SosStatus.converted => 'Added to queue',
         SosStatus.resolvedOnSite => 'Fixed on the spot',
-        SosStatus.declined => 'Declined',
       };
 }
-
-/// How the request reached the garage (BRD USP 2).
-enum SosChannel { online, bleRelay }
 
 class SosRequest {
   SosRequest({
@@ -32,13 +28,8 @@ class SosRequest {
     required this.vehicle,
     required this.issue,
     required this.locationLabel,
-    required this.distanceKm,
-    required this.channel,
     required this.receivedAt,
-    this.hops = 0,
     this.status = SosStatus.pending,
-    this.etaMinutes = 14,
-    this.jobId,
     this.lat,
     this.lng,
   });
@@ -48,13 +39,8 @@ class SosRequest {
   final Vehicle vehicle;
   final String issue;
   final String locationLabel;
-  final double distanceKm;
-  final SosChannel channel;
   final DateTime receivedAt;
-  final int hops;
   SosStatus status;
-  int etaMinutes;
-  String? jobId;
   final double? lat;
   final double? lng;
 
@@ -63,10 +49,7 @@ class SosRequest {
   /// Assigned mechanic id from backend (null = open pool).
   String? assignedMechanicId;
 
-  bool get isOpen =>
-      status != SosStatus.converted &&
-      status != SosStatus.declined &&
-      status != SosStatus.resolvedOnSite;
+  bool get isOpen => status != SosStatus.resolvedOnSite;
 
   /// Only the assigned mechanic (or unassigned pool) may act.
   bool canMechanicAct(String? mechanicId) {
@@ -74,8 +57,4 @@ class SosRequest {
     if (mechanicId == null || mechanicId.isEmpty) return false;
     return assignedMechanicId == mechanicId;
   }
-
-  String get channelLabel => channel == SosChannel.online
-      ? 'Online (mobile data)'
-      : 'Offline BLE relay · $hops hop${hops == 1 ? '' : 's'}';
 }

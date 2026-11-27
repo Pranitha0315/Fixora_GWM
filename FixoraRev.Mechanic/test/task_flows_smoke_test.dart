@@ -42,8 +42,6 @@ void main() {
       ),
       issue: 'Flat',
       locationLabel: 'Galle Rd',
-      distanceKm: 2,
-      channel: SosChannel.online,
       receivedAt: DateTime.now(),
     )..assignedMechanicId = 'mech-1';
     expect(r.canMechanicAct('mech-1'), isTrue);

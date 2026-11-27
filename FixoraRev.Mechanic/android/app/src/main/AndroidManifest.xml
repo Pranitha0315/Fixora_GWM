@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app talks to the Fixora backend and the realtime hub: release builds need this too. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- FixProof voice notes are recorded and sent to the garage for Tamil speech-to-text. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="fixora_rev_mechanic"
         android:name="${applicationName}"

@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fixora_rev/app/app.dart';
 import 'package:fixora_rev/features/auth/presentation/screens/splash_screen.dart';
+import 'package:fixora_rev/features/authentication/presentation/screens/login_screen.dart';
 
 void main() {
   testWidgets('App opens on Splash, then goes to Login', (tester) async {
@@ -13,6 +14,6 @@ void main() {
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
-    expect(find.text('Welcome back'), findsOneWidget);
+    expect(find.byType(LoginScreen), findsOneWidget);
   });
 }

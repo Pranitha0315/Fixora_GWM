@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import '../../app/router/app_router.dart';
+import '../backend/mechanic_backend.dart';
 import '../../app/router/route_names.dart';
 
 /// FCM-ready push handler.
@@ -16,8 +19,28 @@ class FcmNotificationService {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
-    // Production: FirebaseMessaging.instance.requestPermission / onMessage / onMessageOpenedApp
+    // Production: FirebaseMessaging.instance.requestPermission / onMessage / onMessageOpenedApp,
+    // then: FirebaseMessaging.instance.getToken().then(setToken) and onTokenRefresh.listen(setToken).
+    // Needs the firebase_messaging package + Firebase project config (not in this app yet).
+    if (_devToken.isNotEmpty) unawaited(setToken(_devToken));
     debugPrint('FcmNotificationService ready (demo routing enabled)');
+  }
+
+  /// Manual test token: flutter run --dart-define=FIXORA_DEVICE_TOKEN=YOUR_TOKEN
+  static const String _devToken = String.fromEnvironment('FIXORA_DEVICE_TOKEN');
+
+  String? token;
+
+  /// Hand the device's push token to the garage (POST /devices). Call it whenever FCM gives or renews a token.
+  /// It is kept until sign-in if the mechanic is not logged in yet.
+  Future<void> setToken(String value) async {
+    if (value.isEmpty) return;
+    token = value;
+    try {
+      await MechanicBackend.instance.registerDevice(value);
+    } catch (e) {
+      debugPrint('Device token registration failed: $e');
+    }
   }
 
   void handlePayload(Map<String, dynamic> data) {

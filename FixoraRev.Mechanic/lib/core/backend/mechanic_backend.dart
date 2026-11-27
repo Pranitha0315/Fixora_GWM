@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,6 +27,8 @@ class ProposalRoute {
         'ReturnedToMechanic' => 'Returned by the manager: ${managerNote ?? 'see the note'}. Fix and send again.',
         'AwaitingCustomer' => 'The manager sent it to the customer. Wait: do not start these items until the manager releases them.',
         'ReleasedToMechanic' => 'Released by the manager. Do the approved items only.',
+        'CustomerResponded' => 'The customer has answered. Wait for the manager to check it and release the approved items.',
+        'Cancelled' => 'This proposal was cancelled. Send a new one if more work is needed.',
         _ => status,
       };
 
@@ -39,10 +42,26 @@ class ProposalRoute {
 ///  * the customer's answer reaches the mechanic only when the manager releases the work;
 ///  * a customer change request reaches the mechanic only when the manager forwards it.
 class MechanicBackend extends ChangeNotifier {
-  MechanicBackend._();
+  MechanicBackend._() {
+    api.onSessionExpired = _onSessionExpired;
+  }
   static final MechanicBackend instance = MechanicBackend._();
 
   final ApiClient api = ApiClient('fixora.mechanic.session');
+
+  /// The server rejected the saved session while the mechanic was signed in:
+  /// stop live updates and sign out locally. The router then shows the Login page.
+  void _onSessionExpired() {
+    if (!AppServices.auth.isLoggedIn) return;
+    unawaited(hub.stop().catchError((Object _) {}));
+    hub.clearHandlers();
+    live = false;
+    AppServices.notifications.clearServerUnread();
+    routes.clear();
+    forwardedChanges.clear();
+    AppServices.auth.expireSession();
+    notifyListeners();
+  }
   late final FixoraHub hub = FixoraHub(api.freshToken);
 
   /// Lets the backend update Riverpod state (repair proposals) from outside the widget tree.
@@ -54,8 +73,6 @@ class MechanicBackend extends ChangeNotifier {
   /// Change requests the manager forwarded and the mechanic has not acknowledged yet (ChangeRequestDto).
   final List<Map<String, dynamic>> forwardedChanges = [];
 
-  bool get enabled => !FixoraConfig.demoOnly;
-
   // ------------------------------------------------------------------ session
 
   /// Sign in with the employee code (EMP-001) or phone and the 4-digit garage PIN.
@@ -66,19 +83,14 @@ class MechanicBackend extends ChangeNotifier {
     await _afterLogin();
   }
 
-  /// Quick login: picks up the saved garage session (refresh token) after the PIN check.
-  /// Returns false when there is none, or the server cannot be reached.
-  Future<bool> resume() async {
-    if (!enabled) return false;
-    try {
-      await api.restore();
-      if (!api.signedIn) return false;
-      if (await api.refresh() == null) return false;
-      await _afterLogin();
-      return true;
-    } catch (_) {
-      return false;
-    }
+  /// Checks an invitation link before the form is shown (name, phone, expiry).
+  /// Throws [ApiException] 410 when it has expired or was already used.
+  Future<Map<String, dynamic>> checkInvitation(String token) async =>
+      await api.get('/mechanic/auth/invitations/${Uri.encodeComponent(token)}') as Map<String, dynamic>;
+
+  /// Changes the garage PIN used to sign in. Throws [ApiException] 401 when the current PIN is wrong.
+  Future<void> changePin(String currentPin, String newPin) async {
+    await api.post('/mechanic/profile/pin', body: {'currentPin': currentPin, 'newPin': newPin});
   }
 
   /// Accepts the manager's 7-day invitation and sets the PIN.
@@ -93,6 +105,7 @@ class MechanicBackend extends ChangeNotifier {
     hub.clearHandlers();
     await api.logout();
     live = false;
+    AppServices.notifications.clearServerUnread();
     routes.clear();
     forwardedChanges.clear();
     notifyListeners();
@@ -112,7 +125,7 @@ class MechanicBackend extends ChangeNotifier {
       skills: const ['General service', 'Brakes', 'Suspension'],
     ));
     AppServices.auth.setOnDuty(p['onDuty'] == true);
-    await Future.wait([refreshJobs(), refreshNotifications(), refreshSos()]);
+    await Future.wait([refreshJobs(), refreshNotifications(), refreshSos(), _sendDeviceToken()]);
     _wireRealtime();
     await hub.start();
     notifyListeners();
@@ -146,6 +159,10 @@ class MechanicBackend extends ChangeNotifier {
     }
   }
 
+  /// Job card plus the DriveSense hint (`driveSense` is null when the customer has not opted in or has no trips yet).
+  Future<Map<String, dynamic>> jobDetail(String jobId) async =>
+      await api.get('/mechanic/jobs/$jobId') as Map<String, dynamic>;
+
   static Job jobFrom(Map<String, dynamic> j) {
     final label = (j['vehicleLabel'] as String?) ?? 'Vehicle';
     final plateMatch = RegExp(r'\(([^)]*)\)').firstMatch(label);
@@ -153,7 +170,6 @@ class MechanicBackend extends ChangeNotifier {
     final parts = name.split(' ');
     final number = (j['number'] as String?) ?? '';
     final complaint = (j['complaint'] as String?) ?? 'Service';
-    final lower = complaint.toLowerCase();
     return Job(
       id: j['id'] as String,
       token: int.tryParse(number.split('-').last) ?? ((j['queuePosition'] as num?)?.toInt() ?? 0) + 1,
@@ -177,17 +193,12 @@ class MechanicBackend extends ChangeNotifier {
         'Inspecting' => JobStatus.diagnosing,
         'AwaitingManagerReview' || 'AwaitingCustomerApproval' || 'AwaitingRelease' => JobStatus.awaitingApproval,
         'InProgress' || 'Paused' => JobStatus.inProgress,
+        // "Paused" is shown as in progress with the paused flag set below.
         'Completed' || 'Closed' => JobStatus.completed,
         _ => JobStatus.waiting,
       },
       bay: (j['bayName'] as String?) ?? 'Bay 1',
-      scenario: lower.contains('brake')
-          ? 'brakes'
-          : lower.contains('heat')
-              ? 'overheat'
-              : lower.contains('a/c') || lower.contains('ac ')
-                  ? 'ac'
-                  : 'service',
+      paused: j['status'] == 'Paused',
       priority: switch ((j['priority'] as num?)?.toInt() ?? 0) {
         >= 2 => JobPriority.sos,
         1 => JobPriority.safety,
@@ -221,14 +232,97 @@ class MechanicBackend extends ChangeNotifier {
         : (null, r['reason'] as String?);
   }
 
+  // ------------------------------------------------------------------ FixProof (photos → AI draft → verify → publish)
+
+  /// Turns the server's relative signed preview path (`/api/v1/media/{ref}?exp=&sig=`) into a full URL.
+  /// GET /media/{mediaRef} is open to the signature itself, so no Bearer header is needed for image widgets.
+  static String? absoluteMediaUrl(String? previewUrl) {
+    if (previewUrl == null || previewUrl.isEmpty) return null;
+    if (previewUrl.startsWith('http://') || previewUrl.startsWith('https://')) return previewUrl;
+    return '${FixoraConfig.apiBase}${previewUrl.startsWith('/') ? '' : '/'}$previewUrl';
+  }
+
+  /// Uploads one photo or video of the job. Returns the server's media ref and signed preview URL.
+  Future<({String mediaRef, String? previewUrl})> uploadFixProofMedia(
+    String jobId,
+    List<int> bytes, {
+    required String filename,
+    required String contentType,
+    String phase = 'Before',
+  }) async {
+    final r = await api.postFile(
+      '/mechanic/jobs/$jobId/fixproof/media',
+      field: 'file',
+      bytes: bytes,
+      filename: filename,
+      contentType: contentType,
+      fields: {'phase': phase},
+    ) as Map<String, dynamic>;
+    return (mediaRef: r['mediaRef'] as String, previewUrl: absoluteMediaUrl(r['previewUrl'] as String?));
+  }
+
+  /// Photos and videos already uploaded for this job (MediaUploadResult list).
+  Future<List<Map<String, dynamic>>> listFixProofMedia(String jobId) async =>
+      (await api.get('/mechanic/jobs/$jobId/fixproof/media') as List<dynamic>).cast<Map<String, dynamic>>();
+
+  Future<List<Map<String, dynamic>>> listDrafts(String jobId) async =>
+      (await api.get('/mechanic/jobs/$jobId/fixproof/drafts') as List<dynamic>).cast<Map<String, dynamic>>();
+
+  /// Creates a draft finding. With a transcript the server drafts the words; without one it is a manual entry.
+  Future<Map<String, dynamic>> createDraft(
+    String jobId, {
+    required String component,
+    String? transcript,
+    required String language,
+    required String severity,
+    List<String>? mediaRefs,
+  }) async =>
+      await api.post('/mechanic/jobs/$jobId/fixproof/drafts', body: {
+        'component': component,
+        'transcript': transcript,
+        'language': language,
+        'severity': severity,
+        'mediaRefs': mediaRefs,
+      }) as Map<String, dynamic>;
+
+  Future<Map<String, dynamic>> updateDraft(
+    String jobId,
+    String draftId, {
+    required String component,
+    required String findingEn,
+    required String findingTa,
+    required String recommendationEn,
+    required String recommendationTa,
+    required String severity,
+  }) async =>
+      await api.put('/mechanic/jobs/$jobId/fixproof/drafts/$draftId', body: {
+        'component': component,
+        'findingEn': findingEn,
+        'findingTa': findingTa,
+        'recommendationEn': recommendationEn,
+        'recommendationTa': recommendationTa,
+        'severity': severity,
+      }) as Map<String, dynamic>;
+
+  Future<void> discardDraft(String jobId, String draftId) async {
+    await api.delete('/mechanic/jobs/$jobId/fixproof/drafts/$draftId');
+  }
+
+  /// Verifies a draft and publishes it to the manager and customer.
+  Future<Map<String, dynamic>> confirmDraft(String jobId, String draftId) async =>
+      await api.post('/mechanic/jobs/$jobId/fixproof/drafts/$draftId/confirm') as Map<String, dynamic>;
+
   /// Start / pause / complete etc. (JobActionRequest). The manager and customer follow it live.
   Future<void> jobAction(String jobId, String action, {String? stage, String? message, int? percent}) async {
-    if (!live) return;
+    if (!live || !isServerId(jobId)) return; // sample SOS jobs stay on this phone
     await api.post('/mechanic/jobs/$jobId/actions', body: {'action': action, 'stage': stage, 'message': message, 'percent': percent});
     await refreshJobs();
   }
 
   // ------------------------------------------------------------------ proposals (mechanic → manager)
+
+  /// Real garage-server ids are GUIDs; sample / phone-only ids are not.
+  static bool isServerId(String id) => RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(id);
 
   Future<void> refreshProposals(String jobId) async {
     final list = (await api.get('/mechanic/jobs/$jobId/proposals') as List<dynamic>).cast<Map<String, dynamic>>();
@@ -239,6 +333,11 @@ class MechanicBackend extends ChangeNotifier {
 
   /// Sends the unsent items to the service manager (never straight to the customer).
   Future<void> submitProposal(String jobId, List<RepairItem> items, {String? note}) async {
+    // Jobs made from a sample SOS (JOB-xxxx) exist only on this phone: the server has no such job.
+    if (live && !isServerId(jobId)) {
+      throw ApiException(404, 'sample_job',
+          'This job is only on this phone. Ask the manager for a walk-in job to send a repair proposal.');
+    }
     final p = await api.post('/mechanic/jobs/$jobId/proposals', body: {
       'note': note,
       'items': [
@@ -288,10 +387,71 @@ class MechanicBackend extends ChangeNotifier {
   Future<void> refreshNotifications() async {
     final list = (await api.get('/notifications', query: {'take': '60'}) as List<dynamic>).cast<Map<String, dynamic>>();
     AppServices.notifications.replaceAll(list.map(notificationFrom).toList());
+    await refreshUnreadCount();
+  }
+
+  /// GET /notifications/unread-count: the server's number drives the bell badge.
+  Future<void> refreshUnreadCount() async {
+    if (!live) return;
+    try {
+      final r = await api.get('/notifications/unread-count') as Map<String, dynamic>;
+      AppServices.notifications.setServerUnread((r['count'] as num?)?.toInt() ?? 0);
+    } catch (_) {
+      // Keep the locally counted badge when the call fails.
+    }
+  }
+
+  /// POST /notifications/read-all: the server marks every alert of this user read.
+  Future<void> markAllRead() async {
+    if (!live) return;
+    await api.post('/notifications/read-all');
+    await refreshUnreadCount();
   }
 
   void markRead(String? remoteId) {
-    if (live && remoteId != null) unawaited(api.post('/notifications/$remoteId/read').catchError((Object _) => null));
+    if (live && remoteId != null) {
+      unawaited(
+        api.post('/notifications/$remoteId/read').then((_) => refreshUnreadCount()).catchError((Object _) => null),
+      );
+    }
+  }
+
+  // ------------------------------------------------------------------ push device token
+
+  String? _deviceToken;
+
+  /// POST /devices: registers this phone's push token so the garage can reach it.
+  /// Safe to call before login: the token is kept and sent right after sign-in.
+  Future<void> registerDevice(String token, {String? platform}) async {
+    if (token.isEmpty) return;
+    _deviceToken = token;
+    _devicePlatform = platform ?? _currentPlatform();
+    if (!live) return;
+    await _sendDeviceToken();
+  }
+
+  String _devicePlatform = 'web';
+
+  static String _currentPlatform() {
+    if (kIsWeb) return 'web';
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.iOS:
+        return 'ios';
+      case TargetPlatform.android:
+        return 'android';
+      default:
+        return 'web';
+    }
+  }
+
+  Future<void> _sendDeviceToken() async {
+    final t = _deviceToken;
+    if (t == null) return;
+    try {
+      await api.post('/devices', body: {'token': t, 'platform': _devicePlatform});
+    } catch (e) {
+      debugPrint('POST /devices failed: $e');
+    }
   }
 
   static AppNotification notificationFrom(Map<String, dynamic> n) {
@@ -301,7 +461,7 @@ class MechanicBackend extends ChangeNotifier {
         'proposal' || 'approval' => NotificationKind.approval,
         'sos' => NotificationKind.sos,
         'queue' => NotificationKind.queue,
-        'inventory' => NotificationKind.parts,
+        'inventory' => NotificationKind.job,
         _ => NotificationKind.job,
       },
       title: (n['title'] as String?) ?? '',
@@ -316,8 +476,9 @@ class MechanicBackend extends ChangeNotifier {
   }
 
   Future<void> refreshSos() async {
+    // Only the SOS alerts the garage server routed to this mechanic. Closed (Cancelled) ones are left out.
     final list = (await api.get('/mechanic/sos') as List<dynamic>).cast<Map<String, dynamic>>();
-    AppServices.sos.replaceAll(list.map(sosFrom).toList());
+    AppServices.sos.replaceAll(list.where((s) => s['status'] != 'Cancelled').map(sosFrom).toList());
   }
 
   static SosRequest sosFrom(Map<String, dynamic> s) {
@@ -341,15 +502,12 @@ class MechanicBackend extends ChangeNotifier {
       locationLabel: '${(s['lat'] as num?)?.toStringAsFixed(4)}, ${(s['lng'] as num?)?.toStringAsFixed(4)}',
       lat: (s['lat'] as num?)?.toDouble(),
       lng: (s['lng'] as num?)?.toDouble(),
-      distanceKm: 0,
-      channel: SosChannel.online,
       receivedAt: DateTime.tryParse((s['receivedAt'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
       status: switch (s['status']) {
         'Acknowledged' => SosStatus.accepted,
         'Dispatched' => SosStatus.enRoute,
         'OnSite' => SosStatus.arrived,
         'Resolved' => SosStatus.resolvedOnSite,
-        'Cancelled' => SosStatus.declined,
         _ => SosStatus.pending,
       },
     );
@@ -363,6 +521,13 @@ class MechanicBackend extends ChangeNotifier {
 
   // ------------------------------------------------------------------ realtime
 
+  /// Adds a forwarded change request once; the notification and the realtime event can both bring it.
+  void _upsertForwardedChange(Map<String, dynamic> change) {
+    if (forwardedChanges.any((c) => c['id'] == change['id'])) return;
+    forwardedChanges.add(change);
+    notifyListeners();
+  }
+
   void _wireRealtime() {
     hub.clearHandlers();
     hub.on('notification', (payload) {
@@ -372,8 +537,7 @@ class MechanicBackend extends ChangeNotifier {
       final type = (n['type'] as String?) ?? '';
       final jobId = n['jobId'] as String?;
       if (type == 'change.forwarded' && n['entityId'] is String) {
-        forwardedChanges.add({'id': n['entityId'], 'jobId': jobId, 'body': n['body'], 'title': n['title']});
-        notifyListeners();
+        _upsertForwardedChange({'id': n['entityId'], 'jobId': jobId, 'body': n['body'], 'title': n['title']});
       }
       if (type.startsWith('proposal') || type.startsWith('approval') || type.startsWith('job') || type.startsWith('queue')) {
         unawaited(refreshJobs().catchError((Object _) {}));
@@ -385,6 +549,30 @@ class MechanicBackend extends ChangeNotifier {
       if (payload is Map) _applyProposal(Map<String, dynamic>.from(payload));
     });
     hub.on('sos.updated', (_) => unawaited(refreshSos().catchError((Object _) {})));
+    // The manager moved cars in the workshop queue: positions and ETAs on my cards change.
+    hub.on('queue.updated', (_) => unawaited(refreshJobs().catchError((Object _) {})));
+    // My job card changed (status, bay, ETA, notes) on the manager side: re-read my jobs.
+    hub.on('job.updated', (_) => unawaited(refreshJobs().catchError((Object _) {})));
+    // A customer change request moved on (forwarded to me, acknowledged or declined).
+    hub.on('changeRequest.updated', (payload) {
+      if (payload is! Map) return;
+      final id = payload['id'];
+      if (id is! String) return;
+      switch (payload['status']) {
+        case 'ForwardedToMechanic':
+          final changes = (payload['changes'] as List?)?.join(', ') ?? '';
+          final details = (payload['details'] as String?) ?? '';
+          _upsertForwardedChange({
+            'id': id,
+            'jobId': payload['jobCardId'],
+            'title': 'Change request ${payload['number'] ?? ''}'.trim(),
+            'body': [if (changes.isNotEmpty) changes, if (details.isNotEmpty) details].join(' · '),
+          });
+        case 'Acknowledged' || 'Declined':
+          forwardedChanges.removeWhere((c) => c['id'] == id);
+          notifyListeners();
+      }
+    });
     hub.onConnected(() {
       unawaited(refreshJobs().catchError((Object _) {}));
       unawaited(refreshNotifications().catchError((Object _) {}));

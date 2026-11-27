@@ -3,10 +3,7 @@ class RouteNames {
 
   static const splash = '/';
   static const login = '/login';
-  static const quickLogin = '/quick-login';
-  static const forgotPassword = '/forgot-password';
-  static const register = '/register';
-  static const otpVerification = '/verify-otp';
+  static const loading = '/loading';
   static const acceptInvitation = '/invite/accept';
   static const expiredInvitation = '/invite/expired';
   static const shell = '/home';
@@ -14,11 +11,8 @@ class RouteNames {
   static const inspectionCapture = '/fixproof/capture';
   static const reportReview = '/fixproof/review';
   static const repairProposal = '/jobs/proposal';
-  static const evidencePassport = '/jobs/evidence';
   static const progressUpdate = '/jobs/progress';
   static const sosList = '/sos';
   static const sosDetail = '/sos/details';
   static const notifications = '/notifications';
-  static const passport = '/passport';
-  static const parts = '/parts';
 }

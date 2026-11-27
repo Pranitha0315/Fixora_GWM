@@ -4,20 +4,20 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../home/presentation/screens/home_screen.dart';
 import '../../fixproof/presentation/screens/fixproof_hub_screen.dart';
-import '../../inventory/presentation/inventory_screen.dart';
 import '../../queue_board/presentation/screens/queue_board_screen.dart';
 import '../../notifications/presentation/notifications_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 
-/// Current bottom-nav tab.
-final shellTabProvider = StateProvider<int>((ref) => 0);
+/// Current bottom-nav tab. autoDispose: once the shell leaves the screen (logout or
+/// expired session) the tab resets, so the next sign-in always opens on Home.
+final shellTabProvider = StateProvider.autoDispose<int>((ref) => 0);
 
 /// Floating pill bar — icon above label on every tab.
 /// Light: white bar · orange selected · Dark: black bar · orange selected.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
-  static const home = 0, jobs = 1, fixProof = 2, parts = 3, profile = 4;
+  static const home = 0, jobs = 1, fixProof = 2, profile = 3;
 
   /// Space under scroll content so the last card is not hidden by the pill bar.
   static const contentBottomGap = 28.0;
@@ -30,11 +30,10 @@ class MainShell extends ConsumerWidget {
   static void openAlerts(BuildContext context) =>
       Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()));
 
-  static const _tabs = [
+  static final _tabs = [
     _TabSpec('Home', Icons.home_outlined, Icons.home_rounded),
     _TabSpec('Jobs', Icons.handyman_outlined, Icons.handyman_rounded),
     _TabSpec('Proof', Icons.photo_camera_outlined, Icons.photo_camera_rounded),
-    _TabSpec('Parts', Icons.inventory_2_outlined, Icons.inventory_2_rounded),
     _TabSpec('Profile', Icons.person_outline_rounded, Icons.person_rounded),
   ];
 
@@ -63,7 +62,6 @@ class MainShell extends ConsumerWidget {
             HomeScreen(),
             QueueBoardScreen(asTab: true),
             FixProofHubScreen(),
-            InventoryScreen(),
             ProfileScreen(),
           ],
         ),
