@@ -1,1 +1,434 @@
-<p>job-cards works!</p>
+<section class="jc-page" aria-labelledby="jc-page-title">
+  <header class="jc-header">
+    <div>
+      <h1 id="jc-page-title" class="jc-title">Job Cards</h1>
+      <p class="jc-subtitle">
+        Operational workshop job queue, active bay assignments, and direct links
+        to job detail and FixProof oversight.
+      </p>
+    </div>
+
+    <div class="jc-header-actions">
+      @if (realtimeConnection(); as conn) {
+        @if (!state.accessRevoked()) {
+          <span
+            class="jc-realtime-status"
+            data-testid="jobs-realtime-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            [attr.title]="conn.description"
+          >
+            <fx-status-badge
+              [label]="conn.label"
+              [tone]="realtimeConnectionTone()"
+            />
+          </span>
+          @if (canReconnectRealtime()) {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="jobs-realtime-reconnect-btn"
+              (pressed)="reconnectRealtime()"
+            >
+              Reconnect live updates
+            </fx-button>
+          }
+        }
+      }
+      <a
+        class="jc-nav-link"
+        routerLink="/job-cards/fixproof"
+        data-testid="open-fixproof-oversight-link"
+      >
+        FixProof Oversight
+      </a>
+      @if (state.isListLoading()) {
+        <fx-button
+          variant="outline"
+          size="sm"
+          data-testid="cancel-jobs-btn"
+          (pressed)="cancelListLoad()"
+        >
+          Cancel load
+        </fx-button>
+      } @else {
+        <fx-button
+          variant="primary"
+          size="sm"
+          data-testid="refresh-jobs-btn"
+          [disabled]="state.accessRevoked()"
+          (pressed)="refreshList()"
+        >
+          Refresh queue
+        </fx-button>
+      }
+    </div>
+  </header>
+
+  @if (authFailureMessage(); as authMsg) {
+    <div class="jc-banner-stack" data-testid="jobs-auth-failure-banner">
+      <fx-alert
+        tone="error"
+        title="Access revoked"
+        [message]="authMsg"
+      />
+      @if (state.authFailure() === 'unauthorized') {
+        <div class="jc-reauth-row">
+          <a
+            class="jc-nav-link"
+            routerLink="/login"
+            data-testid="jobs-reauth-login-link"
+          >
+            Sign in again
+          </a>
+        </div>
+      }
+    </div>
+  }
+
+  @if (navigationProtection.hasCurrentSessionNotices()) {
+    <section
+      class="jc-banner-stack"
+      aria-label="Current-session unresolved FixProof notices"
+      data-testid="jobs-session-notices"
+    >
+      <div class="jc-notice-header">
+        <span class="jc-section-label">
+          Current-session unresolved FixProof notices (in memory only)
+        </span>
+        <fx-button
+          variant="ghost"
+          size="sm"
+          data-testid="jobs-dismiss-all-notices-btn"
+          (pressed)="dismissAllSessionNotices()"
+        >
+          Dismiss all notices
+        </fx-button>
+      </div>
+      @for (notice of navigationProtection.currentSessionNotices(); track notice.id) {
+        <fx-alert
+          tone="warning"
+          title="Unresolved FixProof operation in this session"
+          [message]="notice.message + ' Refreshing or dismissing this notice does not prove the server outcome.'"
+          [dismissible]="true"
+          dismissLabel="Dismiss session notice"
+          (dismissed)="dismissSessionNotice(notice.id)"
+        />
+      }
+    </section>
+  }
+
+  <div class="jc-kpi-grid" aria-label="Job Cards summary metrics">
+    <fx-kpi-card
+      label="Loaded Jobs"
+      [value]="totalLoadedCount()"
+      [description]="state.serverFilter().activeOnly ? 'Active jobs filter' : 'All statuses filter'"
+      [loading]="state.isListInitialLoading()"
+      tone="primary"
+    />
+    <fx-kpi-card
+      label="Visible Rows"
+      [value]="state.visibleJobs().length"
+      [description]="state.hasLocalFilters() ? 'Filtered locally' : 'No local filter'"
+      [loading]="state.isListInitialLoading()"
+      tone="info"
+    />
+    <fx-kpi-card
+      label="Awaiting Review / Release"
+      [value]="awaitingReviewCount()"
+      description="Manager attention queue"
+      [loading]="state.isListInitialLoading()"
+      tone="warning"
+    />
+    <fx-kpi-card
+      label="Inspecting / In Progress"
+      [value]="inProgressCount()"
+      description="Active workshop bays"
+      [loading]="state.isListInitialLoading()"
+      tone="success"
+    />
+  </div>
+
+  <fx-card
+    title="Operational Job Queue"
+    [subtitle]="state.isListRefreshing() ? 'Refreshing from server...' : 'Authoritative workshop job cards'"
+    [attr.aria-busy]="state.isListLoading()"
+  >
+    <div class="jc-toolbar" role="region" aria-label="Job Cards filters">
+      <label class="jc-checkbox-field">
+        <input
+          type="checkbox"
+          data-testid="active-only-toggle"
+          [checked]="state.serverFilter().activeOnly"
+          [disabled]="state.accessRevoked()"
+          (change)="onActiveOnlyToggle($event)"
+        />
+        <span>Active jobs only (exclude Completed &amp; Closed)</span>
+      </label>
+
+      <div class="jc-field jc-field--grow">
+        <label for="jc-search">Search loaded jobs</label>
+        <input
+          id="jc-search"
+          type="search"
+          class="jc-control"
+          placeholder="Job #, customer, vehicle, mechanic, bay, complaint..."
+          data-testid="jobs-search-input"
+          [value]="state.localFilter().search"
+          [disabled]="state.accessRevoked()"
+          (input)="onSearchInput($event)"
+        />
+      </div>
+
+      <div class="jc-field">
+        <label for="jc-status-filter">Status</label>
+        <select
+          id="jc-status-filter"
+          class="jc-control"
+          data-testid="jobs-status-select"
+          [value]="state.localFilter().status ?? ''"
+          [disabled]="state.accessRevoked()"
+          (change)="onStatusFilterChange($event)"
+        >
+          <option value="">All loaded statuses</option>
+          @for (status of state.statusOptions(); track status) {
+            <option [value]="status">{{ jobStatusLabel(status) }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="jc-field">
+        <label for="jc-priority-filter">Priority</label>
+        <select
+          id="jc-priority-filter"
+          class="jc-control"
+          data-testid="jobs-priority-select"
+          [value]="state.localFilter().priority ?? ''"
+          [disabled]="state.accessRevoked()"
+          (change)="onPriorityFilterChange($event)"
+        >
+          <option value="">All priorities</option>
+          @for (priority of state.priorityOptions(); track priority) {
+            <option [value]="priority">{{ priorityLabel(priority) }}</option>
+          }
+        </select>
+      </div>
+
+      <form
+        class="jc-customer-filter"
+        (submit)="$event.preventDefault(); applyCustomerIdFilter()"
+      >
+        <div class="jc-field">
+          <label for="jc-customer-id">Customer ID (server filter)</label>
+          <input
+            id="jc-customer-id"
+            type="text"
+            class="jc-control"
+            placeholder="UUID (optional)"
+            data-testid="jobs-customer-id-input"
+            [value]="customerIdDraft()"
+            [disabled]="state.accessRevoked()"
+            (input)="onCustomerIdInput($event)"
+          />
+        </div>
+        <fx-button
+          variant="outline"
+          size="sm"
+          type="submit"
+          data-testid="apply-customer-filter-btn"
+          [disabled]="state.accessRevoked()"
+        >
+          Filter
+        </fx-button>
+        @if (state.serverFilter().customerId !== null || customerIdDraft().trim() !== '') {
+          <fx-button
+            variant="ghost"
+            size="sm"
+            data-testid="clear-customer-filter-btn"
+            [disabled]="state.accessRevoked()"
+            (pressed)="clearCustomerIdFilter()"
+          >
+            Clear
+          </fx-button>
+        }
+      </form>
+
+      @if (state.hasLocalFilters()) {
+        <div class="jc-toolbar-actions">
+          <fx-button
+            variant="ghost"
+            size="sm"
+            data-testid="clear-local-filters-btn"
+            (pressed)="clearLocalFilters()"
+          >
+            Reset local filters
+          </fx-button>
+        </div>
+      }
+    </div>
+
+    @if (state.inputError(); as inputErr) {
+      <div class="jc-alert-gap" data-testid="jobs-input-error">
+        <fx-alert
+          tone="warning"
+          title="Invalid filter input"
+          [message]="inputErr.message"
+        />
+      </div>
+    }
+
+    @if (state.possiblyTruncated()) {
+      <div class="jc-alert-gap" data-testid="jobs-truncation-alert">
+        <fx-alert
+          tone="info"
+          title="Job Cards list may be incomplete"
+          [message]="'Showing up to ' + listLimit + ' jobs (backend cap). Narrow the server filter (Active only or Customer ID) to review specific records.'"
+          [announce]="false"
+        />
+      </div>
+    }
+
+    @if (state.listRefreshError(); as refErr) {
+      <div class="jc-alert-gap" data-testid="jobs-stale-alert">
+        <fx-alert
+          tone="warning"
+          title="Latest refresh failed"
+          [message]="refErr.message + ' Showing previously loaded job cards.'"
+          [announce]="false"
+        />
+      </div>
+    } @else if (state.isListStale()) {
+      <div class="jc-alert-gap" data-testid="jobs-stale-alert">
+        <fx-alert
+          tone="warning"
+          title="Job list may be out of date"
+          message="Refresh the queue to confirm the latest workshop state."
+          [announce]="false"
+        />
+      </div>
+    }
+
+    @switch (state.listViewState()) {
+      @case ('loading') {
+        <fx-loading-state
+          message="Loading job cards..."
+          description="Retrieving authoritative workshop job cards."
+        />
+      }
+      @case ('error') {
+        <fx-error-state
+          title="Unable to load job cards"
+          [description]="state.listError()?.message ?? 'Unable to load workshop job cards.'"
+          [showRetry]="!state.accessRevoked()"
+          (retryRequested)="refreshList()"
+        />
+      }
+      @case ('empty') {
+        <fx-empty-state
+          title="No job cards found"
+          description="No workshop job cards matched the current server filter."
+          icon="inbox"
+          actionLabel="Refresh queue"
+          [actionDisabled]="state.accessRevoked()"
+          (actionRequested)="refreshList()"
+        />
+      }
+      @case ('ready') {
+        @if (state.isFilteredEmpty()) {
+          <fx-empty-state
+            title="No matching job cards"
+            description="Adjust or clear local search, status, and priority filters."
+            icon="search"
+            actionLabel="Reset local filters"
+            (actionRequested)="clearLocalFilters()"
+          />
+        } @else {
+          <div class="jc-table-wrap">
+            <table class="jc-table" aria-label="Operational job cards queue">
+              <thead>
+                <tr>
+                  <th scope="col">Job #</th>
+                  <th scope="col">Customer &amp; Vehicle</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Priority</th>
+                  <th scope="col">Mechanic / Bay</th>
+                  <th scope="col">Queue / ETA</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (job of state.visibleJobs(); track job.id) {
+                  <tr [attr.data-testid]="'job-row-' + job.id">
+                    <td>
+                      <strong>{{ job.number }}</strong>
+                      @if (job.managerNote) {
+                        <div class="jc-note-pill">Staff note</div>
+                      }
+                    </td>
+                    <td>
+                      <div class="jc-primary-cell">{{ job.customerName }}</div>
+                      <div class="jc-secondary-cell">{{ job.vehicleLabel }}</div>
+                      @if (job.complaint) {
+                        <div class="jc-secondary-cell jc-truncate">{{ job.complaint }}</div>
+                      }
+                    </td>
+                    <td>
+                      <fx-status-badge
+                        size="sm"
+                        [tone]="jobStatusTone(job.status)"
+                        [label]="jobStatusLabel(job.status)"
+                      />
+                    </td>
+                    <td>
+                      <fx-status-badge
+                        size="sm"
+                        [tone]="priorityTone(job.priority)"
+                        [label]="priorityLabel(job.priority)"
+                      />
+                    </td>
+                    <td>
+                      <div class="jc-primary-cell">{{ job.mechanicName ?? 'Unassigned' }}</div>
+                      <div class="jc-secondary-cell">{{ job.bayName ?? 'No bay' }}</div>
+                    </td>
+                    <td>
+                      <div class="jc-primary-cell">#{{ job.queuePosition }}</div>
+                      <div class="jc-secondary-cell">
+                        @if (job.etaAt) {
+                          {{ job.etaAt | date: 'short' }}
+                        } @else {
+                          No ETA
+                        }
+                      </div>
+                    </td>
+                    <td>{{ job.createdAt | date: 'short' }}</td>
+                    <td>
+                      <a
+                        class="jc-row-link"
+                        [routerLink]="['/job-cards', job.id]"
+                        [attr.data-testid]="'open-job-detail-' + job.id"
+                        [attr.aria-label]="'Open details for job ' + job.number"
+                      >
+                        View detail
+                      </a>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+      @default {
+        <fx-empty-state
+          title="Job Cards not loaded"
+          description="Refresh to load workshop job cards."
+          actionLabel="Refresh queue"
+          [actionDisabled]="state.accessRevoked()"
+          (actionRequested)="refreshList()"
+        />
+      }
+    }
+  </fx-card>
+</section>

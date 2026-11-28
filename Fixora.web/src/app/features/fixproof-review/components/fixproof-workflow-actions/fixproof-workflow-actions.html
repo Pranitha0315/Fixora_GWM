@@ -1,0 +1,200 @@
+@if (proposal(); as prop) {
+  <section
+    class="fwa-root"
+    aria-label="Proposal workflow actions"
+    data-testid="proposal-workflow-actions"
+  >
+    <h4 class="fwa-title">Proposal workflow actions</h4>
+
+    @if (!mutation.canExecute() && !state.accessRevoked()) {
+      <fx-alert
+        tone="warning"
+        title="Workflow actions locked"
+        message="Resolve or acknowledge any in-flight or uncertain FixProof operation and ensure detail is up to date before submitting another action."
+        [announce]="false"
+      />
+    }
+
+    <div class="fwa-group">
+      <div class="fwa-field">
+        <label [for]="'fwa-prop-forward-note-' + prop.id">
+          Optional manager note (for Forward to customer)
+        </label>
+        <textarea
+          [id]="'fwa-prop-forward-note-' + prop.id"
+          class="fwa-textarea"
+          rows="2"
+          placeholder="Optional note included when forwarding proposal..."
+          data-testid="proposal-forward-note-input"
+          [value]="forwardNoteDraft()"
+          [disabled]="!canForwardProposal()"
+          (input)="onForwardNoteInput($event)"
+        ></textarea>
+      </div>
+
+      <div class="fwa-action-row">
+        <fx-button
+          variant="primary"
+          size="sm"
+          data-testid="forward-proposal-btn"
+          [disabled]="!canForwardProposal()"
+          (pressed)="requestForwardProposal()"
+        >
+          Forward to customer
+        </fx-button>
+      </div>
+    </div>
+
+    <div class="fwa-group">
+      <div class="fwa-field">
+        <label [for]="'fwa-prop-return-reason-' + prop.id">
+          Return reason (required to return proposal to mechanic)
+        </label>
+        <textarea
+          [id]="'fwa-prop-return-reason-' + prop.id"
+          class="fwa-textarea"
+          rows="2"
+          placeholder="Explain why this proposal is being returned to the mechanic..."
+          data-testid="proposal-return-reason-input"
+          [value]="mandatoryReasonDraft()"
+          [disabled]="!canReturnProposal()"
+          [attr.aria-invalid]="mandatoryReasonError() !== null"
+          (input)="onMandatoryReasonInput($event)"
+        ></textarea>
+        @if (mandatoryReasonError(); as err) {
+          <span class="fwa-error" role="alert" data-testid="proposal-return-reason-error">
+            {{ err }}
+          </span>
+        }
+      </div>
+
+      <div class="fwa-action-row">
+        <fx-button
+          variant="outline"
+          size="sm"
+          data-testid="return-proposal-btn"
+          [disabled]="!canReturnProposal()"
+          (pressed)="requestReturnProposal()"
+        >
+          Return to mechanic
+        </fx-button>
+      </div>
+    </div>
+
+    <div class="fwa-group fwa-group--blocked" data-testid="b01-release-gated-box">
+      <div class="fwa-action-row">
+        <fx-button
+          variant="outline"
+          size="sm"
+          data-testid="release-proposal-disabled-btn"
+          [disabled]="true"
+        >
+          Release: Disabled (B-01)
+        </fx-button>
+      </div>
+      <p class="fwa-hint">
+        Live approved-work release is disabled pending backend blocker B-01
+        (clamped stock consumption, zero-stock 400 error, and missing Part
+        concurrency token). The UI never claims inventory was deducted.
+      </p>
+    </div>
+  </section>
+}
+
+@if (changeRequest(); as cr) {
+  <section
+    class="fwa-root"
+    aria-label="Change request workflow actions"
+    data-testid="cr-workflow-actions"
+  >
+    <h4 class="fwa-title">Change request workflow actions</h4>
+
+    @if (!mutation.canExecute() && !state.accessRevoked()) {
+      <fx-alert
+        tone="warning"
+        title="Workflow actions locked"
+        message="Resolve or acknowledge any in-flight or uncertain FixProof operation and ensure detail is up to date before submitting another action."
+        [announce]="false"
+      />
+    }
+
+    <div class="fwa-group">
+      <div class="fwa-field">
+        <label [for]="'fwa-cr-forward-note-' + cr.id">
+          Optional manager note (for Forward to mechanic)
+        </label>
+        <textarea
+          [id]="'fwa-cr-forward-note-' + cr.id"
+          class="fwa-textarea"
+          rows="2"
+          placeholder="Optional note for the mechanic..."
+          data-testid="cr-forward-note-input"
+          [value]="forwardNoteDraft()"
+          [disabled]="!canForwardChangeRequest()"
+          (input)="onForwardNoteInput($event)"
+        ></textarea>
+      </div>
+
+      <div class="fwa-action-row">
+        <fx-button
+          variant="primary"
+          size="sm"
+          data-testid="forward-cr-btn"
+          [disabled]="!canForwardChangeRequest()"
+          (pressed)="requestForwardChangeRequest()"
+        >
+          Forward to mechanic
+        </fx-button>
+      </div>
+    </div>
+
+    <div class="fwa-group">
+      <div class="fwa-field">
+        <label [for]="'fwa-cr-decline-reason-' + cr.id">
+          Decline reason (required to decline change request)
+        </label>
+        <textarea
+          [id]="'fwa-cr-decline-reason-' + cr.id"
+          class="fwa-textarea"
+          rows="2"
+          placeholder="Provide a clear reason for declining this customer change request..."
+          data-testid="cr-decline-reason-input"
+          [value]="mandatoryReasonDraft()"
+          [disabled]="!canDeclineChangeRequest()"
+          [attr.aria-invalid]="mandatoryReasonError() !== null"
+          (input)="onMandatoryReasonInput($event)"
+        ></textarea>
+        @if (mandatoryReasonError(); as err) {
+          <span class="fwa-error" role="alert" data-testid="cr-decline-reason-error">
+            {{ err }}
+          </span>
+        }
+      </div>
+
+      <div class="fwa-action-row">
+        <fx-button
+          variant="danger"
+          size="sm"
+          data-testid="decline-cr-btn"
+          [disabled]="!canDeclineChangeRequest()"
+          (pressed)="requestDeclineChangeRequest()"
+        >
+          Decline change request
+        </fx-button>
+      </div>
+    </div>
+  </section>
+}
+
+<fx-confirmation-dialog
+  dialogId="fixproof-workflow-action-confirm"
+  [open]="pendingConfirmation() !== null"
+  [title]="pendingConfirmation()?.title ?? 'Confirm FixProof action'"
+  [message]="pendingConfirmation()?.message ?? ''"
+  [tone]="pendingConfirmation()?.tone ?? 'primary'"
+  [confirmText]="pendingConfirmation()?.confirmText ?? 'Confirm'"
+  cancelText="Cancel"
+  [busy]="mutation.isBusy()"
+  (confirmed)="confirmWorkflowAction()"
+  (cancelled)="cancelConfirmation()"
+/>
