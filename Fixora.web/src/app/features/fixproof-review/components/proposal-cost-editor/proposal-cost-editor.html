@@ -1,0 +1,202 @@
+@if (proposal(); as prop) {
+  <section
+    class="pce-root"
+    aria-label="Repair proposal cost editor"
+    data-testid="proposal-cost-editor"
+  >
+    <div class="pce-header">
+      <h4 class="pce-title">Repair items &amp; cost editor</h4>
+      <span class="pce-hint">
+        Server totals are authoritative; no item add/remove endpoints exist.
+      </span>
+    </div>
+
+    @if (isPostReleaseBlocked()) {
+      <div class="pce-gap" data-testid="b07-post-release-alert">
+        <fx-alert
+          tone="warning"
+          title="Post-release item revision blocked (B-07)"
+          message="This proposal has been released to the mechanic. Post-release item revision is blocked client-side pending backend inventory reconciliation fix B-07."
+          [announce]="false"
+        />
+      </div>
+    }
+
+    <ul class="pce-list">
+      @for (item of prop.items; track item.id) {
+        @let avail = availabilityFor(item.id);
+        @let isEditing = editingItemId() === item.id;
+        <li class="pce-item" [attr.data-testid]="'cost-item-' + item.id">
+          <div class="pce-item-top">
+            <div>
+              <strong class="pce-item-name">{{ item.title }}</strong>
+              <span class="pce-item-meta">
+                ({{ item.kind }}) &middot; v{{ item.version }}
+              </span>
+            </div>
+            <fx-status-badge
+              size="sm"
+              [tone]="itemStatusTone(item.status)"
+              [label]="item.status"
+            />
+          </div>
+
+          <div class="pce-item-bottom">
+            <span class="pce-amount">
+              {{ item.qty }} &times; {{ formatAmount(item.unitPrice) }} =
+              <strong>{{ formatAmount(item.amount) }}</strong>
+            </span>
+
+            <div class="pce-item-actions">
+              @if (avail?.setPrice?.actionReady) {
+                <fx-button
+                  variant="outline"
+                  size="sm"
+                  [attr.data-testid]="'edit-price-btn-' + item.id"
+                  [disabled]="state.accessRevoked() || !mutation.canExecute() || isEditing"
+                  (pressed)="startEdit(item, 'set-price')"
+                >
+                  Edit price
+                </fx-button>
+              } @else if (avail?.revise?.actionReady) {
+                <fx-button
+                  variant="outline"
+                  size="sm"
+                  [attr.data-testid]="'revise-item-btn-' + item.id"
+                  [disabled]="state.accessRevoked() || !mutation.canExecute() || isEditing"
+                  (pressed)="startEdit(item, 'revise')"
+                >
+                  Revise item
+                </fx-button>
+              } @else if (isItemBlockedPostRelease(item)) {
+                <fx-button
+                  variant="outline"
+                  size="sm"
+                  [disabled]="true"
+                  [attr.data-testid]="'revise-blocked-btn-' + item.id"
+                >
+                  Revise: Blocked (B-07)
+                </fx-button>
+              }
+            </div>
+          </div>
+
+          @if (isEditing && editingMode(); as mode) {
+            <form
+              class="pce-form"
+              [attr.data-testid]="'cost-editor-form-' + item.id"
+              (submit)="$event.preventDefault(); requestSubmitConfirmation()"
+            >
+              <div class="pce-form-grid">
+                <div class="pce-field">
+                  <label [for]="'pce-price-' + item.id">Unit price</label>
+                  <input
+                    [id]="'pce-price-' + item.id"
+                    type="text"
+                    inputmode="decimal"
+                    class="pce-input"
+                    data-testid="cost-unit-price-input"
+                    [value]="unitPriceDraft()"
+                    [disabled]="state.accessRevoked() || !mutation.canExecute()"
+                    [attr.aria-invalid]="unitPriceError() !== null"
+                    (input)="onUnitPriceInput($event)"
+                  />
+                  @if (unitPriceError(); as err) {
+                    <span class="pce-error" role="alert" data-testid="cost-price-error">
+                      {{ err }}
+                    </span>
+                  }
+                </div>
+
+                <div class="pce-field">
+                  <label [for]="'pce-qty-' + item.id">Quantity</label>
+                  <input
+                    [id]="'pce-qty-' + item.id"
+                    type="text"
+                    inputmode="numeric"
+                    class="pce-input"
+                    data-testid="cost-qty-input"
+                    [value]="qtyDraft()"
+                    [disabled]="state.accessRevoked() || !mutation.canExecute()"
+                    [attr.aria-invalid]="qtyError() !== null"
+                    (input)="onQtyInput($event)"
+                  />
+                  @if (qtyError(); as err) {
+                    <span class="pce-error" role="alert" data-testid="cost-qty-error">
+                      {{ err }}
+                    </span>
+                  }
+                </div>
+              </div>
+
+              @if (lineOverflowError(); as overflowErr) {
+                <p class="pce-error" role="alert" data-testid="cost-overflow-error">
+                  {{ overflowErr }}
+                </p>
+              } @else if (calculatedLineAmount(); as lineAmt) {
+                <p class="pce-hint" data-testid="cost-indicative-line-total">
+                  Indicative line total: <strong>{{ lineAmt }}</strong> (server total is authoritative)
+                </p>
+              }
+
+              @if (mode === 'revise' && revisionImpact(); as impact) {
+                @if (impact.ok) {
+                  <div class="pce-impact" data-testid="br-fp-08-impact-preview">
+                    <fx-alert
+                      [tone]="impact.needsRenewedApproval ? 'warning' : 'info'"
+                      [title]="impact.needsRenewedApproval
+                        ? 'Indicative BR-FP-08: Renewed customer approval likely required'
+                        : 'Indicative BR-FP-08: Within 10% revision tolerance'"
+                      [message]="'Current ' + impact.oldAmountFormatted + ' -> Proposed ' + impact.newAmountFormatted + ' (delta ' + impact.deltaFormatted + '). Indicative client check only; backend ProposalDto is authoritative.'"
+                      [announce]="false"
+                    />
+                    @if (impact.triggers.length > 0) {
+                      <ul class="pce-triggers">
+                        @for (trigger of impact.triggers; track trigger) {
+                          <li>{{ triggerLabel(trigger) }}</li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+              }
+
+              <div class="pce-form-actions">
+                <fx-button
+                  variant="primary"
+                  size="sm"
+                  type="submit"
+                  data-testid="cost-submit-btn"
+                  [disabled]="!canSubmitEdit()"
+                >
+                  {{ mode === 'set-price' ? 'Save price' : 'Submit revision' }}
+                </fx-button>
+                <fx-button
+                  variant="ghost"
+                  size="sm"
+                  data-testid="cost-cancel-btn"
+                  (pressed)="cancelEdit()"
+                >
+                  Cancel
+                </fx-button>
+              </div>
+            </form>
+          }
+        </li>
+      }
+    </ul>
+
+    <fx-confirmation-dialog
+      dialogId="fixproof-cost-editor-confirm"
+      [open]="pendingConfirmation() !== null"
+      [title]="pendingConfirmation()?.mode === 'revise' ? 'Confirm item revision' : 'Confirm item price update'"
+      [message]="pendingConfirmation()?.message ?? ''"
+      [tone]="pendingConfirmation()?.mode === 'revise' ? 'warning' : 'primary'"
+      confirmText="Submit update"
+      cancelText="Cancel"
+      [busy]="mutation.isBusy()"
+      (confirmed)="confirmSubmit()"
+      (cancelled)="cancelConfirmation()"
+    />
+  </section>
+}

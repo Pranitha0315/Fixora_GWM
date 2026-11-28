@@ -1,0 +1,1008 @@
+<section class="fp-page" aria-labelledby="fixproof-oversight-heading">
+  <header class="fp-header">
+    <div class="fp-heading">
+      <div class="fp-breadcrumb">
+        <a
+          class="fp-back-link"
+          routerLink="/job-cards"
+          data-testid="back-to-job-cards"
+        >
+          &larr; Back to Job Cards
+        </a>
+      </div>
+      <h1 id="fixproof-oversight-heading">FixProof Oversight</h1>
+      <p class="fp-subtitle">
+        Server-authoritative oversight of repair proposals, customer change
+        requests, and linked inspection context.
+      </p>
+    </div>
+
+    <div class="fp-header-actions">
+      @if (realtimeConnection(); as conn) {
+        @if (!state.accessRevoked()) {
+          <span
+            class="fp-realtime-status"
+            data-testid="fixproof-realtime-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            [attr.title]="conn.description"
+          >
+            <fx-status-badge
+              [label]="conn.label"
+              [tone]="realtimeConnectionTone()"
+            />
+          </span>
+          @if (canReconnectRealtime()) {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="fixproof-realtime-reconnect-btn"
+              (pressed)="reconnectRealtime()"
+            >
+              Reconnect live updates
+            </fx-button>
+          }
+        }
+      }
+      <fx-button
+        data-testid="refresh-all-btn"
+        variant="outline"
+        [disabled]="isAnyListLoading() || state.accessRevoked()"
+        (pressed)="refreshAll()"
+      >
+        Refresh board
+      </fx-button>
+    </div>
+  </header>
+
+  @if (deepLinkNotice(); as dlNotice) {
+    <section
+      class="fp-notices"
+      aria-label="Deep link notice"
+      data-testid="deep-link-notice-banner"
+    >
+      <fx-alert
+        tone="warning"
+        title="Linked record could not be opened"
+        [message]="dlNotice"
+        [dismissible]="true"
+        dismissLabel="Dismiss link notice"
+        (dismissed)="dismissDeepLinkNotice()"
+      />
+    </section>
+  }
+
+  @if (authFailureMessage(); as authMessage) {
+    <section class="fp-auth-banner" aria-label="Authorization notice">
+      <fx-alert
+        tone="error"
+        title="Access revoked"
+        [message]="authMessage"
+      />
+      @if (state.authFailure() === 'unauthorized') {
+        <div class="fp-auth-actions">
+          <a
+            class="fp-reauth-link"
+            routerLink="/login"
+            data-testid="reauth-login-link"
+          >
+            Sign in again
+          </a>
+        </div>
+      }
+    </section>
+  }
+
+  @if (navigationProtection.hasCurrentSessionNotices()) {
+    <section
+      class="fp-notices"
+      aria-label="Unresolved session notices"
+      data-testid="session-notices-section"
+    >
+      <div class="fp-notices-header">
+        <h2>Unresolved session notices</h2>
+        <fx-button
+          variant="ghost"
+          size="sm"
+          data-testid="dismiss-all-notices-btn"
+          (pressed)="dismissAllSessionNotices()"
+        >
+          Dismiss all notices
+        </fx-button>
+      </div>
+      <p class="fp-hint">
+        Dismissing a notice only clears this reminder; it does not prove the
+        server outcome, does not roll back any request, and does not authorize a
+        retry.
+      </p>
+      @for (notice of navigationProtection.currentSessionNotices(); track notice.id) {
+        <fx-alert
+          tone="warning"
+          [title]="notice.action ? 'Unresolved action (' + notice.action + ')' : 'Unresolved FixProof request'"
+          [message]="notice.message"
+          [dismissible]="true"
+          dismissLabel="Dismiss unresolved notice"
+          (dismissed)="dismissSessionNotice(notice.id)"
+        />
+      }
+    </section>
+  }
+
+  @if (showMutationRecoveryPanel()) {
+    <fx-card
+      title="Active FixProof operation status"
+      subtitle="Manual recovery and non-definitive reconciliation controls"
+      data-testid="mutation-recovery-panel"
+    >
+      <div class="fp-recovery-body">
+        <div class="fp-recovery-meta">
+          <fx-status-badge
+            size="sm"
+            [tone]="mutation.hasUnresolvedOperation() || mutation.detachedRequestPending() ? 'warning' : 'info'"
+            [label]="'Phase: ' + mutation.phase()"
+          />
+          @if (mutation.detachedRequestPending()) {
+            <fx-status-badge
+              size="sm"
+              tone="warning"
+              label="Detached request pending"
+            />
+          }
+        </div>
+
+        @if (mutation.result(); as res) {
+          <p class="fp-recovery-message">{{ res.message }}</p>
+        }
+
+        @if (mutation.reconciliation(); as rec) {
+          <p class="fp-hint" data-testid="reconciliation-disclaimer">
+            Reconciliation is read-only and non-definitive; matching server
+            state does not prove whether your request or another actor applied
+            the change.
+          </p>
+          @for (warn of rec.warnings; track warn.code) {
+            <fx-alert
+              tone="warning"
+              [title]="warn.code"
+              [message]="warn.message"
+              [announce]="false"
+            />
+          }
+        }
+
+        <div class="fp-recovery-actions">
+          @if (mutation.phase() === 'validating') {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="cancel-preflight-btn"
+              (pressed)="cancelMutationPreflight()"
+            >
+              Cancel preflight
+            </fx-button>
+          }
+          @if (mutation.phase() === 'submitting') {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="stop-waiting-btn"
+              (pressed)="stopWaitingForMutation()"
+            >
+              Stop waiting
+            </fx-button>
+          }
+          @if (mutation.reconciliation()?.state === 'reading') {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="cancel-reconciliation-btn"
+              (pressed)="cancelMutationReconciliation()"
+            >
+              Cancel reconciliation
+            </fx-button>
+          }
+          @if (mutation.canReconcile()) {
+            <fx-button
+              variant="primary"
+              size="sm"
+              data-testid="reconcile-btn"
+              (pressed)="reconcileMutation()"
+            >
+              Reconcile from server
+            </fx-button>
+          }
+          @if (mutation.requiresAcknowledgement()) {
+            <fx-button
+              variant="secondary"
+              size="sm"
+              data-testid="acknowledge-btn"
+              (pressed)="acknowledgeMutation()"
+            >
+              Acknowledge reviewed state
+            </fx-button>
+          }
+          @if (mutation.phase() === 'succeeded' || mutation.phase() === 'rejected') {
+            <fx-button
+              variant="ghost"
+              size="sm"
+              data-testid="dismiss-outcome-btn"
+              (pressed)="dismissMutationOutcome()"
+            >
+              Dismiss outcome
+            </fx-button>
+          }
+        </div>
+      </div>
+    </fx-card>
+  }
+
+  <div class="fp-kpi-grid" aria-label="Oversight summary">
+    <fx-kpi-card
+      label="Loaded proposals"
+      [value]="state.proposals()?.length ?? 0"
+      [description]="state.possiblyTruncatedProposals() ? 'Capped at 100 records' : 'Current server filter'"
+      [showIcon]="false"
+      [loading]="state.isProposalsInitialLoading()"
+    />
+    <fx-kpi-card
+      label="Pending manager review"
+      tone="warning"
+      [value]="pendingProposalCount()"
+      description="Within loaded proposals"
+      [showIcon]="false"
+      [loading]="state.isProposalsInitialLoading()"
+    />
+    <fx-kpi-card
+      label="Loaded change requests"
+      tone="info"
+      [value]="state.changeRequests()?.length ?? 0"
+      [description]="state.possiblyTruncatedChangeRequests() ? 'Capped at 100 records' : 'Current server filter'"
+      [showIcon]="false"
+      [loading]="state.isChangeRequestsInitialLoading()"
+    />
+    <fx-kpi-card
+      label="Pending change requests"
+      tone="warning"
+      [value]="pendingChangeRequestCount()"
+      description="Within loaded requests"
+      [showIcon]="false"
+      [loading]="state.isChangeRequestsInitialLoading()"
+    />
+  </div>
+
+  <div class="fp-layout">
+    <div class="fp-main-column">
+      <!-- Repair Proposals Oversight -->
+      <fx-card
+        title="Repair proposals"
+        subtitle="Filter by backend status or search loaded proposals"
+        data-testid="proposals-section"
+      >
+        <div class="fp-toolbar">
+          <div class="fp-field">
+            <label for="fp-proposal-server-status">Server status</label>
+            <select
+              id="fp-proposal-server-status"
+              class="fp-control"
+              [value]="state.proposalFilter().status ?? ''"
+              [disabled]="state.accessRevoked()"
+              (change)="onProposalServerStatusChange($event)"
+            >
+              <option value="">All active (excludes Cancelled)</option>
+              @for (status of proposalStatusFilterOptions; track status) {
+                <option [value]="status">{{ proposalStatusLabel(status) }}</option>
+              }
+            </select>
+          </div>
+
+          <div class="fp-field">
+            <label for="fp-proposal-search">Search loaded proposals</label>
+            <input
+              id="fp-proposal-search"
+              type="search"
+              class="fp-control"
+              placeholder="Job #, vehicle, customer, mechanic..."
+              [value]="state.proposalLocalFilters().search"
+              [disabled]="state.accessRevoked()"
+              (input)="onProposalSearchInput($event)"
+            />
+          </div>
+
+          @if (state.proposalStatusOptions().length > 1) {
+            <div class="fp-field">
+              <label for="fp-proposal-local-status">Local status</label>
+              <select
+                id="fp-proposal-local-status"
+                class="fp-control"
+                [value]="state.proposalLocalFilters().status ?? ''"
+                [disabled]="state.accessRevoked()"
+                (change)="onProposalLocalStatusChange($event)"
+              >
+                <option value="">All loaded statuses</option>
+                @for (status of state.proposalStatusOptions(); track status) {
+                  <option [value]="status">{{ proposalStatusLabel(status) }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          <div class="fp-toolbar-actions">
+            @if (state.hasProposalLocalFilters()) {
+              <fx-button
+                variant="ghost"
+                size="sm"
+                data-testid="clear-proposal-filters-btn"
+                (pressed)="clearProposalFilters()"
+              >
+                Clear filters
+              </fx-button>
+            }
+            @if (state.isProposalsLoading()) {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="cancel-proposals-btn"
+                (pressed)="cancelProposalsLoad()"
+              >
+                Cancel load
+              </fx-button>
+            } @else {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="refresh-proposals-btn"
+                [disabled]="state.accessRevoked()"
+                (pressed)="refreshProposals()"
+              >
+                Refresh
+              </fx-button>
+            }
+          </div>
+        </div>
+
+        <div class="fp-meta-bar" role="status">
+          @if (!state.proposalListIncludesCancelled()) {
+            <span class="fp-hint">
+              Cancelled proposals are excluded unless the Cancelled status filter
+              is selected.
+            </span>
+          }
+          @if (state.proposalsLastSyncedAt(); as synced) {
+            <span class="fp-hint">
+              Last synced: {{ synced | date: 'medium' }}
+            </span>
+          }
+          @if (state.isProposalsRefreshing()) {
+            <span class="fp-hint">Refreshing proposals...</span>
+          }
+        </div>
+
+        @if (state.possiblyTruncatedProposals()) {
+          <fx-alert
+            data-testid="proposals-truncation-alert"
+            tone="info"
+            title="Proposal list may be incomplete"
+            [message]="'Showing up to ' + proposalsLimit + ' proposals (backend cap). Narrow the server status filter to inspect older records.'"
+            [announce]="false"
+          />
+        }
+
+        @if (state.proposalsRefreshError(); as refErr) {
+          <fx-alert
+            data-testid="proposals-stale-alert"
+            tone="warning"
+            title="Latest proposal refresh failed"
+            [message]="refErr.message + ' Showing previously loaded data.'"
+            [announce]="false"
+          />
+        } @else if (state.isProposalsStale()) {
+          <fx-alert
+            data-testid="proposals-stale-alert"
+            tone="warning"
+            title="Proposal list may be out of date"
+            message="Refresh proposals to confirm current server state."
+            [announce]="false"
+          />
+        }
+
+        @switch (state.proposalsViewState()) {
+          @case ('loading') {
+            <fx-loading-state
+              message="Loading repair proposals..."
+              description="Retrieving proposals from FixProof approvals."
+            />
+          }
+          @case ('error') {
+            <fx-error-state
+              title="Unable to load repair proposals"
+              [description]="state.proposalsError()?.message ?? 'Unable to load proposals.'"
+              [showRetry]="!state.accessRevoked()"
+              (retryRequested)="refreshProposals()"
+            />
+          }
+          @case ('empty') {
+            <fx-empty-state
+              title="No repair proposals"
+              description="No repair proposals matched the selected server filter."
+              icon="file"
+              actionLabel="Refresh"
+              [actionDisabled]="state.accessRevoked()"
+              (actionRequested)="refreshProposals()"
+            />
+          }
+          @case ('ready') {
+            @if (state.proposalsFilteredEmpty()) {
+              <fx-empty-state
+                title="No matching proposals"
+                description="Adjust or clear local search and status filters."
+                icon="search"
+                actionLabel="Clear filters"
+                (actionRequested)="clearProposalFilters()"
+              />
+            } @else {
+              <div class="fp-table-wrap">
+                <table class="fp-table" aria-label="Repair proposals">
+                  <thead>
+                    <tr>
+                      <th scope="col">Job</th>
+                      <th scope="col">Customer &amp; Vehicle</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Items</th>
+                      <th scope="col">Total</th>
+                      <th scope="col">Submitted</th>
+                      <th scope="col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (proposal of state.visibleProposals(); track proposal.id) {
+                      <tr [class.fp-row-selected]="isSelected('proposal', proposal.id)">
+                        <td>
+                          <strong>{{ proposal.jobNumber }}</strong>
+                        </td>
+                        <td>
+                          <div class="fp-cell-primary">{{ proposal.customerName }}</div>
+                          <div class="fp-cell-secondary">{{ proposal.vehicleLabel }}</div>
+                        </td>
+                        <td>
+                          <fx-status-badge
+                            size="sm"
+                            [tone]="proposalStatusTone(proposal.status)"
+                            [label]="proposalStatusLabel(proposal.status)"
+                          />
+                        </td>
+                        <td>{{ proposal.items.length }}</td>
+                        <td>
+                          <div class="fp-cell-primary">{{ formatAmount(proposal.total) }}</div>
+                          <div class="fp-cell-secondary">
+                            Approved: {{ formatAmount(proposal.approvedTotal) }}
+                          </div>
+                        </td>
+                        <td>{{ proposal.submittedAt | date: 'short' }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="fp-inspect-btn"
+                            [attr.aria-pressed]="isSelected('proposal', proposal.id)"
+                            [disabled]="state.accessRevoked()"
+                            [attr.data-testid]="'inspect-proposal-' + proposal.id"
+                            (click)="selectProposal(proposal.id)"
+                          >
+                            {{ isSelected('proposal', proposal.id) ? 'Selected' : 'Inspect' }}
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+          @default {
+            <fx-empty-state
+              title="Proposals not loaded"
+              description="Refresh to load repair proposals."
+              actionLabel="Refresh"
+              [actionDisabled]="state.accessRevoked()"
+              (actionRequested)="refreshProposals()"
+            />
+          }
+        }
+      </fx-card>
+
+      <!-- Customer Change Requests Oversight -->
+      <fx-card
+        title="Customer change requests"
+        subtitle="Track pending and historical customer change requests"
+        data-testid="change-requests-section"
+      >
+        <div class="fp-toolbar">
+          <label class="fp-checkbox-label" for="fp-cr-pending-only">
+            <input
+              id="fp-cr-pending-only"
+              type="checkbox"
+              [checked]="state.changeRequestFilter().pendingOnly"
+              [disabled]="state.accessRevoked()"
+              (change)="onPendingOnlyToggle($event)"
+            />
+            <span>Pending manager review only</span>
+          </label>
+
+          <div class="fp-field">
+            <label for="fp-cr-search">Search change requests</label>
+            <input
+              id="fp-cr-search"
+              type="search"
+              class="fp-control"
+              placeholder="Job #, request #, details..."
+              [value]="state.changeRequestLocalFilters().search"
+              [disabled]="state.accessRevoked()"
+              (input)="onChangeRequestSearchInput($event)"
+            />
+          </div>
+
+          @if (state.changeRequestStatusOptions().length > 1) {
+            <div class="fp-field">
+              <label for="fp-cr-local-status">Local status</label>
+              <select
+                id="fp-cr-local-status"
+                class="fp-control"
+                [value]="state.changeRequestLocalFilters().status ?? ''"
+                [disabled]="state.accessRevoked()"
+                (change)="onChangeRequestLocalStatusChange($event)"
+              >
+                <option value="">All loaded statuses</option>
+                @for (status of state.changeRequestStatusOptions(); track status) {
+                  <option [value]="status">{{ changeRequestStatusLabel(status) }}</option>
+                }
+              </select>
+            </div>
+          }
+
+          <div class="fp-toolbar-actions">
+            @if (state.hasChangeRequestLocalFilters()) {
+              <fx-button
+                variant="ghost"
+                size="sm"
+                data-testid="clear-cr-filters-btn"
+                (pressed)="clearChangeRequestFilters()"
+              >
+                Clear filters
+              </fx-button>
+            }
+            @if (state.isChangeRequestsLoading()) {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="cancel-cr-btn"
+                (pressed)="cancelChangeRequestsLoad()"
+              >
+                Cancel load
+              </fx-button>
+            } @else {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="refresh-cr-btn"
+                [disabled]="state.accessRevoked()"
+                (pressed)="refreshChangeRequests()"
+              >
+                Refresh
+              </fx-button>
+            }
+          </div>
+        </div>
+
+        @if (state.possiblyTruncatedChangeRequests()) {
+          <fx-alert
+            data-testid="cr-truncation-alert"
+            tone="info"
+            title="Change request list may be incomplete"
+            [message]="'Showing up to ' + changeRequestsLimit + ' change requests (backend cap). Enable Pending only to focus on actionable requests.'"
+            [announce]="false"
+          />
+        }
+
+        @if (state.changeRequestsRefreshError(); as crRefErr) {
+          <fx-alert
+            data-testid="cr-stale-alert"
+            tone="warning"
+            title="Latest change-request refresh failed"
+            [message]="crRefErr.message + ' Showing previously loaded data.'"
+            [announce]="false"
+          />
+        } @else if (state.isChangeRequestsStale()) {
+          <fx-alert
+            data-testid="cr-stale-alert"
+            tone="warning"
+            title="Change request list may be out of date"
+            message="Refresh change requests to confirm current server state."
+            [announce]="false"
+          />
+        }
+
+        @switch (state.changeRequestsViewState()) {
+          @case ('loading') {
+            <fx-loading-state
+              message="Loading change requests..."
+              description="Retrieving customer change requests."
+            />
+          }
+          @case ('error') {
+            <fx-error-state
+              title="Unable to load change requests"
+              [description]="state.changeRequestsError()?.message ?? 'Unable to load change requests.'"
+              [showRetry]="!state.accessRevoked()"
+              (retryRequested)="refreshChangeRequests()"
+            />
+          }
+          @case ('empty') {
+            <fx-empty-state
+              title="No customer change requests"
+              description="No customer change requests matched the selected filter."
+              icon="inbox"
+              actionLabel="Refresh"
+              [actionDisabled]="state.accessRevoked()"
+              (actionRequested)="refreshChangeRequests()"
+            />
+          }
+          @case ('ready') {
+            @if (state.changeRequestsFilteredEmpty()) {
+              <fx-empty-state
+                title="No matching change requests"
+                description="Adjust or clear local search and status filters."
+                icon="search"
+                actionLabel="Clear filters"
+                (actionRequested)="clearChangeRequestFilters()"
+              />
+            } @else {
+              <div class="fp-table-wrap">
+                <table class="fp-table" aria-label="Customer change requests">
+                  <thead>
+                    <tr>
+                      <th scope="col">Request #</th>
+                      <th scope="col">Job</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Details</th>
+                      <th scope="col">Created</th>
+                      <th scope="col">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (cr of state.visibleChangeRequests(); track cr.id) {
+                      <tr [class.fp-row-selected]="isSelected('change-request', cr.id)">
+                        <td><strong>{{ cr.number }}</strong></td>
+                        <td>{{ cr.jobNumber }}</td>
+                        <td>
+                          <fx-status-badge
+                            size="sm"
+                            [tone]="changeRequestStatusTone(cr.status)"
+                            [label]="changeRequestStatusLabel(cr.status)"
+                          />
+                        </td>
+                        <td class="fp-wrap-cell">{{ cr.details }}</td>
+                        <td>{{ cr.createdAt | date: 'short' }}</td>
+                        <td>
+                          <button
+                            type="button"
+                            class="fp-inspect-btn"
+                            [attr.aria-pressed]="isSelected('change-request', cr.id)"
+                            [disabled]="state.accessRevoked()"
+                            [attr.data-testid]="'inspect-cr-' + cr.id"
+                            (click)="selectChangeRequest(cr.id)"
+                          >
+                            {{ isSelected('change-request', cr.id) ? 'Selected' : 'Inspect' }}
+                          </button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+          @default {
+            <fx-empty-state
+              title="Change requests not loaded"
+              description="Refresh to load customer change requests."
+              actionLabel="Refresh"
+              [actionDisabled]="state.accessRevoked()"
+              (actionRequested)="refreshChangeRequests()"
+            />
+          }
+        }
+      </fx-card>
+    </div>
+
+    <!-- Linked Inspection & Authoritative Oversight Context Panel -->
+    <aside class="fp-detail-column" aria-label="Selected FixProof inspection context">
+      <fx-card
+        title="Oversight context"
+        subtitle="Authoritative job detail &amp; linked FixProof findings"
+        data-testid="detail-context-panel"
+      >
+        @if (!state.selected()) {
+          <fx-empty-state
+            title="Select a proposal or change request"
+            description="Choose Inspect on any row to review authoritative job status, pricing diagnostics, audit trail, and linked inspection findings."
+            icon="file"
+            [compact]="true"
+          />
+        } @else {
+          <div class="fp-detail-controls">
+            @if (state.isDetailLoading()) {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="cancel-detail-btn"
+                (pressed)="cancelDetailLoad()"
+              >
+                Cancel detail load
+              </fx-button>
+            } @else {
+              <fx-button
+                variant="outline"
+                size="sm"
+                data-testid="refresh-detail-btn"
+                [disabled]="state.accessRevoked()"
+                (pressed)="refreshDetail()"
+              >
+                Refresh detail
+              </fx-button>
+            }
+            <fx-button
+              variant="ghost"
+              size="sm"
+              data-testid="clear-selection-btn"
+              (pressed)="clearSelection()"
+            >
+              Close
+            </fx-button>
+          </div>
+
+          @if (state.detailRefreshError(); as detRefErr) {
+            <fx-alert
+              data-testid="detail-stale-alert"
+              tone="warning"
+              title="Latest detail refresh failed"
+              [message]="detRefErr.message + ' Authoritative detail may be stale.'"
+              [announce]="false"
+            />
+          } @else if (state.isDetailStale()) {
+            <fx-alert
+              data-testid="detail-stale-alert"
+              tone="warning"
+              title="Authoritative detail may be out of date"
+              message="Refresh detail before relying on action readiness."
+              [announce]="false"
+            />
+          }
+
+          @switch (state.selectionState()) {
+            @case ('loading') {
+              <fx-loading-state
+                message="Loading authoritative job detail..."
+                [compact]="true"
+              />
+            }
+            @case ('error') {
+              <fx-error-state
+                title="Unable to load job detail"
+                [description]="state.detailError()?.message ?? 'Unable to load authoritative job context.'"
+                [showRetry]="!state.accessRevoked()"
+                [compact]="true"
+                (retryRequested)="refreshDetail()"
+              />
+            }
+            @case ('job-not-found') {
+              <fx-alert
+                tone="warning"
+                title="Job not found"
+                message="The associated job card was not found on the server. Refresh the board."
+              />
+            }
+            @case ('entity-missing') {
+              <fx-alert
+                tone="warning"
+                title="Selected record no longer present"
+                message="The selected record was not found in the authoritative job detail. Refresh the board."
+              />
+            }
+            @case ('entity-mismatch') {
+              <fx-alert
+                tone="warning"
+                title="Job reference mismatch"
+                message="The returned job detail does not match the selected record."
+              />
+            }
+            @case ('ready') {
+              @if (state.detail(); as detail) {
+                <div class="fp-detail-section">
+                  <div class="fp-detail-header-row">
+                    <div>
+                      <h3 class="fp-detail-title">{{ detail.job.number }}</h3>
+                      <p class="fp-hint">
+                        {{ detail.job.customerName }} &middot;
+                        {{ detail.job.vehicleLabel }}
+                      </p>
+                    </div>
+                    <fx-status-badge
+                      size="sm"
+                      tone="info"
+                      [label]="'Job: ' + detail.job.status"
+                    />
+                  </div>
+                  <p class="fp-hint">
+                    Authoritative job status comes from job detail, never inferred
+                    from proposal status.
+                    <a
+                      class="fp-inline-link"
+                      [routerLink]="['/job-cards', detail.job.id]"
+                      data-testid="detail-job-cards-link"
+                    >
+                      Open Job Card detail
+                    </a>
+                  </p>
+                </div>
+
+                @if (state.pricingReview(); as review) {
+                  <div class="fp-detail-section" data-testid="proposal-pricing-review">
+                    <h4>Proposal pricing summary</h4>
+                    <p class="fp-hint">
+                      Server total: <strong>{{ review.backendTotalFormatted ?? review.backendTotal }}</strong>
+                      &middot; Approved total:
+                      <strong>{{ review.backendApprovedTotalFormatted ?? review.backendApprovedTotal }}</strong>
+                    </p>
+                    @for (diag of state.pricingDiagnostics(); track diag.code + (diag.itemId ?? '')) {
+                      <fx-alert
+                        tone="warning"
+                        [title]="diag.code"
+                        [message]="diag.message"
+                        [announce]="false"
+                      />
+                    }
+
+                    <app-proposal-cost-editor />
+
+                    @if (state.proposalActions(); as actions) {
+                      <div class="fp-advisory-box" data-testid="proposal-advisory-box">
+                        <p class="fp-hint">
+                          Advisory action readiness (live release remains disabled pending
+                          backend B-01 and post-release revision remains blocked pending B-07):
+                        </p>
+                        <div class="fp-badge-row">
+                          <fx-status-badge
+                            size="sm"
+                            [tone]="actions.forward.actionReady ? 'info' : 'neutral'"
+                            [label]="'Forward: ' + (actions.forward.actionReady ? 'Eligible' : 'Blocked')"
+                          />
+                          <fx-status-badge
+                            size="sm"
+                            [tone]="actions.returnToMechanic.actionReady ? 'info' : 'neutral'"
+                            [label]="'Return: ' + (actions.returnToMechanic.actionReady ? 'Eligible' : 'Blocked')"
+                          />
+                          <fx-status-badge
+                            size="sm"
+                            tone="warning"
+                            label="Release: Disabled (B-01)"
+                          />
+                        </div>
+                      </div>
+                    }
+
+                    <app-fixproof-workflow-actions />
+
+                    @if (state.proposalAudit().length > 0) {
+                      <h4>Approval audit history</h4>
+                      <ul class="fp-compact-list">
+                        @for (entry of state.proposalAudit(); track entry.at + entry.action) {
+                          <li>
+                            <strong>{{ entry.action }}</strong> ({{ entry.actorRole }})
+                            &mdash; {{ entry.at | date: 'short' }}
+                            @if (entry.detail) {
+                              <div class="fp-hint">{{ entry.detail }}</div>
+                            }
+                          </li>
+                        }
+                      </ul>
+                    }
+                  </div>
+                }
+
+                @if (state.selectedChangeRequest(); as cr) {
+                  <div class="fp-detail-section" data-testid="change-request-detail">
+                    <h4>Change request {{ cr.number }}</h4>
+                    <p>{{ cr.details }}</p>
+                    @if (state.changeRequestChanges().length > 0) {
+                      <ul class="fp-compact-list">
+                        @for (change of state.changeRequestChanges(); track change) {
+                          <li>{{ change }}</li>
+                        }
+                      </ul>
+                    }
+                    @if (state.changeRequestActions(); as crActions) {
+                      <div class="fp-badge-row">
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="crActions.forward.actionReady ? 'info' : 'neutral'"
+                          [label]="'Forward: ' + (crActions.forward.actionReady ? 'Eligible' : 'Blocked')"
+                        />
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="crActions.decline.actionReady ? 'info' : 'neutral'"
+                          [label]="'Decline: ' + (crActions.decline.actionReady ? 'Eligible' : 'Blocked')"
+                        />
+                      </div>
+                    }
+                    <app-fixproof-workflow-actions />
+                  </div>
+                }
+
+                <div class="fp-detail-section" data-testid="linked-inspection-findings">
+                  <h4>Linked inspection findings ({{ linkedIssues().length }})</h4>
+                  <fx-alert
+                    data-testid="media-restriction-alert"
+                    tone="info"
+                    title="Inspection media preview restricted"
+                    message="Live inspection media preview and download remain disabled until backend media security hardening (BE-01, BE-02, F-A04-06) is completed."
+                    [announce]="false"
+                  />
+                  @if (linkedIssues().length === 0) {
+                    <p class="fp-hint">No verified inspection findings recorded for this job.</p>
+                  } @else {
+                    <ul class="fp-compact-list">
+                      @for (issue of linkedIssues(); track issue.id) {
+                        <li>
+                          <div class="fp-item-row">
+                            <strong>{{ issue.component }}</strong>
+                            <fx-status-badge
+                              size="sm"
+                              [tone]="issue.severityTone"
+                              [label]="issue.severity"
+                            />
+                          </div>
+                          <div>{{ issue.findingEn }}</div>
+                          @if (issue.findingTa) {
+                            <div class="fp-hint">{{ issue.findingTa }}</div>
+                          }
+                          <div class="fp-hint">
+                            Recommendation: {{ issue.recommendationEn }}
+                          </div>
+                          @if (issue.recommendationTa) {
+                            <div class="fp-hint">{{ issue.recommendationTa }}</div>
+                          }
+                          <div class="fp-hint">
+                            Report v{{ issue.reportVersion }} &middot;
+                            Confirmed {{ issue.confirmedAt | date: 'short' }} &middot;
+                            Attachments: {{ issue.mediaCount }}
+                            @if (issue.mediaCount > 0) {
+                              ({{ issue.validMediaCount }} valid hint,
+                              {{ issue.expiredMediaCount }} expired,
+                              {{ issue.unsupportedOrRejectedCount }} restricted)
+                            }
+                          </div>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+              }
+            }
+          }
+        }
+      </fx-card>
+    </aside>
+  </div>
+
+  <fx-confirmation-dialog
+    dialogId="fixproof-nav-leave-dialog"
+    title="Leave FixProof Oversight?"
+    tone="warning"
+    confirmText="Leave page"
+    cancelText="Stay on page"
+    [open]="navConfirmOpen()"
+    [message]="navConfirmMessage()"
+    (confirmed)="confirmLeaveNavigation()"
+    (cancelled)="cancelLeaveNavigation()"
+  />
+</section>

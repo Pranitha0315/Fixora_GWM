@@ -53,7 +53,7 @@ export const routes: Routes = [
         path: 'job-cards',
         loadChildren: () =>
           import('./features/job-cards/job-cards.routes')
-            .then((m) => m.JOB_CARDS_ROUTES),
+            .then((m) => m.JOB_CARDS_WORKSPACE_ROUTES),
       },
       {
         path: 'adaptive-queue',

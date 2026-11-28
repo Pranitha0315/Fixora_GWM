@@ -1,0 +1,651 @@
+<section class="jcd-page" aria-labelledby="jcd-page-title">
+  <header class="jcd-header">
+    <div>
+      <div class="jcd-breadcrumb">
+        <a
+          class="jcd-link"
+          routerLink="/job-cards"
+          data-testid="back-to-job-cards-link"
+        >
+          &larr; Back to Job Cards
+        </a>
+        <a
+          class="jcd-link"
+          routerLink="/job-cards/fixproof"
+          data-testid="open-fixproof-link"
+        >
+          FixProof Oversight
+        </a>
+      </div>
+      <h1 id="jcd-page-title" class="jcd-title">
+        @if (state.job(); as job) {
+          Job Card {{ job.number }}
+        } @else {
+          Job Card Detail
+        }
+      </h1>
+      <p class="jcd-subtitle">
+        Authoritative job summary, queue status, timeline, verified bilingual
+        inspection findings, invoice summary, and linked FixProof records.
+      </p>
+    </div>
+
+    <div class="jcd-header-actions">
+      @if (realtimeConnection(); as conn) {
+        @if (!state.accessRevoked()) {
+          <span
+            class="jcd-realtime-status"
+            data-testid="detail-realtime-status"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+            [attr.title]="conn.description"
+          >
+            <fx-status-badge
+              [label]="conn.label"
+              [tone]="realtimeConnectionTone()"
+            />
+          </span>
+          @if (canReconnectRealtime()) {
+            <fx-button
+              variant="outline"
+              size="sm"
+              data-testid="detail-realtime-reconnect-btn"
+              (pressed)="reconnectRealtime()"
+            >
+              Reconnect live updates
+            </fx-button>
+          }
+        }
+      }
+      @if (state.isDetailLoading()) {
+        <fx-button
+          variant="outline"
+          size="sm"
+          data-testid="cancel-detail-btn"
+          (pressed)="cancelDetailLoad()"
+        >
+          Cancel load
+        </fx-button>
+      } @else if (state.selectedJobId()) {
+        <fx-button
+          variant="primary"
+          size="sm"
+          data-testid="refresh-detail-btn"
+          [disabled]="state.accessRevoked()"
+          (pressed)="refreshDetail()"
+        >
+          Refresh detail
+        </fx-button>
+      }
+    </div>
+  </header>
+
+  @if (authFailureMessage(); as authMsg) {
+    <div class="jcd-stack" data-testid="detail-auth-failure-banner">
+      <fx-alert tone="error" title="Access revoked" [message]="authMsg" />
+      @if (state.authFailure() === 'unauthorized') {
+        <div>
+          <a
+            class="jcd-link"
+            routerLink="/login"
+            data-testid="detail-reauth-login-link"
+          >
+            Sign in again
+          </a>
+        </div>
+      }
+    </div>
+  }
+
+  @if (navigationProtection.hasCurrentSessionNotices()) {
+    <section
+      class="jcd-stack"
+      aria-label="Current-session unresolved FixProof notices"
+      data-testid="detail-session-notices"
+    >
+      <div class="jcd-row-between">
+        <span class="jcd-hint">
+          Current-session unresolved FixProof notices (in memory only)
+        </span>
+        <fx-button
+          variant="ghost"
+          size="sm"
+          data-testid="detail-dismiss-all-notices-btn"
+          (pressed)="dismissAllSessionNotices()"
+        >
+          Dismiss all notices
+        </fx-button>
+      </div>
+      @for (notice of navigationProtection.currentSessionNotices(); track notice.id) {
+        <fx-alert
+          tone="warning"
+          title="Unresolved FixProof operation in this session"
+          [message]="notice.message + ' Refreshing or dismissing this notice does not prove the server outcome.'"
+          [dismissible]="true"
+          dismissLabel="Dismiss session notice"
+          (dismissed)="dismissSessionNotice(notice.id)"
+        />
+      }
+    </section>
+  }
+
+  @if (state.inputError(); as inputErr) {
+    <fx-error-state
+      data-testid="invalid-job-id-state"
+      title="Invalid job card identifier"
+      [description]="inputErr.message"
+      [showRetry]="false"
+    />
+  } @else {
+    @if (state.detailRefreshError(); as refErr) {
+      <fx-alert
+        data-testid="detail-stale-alert"
+        tone="warning"
+        title="Latest detail refresh failed"
+        [message]="refErr.message + ' Showing previously loaded job detail.'"
+        [announce]="false"
+      />
+    } @else if (state.isDetailStale()) {
+      <fx-alert
+        data-testid="detail-stale-alert"
+        tone="warning"
+        title="Job detail may be out of date"
+        message="Refresh detail to confirm the latest authoritative server state."
+        [announce]="false"
+      />
+    }
+
+    @switch (state.detailViewState()) {
+      @case ('loading') {
+        <fx-loading-state
+          message="Loading job card detail..."
+          description="Retrieving authoritative job summary, inspection findings, proposals, and invoice."
+        />
+      }
+      @case ('not-found') {
+        <fx-empty-state
+          data-testid="job-not-found-state"
+          title="Job card not found"
+          description="The requested job card could not be found on the server. Return to the Job Cards queue to select another record."
+          icon="file"
+        />
+      }
+      @case ('error') {
+        <fx-error-state
+          data-testid="detail-error-state"
+          title="Unable to load job card detail"
+          [description]="state.detailError()?.message ?? 'Unable to retrieve authoritative job detail.'"
+          [showRetry]="!state.accessRevoked()"
+          (retryRequested)="refreshDetail()"
+        />
+      }
+      @case ('ready') {
+        @if (state.job(); as job) {
+          @if (job.managerNote) {
+            <div data-testid="staff-manager-note">
+              <fx-alert
+                tone="info"
+                title="Internal Manager Note (Staff Only)"
+                [message]="job.managerNote"
+                [announce]="false"
+              />
+            </div>
+          }
+
+          <div class="jcd-grid">
+            <fx-card
+              title="Job Summary"
+              [subtitle]="state.isDetailRefreshing() ? 'Refreshing...' : 'Authoritative workshop record'"
+              data-testid="job-summary-card"
+            >
+              <div class="jcd-badge-row">
+                <fx-status-badge
+                  size="sm"
+                  [tone]="jobStatusTone(job.status)"
+                  [label]="jobStatusLabel(job.status)"
+                />
+                <fx-status-badge
+                  size="sm"
+                  [tone]="job.priority <= 1 ? 'danger' : 'warning'"
+                  [label]="'Priority P' + job.priority"
+                />
+              </div>
+
+              <dl class="jcd-dl">
+                <div>
+                  <dt>Customer</dt>
+                  <dd>{{ job.customerName }}</dd>
+                </div>
+                <div>
+                  <dt>Vehicle</dt>
+                  <dd>{{ job.vehicleLabel }}</dd>
+                </div>
+                <div>
+                  <dt>Mechanic</dt>
+                  <dd>{{ job.mechanicName ?? 'Unassigned' }}</dd>
+                </div>
+                <div>
+                  <dt>Bay</dt>
+                  <dd>{{ job.bayName ?? 'No bay assigned' }}</dd>
+                </div>
+                <div>
+                  <dt>Created</dt>
+                  <dd>{{ job.createdAt | date: 'medium' }}</dd>
+                </div>
+                <div>
+                  <dt>Started / Completed</dt>
+                  <dd>
+                    {{ job.startedAt ? (job.startedAt | date: 'short') : 'Not started' }}
+                    /
+                    {{ job.completedAt ? (job.completedAt | date: 'short') : 'In progress' }}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Time (Est. / Elapsed)</dt>
+                  <dd>{{ job.estimatedMinutes }} min / {{ job.elapsedMinutes }} min</dd>
+                </div>
+                @if (job.complaint) {
+                  <div class="jcd-dl-wide">
+                    <dt>Customer complaint</dt>
+                    <dd>{{ job.complaint }}</dd>
+                  </div>
+                }
+              </dl>
+            </fx-card>
+
+            <fx-card
+              title="Queue &amp; ETA"
+              subtitle="Workshop queue position"
+              data-testid="job-queue-card"
+            >
+              @if (state.queue(); as q) {
+                <div class="jcd-badge-row">
+                  <fx-status-badge
+                    size="sm"
+                    tone="primary"
+                    [label]="'Position #' + q.position"
+                  />
+                  <fx-status-badge
+                    size="sm"
+                    tone="info"
+                    [label]="q.status"
+                  />
+                  @if (q.indicative) {
+                    <fx-status-badge
+                      size="sm"
+                      tone="neutral"
+                      label="Indicative ETA"
+                    />
+                  }
+                </div>
+                <p class="jcd-hint">
+                  Estimated completion:
+                  <strong>
+                    @if (q.etaAt) {
+                      {{ q.etaAt | date: 'medium' }}
+                    } @else {
+                      Not scheduled
+                    }
+                  </strong>
+                </p>
+              }
+            </fx-card>
+          </div>
+
+          <!-- Progress Timeline -->
+          <fx-card
+            title="Progress Timeline"
+            [subtitle]="state.timeline().length + ' recorded milestone(s)'"
+            data-testid="job-timeline-card"
+          >
+            @if (state.timeline().length === 0) {
+              <fx-empty-state
+                title="No progress milestones yet"
+                description="Workshop timeline entries will appear as the job progresses."
+                [compact]="true"
+              />
+            } @else {
+              <ol class="jcd-timeline">
+                @for (entry of state.timeline(); track entry.at + entry.stage) {
+                  <li class="jcd-timeline-item">
+                    <div class="jcd-row-between">
+                      <strong>{{ entry.stage }} ({{ entry.percent }}%)</strong>
+                      <span class="jcd-hint">{{ entry.at | date: 'short' }}</span>
+                    </div>
+                    <p class="jcd-body">{{ entry.message }}</p>
+                    <span class="jcd-hint">Actor: {{ entry.actorRole }}</span>
+                  </li>
+                }
+              </ol>
+            }
+          </fx-card>
+
+          <!-- Verified Inspection Issues & Safe Evidence Status -->
+          <fx-card
+            title="Verified Inspection Findings &amp; Evidence Status"
+            [subtitle]="issueViews().length + ' verified finding(s)'"
+            data-testid="job-issues-card"
+          >
+            <div class="jcd-alert-gap" data-testid="detail-media-restriction-alert">
+              <fx-alert
+                tone="info"
+                title="Inspection media preview disabled (Backend BE-01 / BE-02 / F-A04-06)"
+                message="Evidence status is validated through SignedMediaUrlService. Raw signed media URLs are never exposed in the DOM, and live preview/download stays disabled until backend media security blockers are resolved."
+                [announce]="false"
+              />
+            </div>
+
+            @if (state.hasEvidence()) {
+              <div class="jcd-evidence-bar">
+                @if (state.evidenceNeedsRefresh()) {
+                  <fx-status-badge
+                    size="sm"
+                    tone="warning"
+                    label="One or more evidence links expired"
+                  />
+                } @else {
+                  <fx-status-badge
+                    size="sm"
+                    tone="success"
+                    label="Evidence links validated"
+                  />
+                }
+                @if (state.isDetailLoading()) {
+                  <fx-button
+                    variant="outline"
+                    size="sm"
+                    data-testid="cancel-evidence-refresh-btn"
+                    (pressed)="cancelEvidenceRefresh()"
+                  >
+                    Cancel evidence refresh
+                  </fx-button>
+                } @else {
+                  <fx-button
+                    variant="outline"
+                    size="sm"
+                    data-testid="refresh-evidence-btn"
+                    [disabled]="state.accessRevoked()"
+                    (pressed)="refreshEvidence()"
+                  >
+                    Refresh evidence links
+                  </fx-button>
+                }
+              </div>
+            }
+
+            @if (issueViews().length === 0) {
+              <fx-empty-state
+                title="No inspection findings recorded"
+                description="Verified bilingual FixProof findings will appear once inspection completes."
+                [compact]="true"
+              />
+            } @else {
+              <ul class="jcd-list">
+                @for (item of issueViews(); track item.issue.id) {
+                  <li class="jcd-list-item">
+                    <div class="jcd-row-between">
+                      <strong>{{ item.issue.component }}</strong>
+                      <div class="jcd-badge-row">
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="item.severityTone"
+                          [label]="item.issue.severity"
+                        />
+                        <span class="jcd-hint">
+                          v{{ item.issue.reportVersion }} &middot;
+                          {{ item.issue.confirmedAt | date: 'short' }}
+                        </span>
+                      </div>
+                    </div>
+                    <p class="jcd-body"><strong>EN:</strong> {{ item.issue.findingEn }}</p>
+                    <p class="jcd-body"><strong>TA:</strong> {{ item.issue.findingTa }}</p>
+                    <p class="jcd-hint">
+                      <strong>Recommendation (EN):</strong> {{ item.issue.recommendationEn }}
+                    </p>
+                    <p class="jcd-hint">
+                      <strong>Recommendation (TA):</strong> {{ item.issue.recommendationTa }}
+                    </p>
+                    <p class="jcd-hint" [attr.data-testid]="'issue-evidence-' + item.issue.id">
+                      Evidence attachments: {{ item.mediaCount }}
+                      (valid: {{ item.validCount }}, expired: {{ item.expiredCount }},
+                      blocked/unsupported: {{ item.rejectedOrUnsupportedCount }})
+                    </p>
+                  </li>
+                }
+              </ul>
+            }
+          </fx-card>
+
+          <!-- Linked Repair Proposals & Customer Change Requests -->
+          <div class="jcd-grid">
+            <fx-card
+              title="Repair Proposals"
+              [subtitle]="proposalSummaryViews().length + ' linked proposal(s)'"
+              data-testid="job-proposals-card"
+            >
+              @if (proposalSummaryViews().length === 0) {
+                <fx-empty-state
+                  title="No repair proposals"
+                  description="No FixProof repair proposals are linked to this job card yet."
+                  [compact]="true"
+                />
+              } @else {
+                <ul class="jcd-list">
+                  @for (entry of proposalSummaryViews(); track entry.proposal.id) {
+                    @let prop = entry.proposal;
+                    <li class="jcd-list-item" [attr.data-testid]="'detail-proposal-' + prop.id">
+                      <div class="jcd-row-between">
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="proposalStatusTone(prop.status)"
+                          [label]="prop.status"
+                        />
+                        <span class="jcd-hint">
+                          {{ prop.items.length }} item(s) &middot; Total
+                          <strong>{{ formatAmount(prop.total) }}</strong>
+                        </span>
+                      </div>
+                      <p class="jcd-hint">
+                        Approved total: <strong>{{ formatAmount(prop.approvedTotal) }}</strong>
+                        &middot; Audit entries: {{ prop.audit.length }}
+                      </p>
+
+                      @if (prop.items.length > 0) {
+                        <ul class="jcd-list">
+                          @for (item of prop.items; track item.id) {
+                            <li class="jcd-hint">
+                              <strong>{{ item.title }}</strong> ({{ item.kind }}) &mdash;
+                              {{ item.qty }} &times; {{ formatAmount(item.unitPrice) }} =
+                              <strong>{{ formatAmount(item.amount) }}</strong>
+                              [{{ item.status }}, v{{ item.version }}]
+                            </li>
+                          }
+                        </ul>
+                      }
+
+                      <div class="jcd-badge-row">
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="entry.forwardEligible ? 'info' : 'neutral'"
+                          [label]="'Forward: ' + (entry.forwardEligible ? 'Eligible' : 'Blocked')"
+                        />
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="entry.returnEligible ? 'info' : 'neutral'"
+                          [label]="'Return: ' + (entry.returnEligible ? 'Eligible' : 'Blocked')"
+                        />
+                        <fx-status-badge
+                          size="sm"
+                          tone="warning"
+                          label="Release: Disabled (B-01)"
+                        />
+                        @if (entry.isReleasedPostBlock) {
+                          <fx-status-badge
+                            size="sm"
+                            tone="warning"
+                            label="Revise: Blocked (B-07)"
+                          />
+                        }
+                      </div>
+
+                      <div class="jcd-row-actions">
+                        <a
+                          class="jcd-link"
+                          routerLink="/job-cards/fixproof"
+                          [queryParams]="{ proposalId: prop.id }"
+                          [attr.data-testid]="'open-proposal-workflow-' + prop.id"
+                        >
+                          Open in FixProof Workflow
+                        </a>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </fx-card>
+
+            <fx-card
+              title="Customer Change Requests"
+              [subtitle]="changeRequestSummaryViews().length + ' linked request(s)'"
+              data-testid="job-change-requests-card"
+            >
+              @if (changeRequestSummaryViews().length === 0) {
+                <fx-empty-state
+                  title="No customer change requests"
+                  description="No customer change requests have been submitted for this job."
+                  [compact]="true"
+                />
+              } @else {
+                <ul class="jcd-list">
+                  @for (entry of changeRequestSummaryViews(); track entry.changeRequest.id) {
+                    @let cr = entry.changeRequest;
+                    <li class="jcd-list-item" [attr.data-testid]="'detail-cr-' + cr.id">
+                      <div class="jcd-row-between">
+                        <strong>{{ cr.number }}</strong>
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="changeRequestStatusTone(cr.status)"
+                          [label]="cr.status"
+                        />
+                      </div>
+                      <p class="jcd-body">{{ cr.details }}</p>
+                      <div class="jcd-badge-row">
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="entry.forwardEligible ? 'info' : 'neutral'"
+                          [label]="'Forward: ' + (entry.forwardEligible ? 'Eligible' : 'Blocked')"
+                        />
+                        <fx-status-badge
+                          size="sm"
+                          [tone]="entry.declineEligible ? 'info' : 'neutral'"
+                          [label]="'Decline: ' + (entry.declineEligible ? 'Eligible' : 'Blocked')"
+                        />
+                      </div>
+                      <div class="jcd-row-actions">
+                        <a
+                          class="jcd-link"
+                          routerLink="/job-cards/fixproof"
+                          [queryParams]="{ changeRequestId: cr.id }"
+                          [attr.data-testid]="'open-cr-workflow-' + cr.id"
+                        >
+                          Review in FixProof Workflow
+                        </a>
+                      </div>
+                    </li>
+                  }
+                </ul>
+              }
+            </fx-card>
+          </div>
+
+          <!-- Read-Only Invoice Summary -->
+          <fx-card
+            title="Invoice Summary (Read-Only)"
+            subtitle="Authoritative billing totals"
+            data-testid="job-invoice-card"
+          >
+            @if (state.invoice(); as inv) {
+              <div class="jcd-row-between jcd-alert-gap">
+                <div>
+                  <strong>Invoice {{ inv.number }}</strong>
+                  <span class="jcd-hint">
+                    &middot; Issued {{ inv.issuedAt | date: 'short' }}
+                    @if (inv.paidAt) {
+                      &middot; Paid {{ inv.paidAt | date: 'short' }}
+                    }
+                    @if (inv.paymentMethod) {
+                      &middot; {{ inv.paymentMethod }}
+                    }
+                  </span>
+                </div>
+                <fx-status-badge
+                  size="sm"
+                  [tone]="invoiceStatusTone(inv.status)"
+                  [label]="inv.status"
+                />
+              </div>
+
+              @if (inv.lines.length > 0) {
+                <div class="jcd-table-wrap">
+                  <table class="jcd-table" aria-label="Invoice line items">
+                    <thead>
+                      <tr>
+                        <th scope="col">Description</th>
+                        <th scope="col">Qty</th>
+                        <th scope="col">Unit Price</th>
+                        <th scope="col">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (line of inv.lines; track $index) {
+                        <tr>
+                          <td>{{ line.description }}</td>
+                          <td>{{ line.qty }}</td>
+                          <td>{{ formatAmount(line.unitPrice) }}</td>
+                          <td><strong>{{ formatAmount(line.amount) }}</strong></td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+
+              <dl class="jcd-invoice-totals">
+                <div>
+                  <dt>Subtotal</dt>
+                  <dd>{{ formatAmount(inv.subtotal) }}</dd>
+                </div>
+                <div>
+                  <dt>Tax</dt>
+                  <dd>{{ formatAmount(inv.tax) }}</dd>
+                </div>
+                <div>
+                  <dt>Loyalty discount</dt>
+                  <dd>{{ formatAmount(inv.loyaltyDiscount) }}</dd>
+                </div>
+                <div>
+                  <dt>Total</dt>
+                  <dd><strong>{{ formatAmount(inv.total) }}</strong></dd>
+                </div>
+              </dl>
+            } @else {
+              <fx-empty-state
+                title="No invoice issued"
+                description="An invoice has not been generated for this job card yet."
+                [compact]="true"
+              />
+            }
+          </fx-card>
+        }
+      }
+      @default {
+        <fx-empty-state
+          title="Select a job card"
+          description="Choose a job card from the operational queue to inspect its authoritative detail."
+          [compact]="true"
+        />
+      }
+    }
+  }
+</section>
